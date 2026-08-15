@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-auth";
+import { requireAuth, requireInternalAuth } from "@/lib/api-auth";
 import { isKomunikaConfigured } from "@/lib/services/komunika";
 
 export const runtime = "nodejs";
@@ -8,9 +8,21 @@ const baseUrl = () =>
   (process.env.KOMUNIKA_BASE_URL ?? "https://api.komunika.site/api/v1").replace(/\/+$/, "");
 
 // Registra (ou atualiza) o endpoint de webhook da Komunika apontando para /api/webhooks/komunika
+// Aceita autenticação via cookie de sessão OU via Bearer token (INTERNAL_API_TOKEN)
 export async function POST(request: NextRequest) {
-  const authError = requireAuth(request);
-  if (authError) return authError;
+  const hasInternalToken = Boolean(process.env.INTERNAL_API_TOKEN);
+  if (hasInternalToken) {
+    const internalAuthError = requireInternalAuth(request);
+    if (!internalAuthError) {
+      // autenticou via INTERNAL_API_TOKEN — segue
+    } else {
+      const sessionAuthError = requireAuth(request);
+      if (sessionAuthError) return sessionAuthError;
+    }
+  } else {
+    const sessionAuthError = requireAuth(request);
+    if (sessionAuthError) return sessionAuthError;
+  }
   if (!isKomunikaConfigured()) {
     return NextResponse.json({ ok: false, error: "Komunika não configurado." }, { status: 400 });
   }
@@ -52,20 +64,7 @@ export async function POST(request: NextRequest) {
     endpointId = createdBody.id;
 
     if (createdBody.secret) {
-      const fs = await import("node:fs");
-      const path = await import("node:path");
-      const envPath = path.join(process.cwd(), ".env");
-      try {
-        let env = fs.readFileSync(envPath, "utf8");
-        if (new RegExp("^KOMUNIKA_WEBHOOK_SECRET=", "m").test(env)) {
-          env = env.replace(/^KOMUNIKA_WEBHOOK_SECRET=.*$/m, `KOMUNIKA_WEBHOOK_SECRET=${createdBody.secret}`);
-        } else {
-          env += `\nKOMUNIKA_WEBHOOK_SECRET=${createdBody.secret}\n`;
-        }
-        fs.writeFileSync(envPath, env, "utf8");
-      } catch {
-        // falha ao atualizar o .env não impede o registro do webhook
-      }
+      console.log(`[komunika/setup] Novo webhook secret recebido. Atualize KOMUNIKA_WEBHOOK_SECRET nas variáveis de ambiente da Vercel.`);
     }
 
     return NextResponse.json({ ok: true, endpointId, url: webhookPath });

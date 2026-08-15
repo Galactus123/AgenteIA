@@ -3,7 +3,8 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { hashSync } from "bcryptjs";
 
-const dataDir = path.join(process.cwd(), "data");
+const isVercel = Boolean(process.env.VERCEL);
+const dataDir = isVercel ? "/tmp" : path.join(process.cwd(), "data");
 mkdirSync(dataDir, { recursive: true });
 
 export const db = new DatabaseSync(path.join(dataDir, "saudesync.db"));
