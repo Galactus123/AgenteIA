@@ -1,0 +1,26 @@
+▲ Next.js 16.2.12 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://10.45.95.171:3000
+- Environments: .env.local, .env
+✓ Ready in 1790ms
+
+ POST /api/auth/login 200 in 2.7s (next.js: 2.3s, application-code: 428ms)
+ POST /api/auth/login 400 in 48ms (next.js: 18ms, application-code: 30ms)
+ POST /api/auth/login 200 in 277ms (next.js: 16ms, application-code: 262ms)
+ POST /api/integrations/komunika/setup 200 in 2.9s (next.js: 198ms, application-code: 2.7s)
+  Reload env: .env
+ POST /api/webhooks/komunika 401 in 297ms (next.js: 245ms, application-code: 53ms)
+ POST /api/webhooks/komunika 401 in 43ms (next.js: 17ms, application-code: 26ms)
+ POST /api/webhooks/komunika 401 in 39ms (next.js: 12ms, application-code: 27ms)
+ POST /api/webhooks/komunika 401 in 38ms (next.js: 11ms, application-code: 27ms)
+ POST /api/webhooks/komunika 401 in 57ms (next.js: 19ms, application-code: 37ms)
+ POST /api/webhooks/komunika 401 in 42ms (next.js: 14ms, application-code: 28ms)
+ POST /api/webhooks/komunika 401 in 37ms (next.js: 13ms, application-code: 24ms)
+ POST /api/webhooks/komunika 401 in 38ms (next.js: 12ms, application-code: 25ms)
+ POST /api/webhooks/komunika 401 in 37ms (next.js: 11ms, application-code: 26ms)
+ POST /api/webhooks/komunika 401 in 39ms (next.js: 13ms, application-code: 26ms)
+ POST /api/webhooks/komunika 401 in 209ms (next.js: 174ms, application-code: 36ms)
+ POST /api/webhooks/komunika 401 in 224ms (next.js: 182ms, application-code: 42ms)
+ POST /api/test-debug 200 in 829ms (next.js: 790ms, application-code: 39ms)
+ POST /login 200 in 1558ms (next.js: 625ms, proxy.ts: 28ms, application-code: 905ms)
+^C
