@@ -18,6 +18,17 @@ const HUMAN_TRANSFER_NOTICE =
 //
 // Responde 200 imediatamente e processa em segundo plano (via `after`) para não
 // estourar o timeout do webhook, que pode desativar o endpoint após erros repetidos.
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, x-komunika-signature",
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   const rawBody = await request.text().catch(() => "");
   const signature = request.headers.get("x-komunika-signature");
