@@ -76,7 +76,8 @@ export async function sendKomunikaMessage(
       );
       return { ok: false, status: res.status, error: body?.message ?? body?.error ?? res.statusText, rawBody: body };
     }
-    return { ok: true, status: res.status, messageId: body?.messageId };
+    console.log(`[komunika] Mensagem enviada com sucesso: status=${res.status} messageId=${body?.messageId}`);
+    return { ok: true, status: res.status, messageId: body?.messageId, rawBody: body };
   } catch (err) {
     console.error(`[komunika] Exceção ao enviar mensagem:`, err);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };

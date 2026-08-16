@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { after } from "next/server";
 import { handlePatientMessage } from "@/lib/agent/agent";
 import {
   parseKomunikaInbound,
@@ -49,36 +48,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, ignored: true });
   }
 
-  after(async () => {
-    try {
-      const result = await handlePatientMessage(inbound.phone, inbound.text);
+  // Processa tudo ANTES de retornar — evita que o serverless encerre antes do fetch
+  try {
+    const result = await handlePatientMessage(inbound.phone, inbound.text);
 
-      if (result.reply) {
-        const cleanReply = cleanResponseText(result.reply);
-        if (!cleanReply) {
-          console.error(`[webhook] Resposta da IA ficou vazia após limpeza para phone=${inbound.phone}`);
-          return;
-        }
-        const sendResult = await sendKomunikaMessage(inbound.phone, cleanReply, { type: "text" });
-        if (!sendResult.ok) {
-          console.error(
-            `[webhook] Falha ao enviar resposta para ${inbound.phone}: status=${sendResult.status} error=${sendResult.error} rawBody=${JSON.stringify(sendResult.rawBody)}`
-          );
-        }
+    if (result.reply) {
+      const cleanReply = cleanResponseText(result.reply);
+      if (!cleanReply) {
+        console.error(`[webhook] Resposta da IA vazia após limpeza para phone=${inbound.phone}`);
+        return NextResponse.json({ received: true, error: "empty_reply" });
       }
-
-      if (result.transferred) {
-        const transferResult = await sendKomunikaMessage(inbound.phone, HUMAN_TRANSFER_NOTICE, { type: "text" });
-        if (!transferResult.ok) {
-          console.error(
-            `[webhook] Falha ao enviar aviso de transferência para ${inbound.phone}: status=${transferResult.status} error=${transferResult.error}`
-          );
-        }
+      const sendResult = await sendKomunikaMessage(inbound.phone, cleanReply, { type: "text" });
+      console.log("[webhook] Status Komunika:", sendResult.status);
+      console.log("[webhook] Body Komunika:", JSON.stringify(sendResult.rawBody ?? { messageId: sendResult.messageId }));
+      if (!sendResult.ok) {
+        console.error(
+          `[webhook] Falha ao enviar resposta para ${inbound.phone}: status=${sendResult.status} error=${sendResult.error}`
+        );
       }
-    } catch (err) {
-      console.error(`[webhook] Erro ao processar mensagem de ${inbound.phone}:`, err);
     }
-  });
+
+    if (result.transferred) {
+      const transferResult = await sendKomunikaMessage(inbound.phone, HUMAN_TRANSFER_NOTICE, { type: "text" });
+      console.log("[webhook] Status Komunika (transfer):", transferResult.status);
+      console.log("[webhook] Body Komunika (transfer):", JSON.stringify(transferResult.rawBody ?? { messageId: transferResult.messageId }));
+    }
+  } catch (err) {
+    console.error(`[webhook] Erro ao processar mensagem de ${inbound.phone}:`, err);
+  }
 
   return NextResponse.json({ received: true });
 }
