@@ -5,6 +5,7 @@ import {
   parseKomunikaInbound,
   sendKomunikaMessage,
   verifyKomunikaSignature,
+  cleanResponseText,
 } from "@/lib/services/komunika";
 
 export const runtime = "nodejs";
@@ -13,11 +14,6 @@ export const dynamic = "force-dynamic";
 const HUMAN_TRANSFER_NOTICE =
   "Se preferir falar com um atendente agora, a recepcionista vai te atender em breve. Obrigado pela paciência!";
 
-// Escuta eventos de mensagens recebidas da Komunika, processa com o agente de IA
-// e envia a resposta de volta ao WhatsApp.
-//
-// Responde 200 imediatamente e processa em segundo plano (via `after`) para não
-// estourar o timeout do webhook, que pode desativar o endpoint após erros repetidos.
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
@@ -56,16 +52,27 @@ export async function POST(request: NextRequest) {
   after(async () => {
     try {
       const result = await handlePatientMessage(inbound.phone, inbound.text);
+
       if (result.reply) {
-        const sendResult = await sendKomunikaMessage(inbound.phone, result.reply, { type: "text" });
+        const cleanReply = cleanResponseText(result.reply);
+        if (!cleanReply) {
+          console.error(`[webhook] Resposta da IA ficou vazia após limpeza para phone=${inbound.phone}`);
+          return;
+        }
+        const sendResult = await sendKomunikaMessage(inbound.phone, cleanReply, { type: "text" });
         if (!sendResult.ok) {
-          console.error(`[webhook] Falha ao enviar resposta para ${inbound.phone}: ${sendResult.error} (status=${sendResult.status})`);
+          console.error(
+            `[webhook] Falha ao enviar resposta para ${inbound.phone}: status=${sendResult.status} error=${sendResult.error} rawBody=${JSON.stringify(sendResult.rawBody)}`
+          );
         }
       }
+
       if (result.transferred) {
         const transferResult = await sendKomunikaMessage(inbound.phone, HUMAN_TRANSFER_NOTICE, { type: "text" });
         if (!transferResult.ok) {
-          console.error(`[webhook] Falha ao enviar aviso de transferência para ${inbound.phone}: ${transferResult.error}`);
+          console.error(
+            `[webhook] Falha ao enviar aviso de transferência para ${inbound.phone}: status=${transferResult.status} error=${transferResult.error}`
+          );
         }
       }
     } catch (err) {

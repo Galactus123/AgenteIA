@@ -9,11 +9,38 @@ export function isKomunikaConfigured(): boolean {
   return Boolean(token && instanceId);
 }
 
+// Remove formatações Markdown e caracteres especiais que podem quebrar o JSON enviado à Komunika
+export function cleanResponseText(text: string): string {
+  return text
+    // Remove bold/italic Markdown
+    .replace(/\*{1,3}([^*]+)\*{1,3}/g, "$1")
+    // Remove inline code
+    .replace(/`([^`]+)`/g, "$1")
+    // Remove headers Markdown
+    .replace(/^#{1,6}\s+/gm, "")
+    // Remove links Markdown, mantendo o texto
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    // Remove listas Markdown
+    .replace(/^[\s]*[-*+]\s+/gm, "")
+    // Remove listas numeradas
+    .replace(/^[\s]*\d+\.\s+/gm, "")
+    // Remove blockquotes
+    .replace(/^>\s+/gm, "")
+    // Remove separadores
+    .replace(/^[-*_]{3,}\s*$/gm, "")
+    // Remove quebras de linha excessivas (máx 2)
+    .replace(/\n{3,}/g, "\n\n")
+    // Remove caracteres de controle perigosos (exceto \n e \r)
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "")
+    .trim();
+}
+
 export interface KomunikaSendResult {
   ok: boolean;
   status?: number;
   messageId?: string;
   error?: string;
+  rawBody?: unknown;
 }
 
 export async function sendKomunikaMessage(
@@ -44,8 +71,10 @@ export async function sendKomunikaMessage(
       error?: string;
     } | null;
     if (!res.ok) {
-      console.error(`[komunika] Erro ao enviar mensagem: status=${res.status} erro=${body?.message ?? body?.error ?? res.statusText}`);
-      return { ok: false, status: res.status, error: body?.message ?? body?.error ?? res.statusText };
+      console.error(
+        `[komunika] Erro ao enviar mensagem: status=${res.status} body=${JSON.stringify(body)} texto=${content.slice(0, 100)}`
+      );
+      return { ok: false, status: res.status, error: body?.message ?? body?.error ?? res.statusText, rawBody: body };
     }
     return { ok: true, status: res.status, messageId: body?.messageId };
   } catch (err) {
