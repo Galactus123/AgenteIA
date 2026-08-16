@@ -57,13 +57,19 @@ export async function POST(request: NextRequest) {
     try {
       const result = await handlePatientMessage(inbound.phone, inbound.text);
       if (result.reply) {
-        await sendKomunikaMessage(inbound.phone, result.reply, { type: "text" });
+        const sendResult = await sendKomunikaMessage(inbound.phone, result.reply, { type: "text" });
+        if (!sendResult.ok) {
+          console.error(`[webhook] Falha ao enviar resposta para ${inbound.phone}: ${sendResult.error} (status=${sendResult.status})`);
+        }
       }
       if (result.transferred) {
-        await sendKomunikaMessage(inbound.phone, HUMAN_TRANSFER_NOTICE, { type: "text" });
+        const transferResult = await sendKomunikaMessage(inbound.phone, HUMAN_TRANSFER_NOTICE, { type: "text" });
+        if (!transferResult.ok) {
+          console.error(`[webhook] Falha ao enviar aviso de transferência para ${inbound.phone}: ${transferResult.error}`);
+        }
       }
-    } catch {
-      // o webhook já respondeu 200; não deixa o erro derrubar o processo
+    } catch (err) {
+      console.error(`[webhook] Erro ao processar mensagem de ${inbound.phone}:`, err);
     }
   });
 

@@ -44,10 +44,12 @@ export async function sendKomunikaMessage(
       error?: string;
     } | null;
     if (!res.ok) {
+      console.error(`[komunika] Erro ao enviar mensagem: status=${res.status} erro=${body?.message ?? body?.error ?? res.statusText}`);
       return { ok: false, status: res.status, error: body?.message ?? body?.error ?? res.statusText };
     }
     return { ok: true, status: res.status, messageId: body?.messageId };
   } catch (err) {
+    console.error(`[komunika] Exceção ao enviar mensagem:`, err);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
@@ -71,8 +73,15 @@ export interface KomunikaInboundMessage {
 
 // Aceita os formatos de payload mais comuns (`data.text` / `data.message.content`,
 // ou um body plano com `phone`/`from` + `text`/`content`).
+// Retorna null se a mensagem foi enviada pelo próprio bot (fromMe) para evitar loops.
 export function parseKomunikaInbound(body: Record<string, unknown>): KomunikaInboundMessage | null {
   const data = (body.data ?? body) as Record<string, unknown>;
+
+  // Ignora mensagens enviadas pelo próprio bot — evita loop infinito
+  if (data.fromMe === true || data.fromMe === "true" || body.fromMe === true || body.fromMe === "true") {
+    return null;
+  }
+
   const text = String(
     data.text ??
       extractMessageText(data.message ?? data.payload ?? data) ??
