@@ -26,10 +26,10 @@ function sign(payload: string): string {
   return createHmac("sha256", SESSION_SECRET).update(payload).digest("base64url");
 }
 
-export function verifyPassword(username: string, password: string): boolean {
-  const admin = db.prepare("SELECT password_hash FROM admins WHERE username = ?").get(username) as
-    | { password_hash: string }
-    | undefined;
+export function verifyPassword(identifier: string, password: string): boolean {
+  const admin = db
+    .prepare("SELECT password_hash FROM admins WHERE username = ? OR email = ?")
+    .get(identifier, identifier) as { password_hash: string } | undefined;
   if (!admin) return false;
   try {
     return compareSync(password, admin.password_hash);
@@ -38,10 +38,10 @@ export function verifyPassword(username: string, password: string): boolean {
   }
 }
 
-export function getAdminByUsername(username: string): { id: number; role: AdminRole } | null {
-  const admin = db.prepare("SELECT id, role FROM admins WHERE username = ?").get(username) as
-    | { id: number; role: string }
-    | undefined;
+export function getAdminByIdentifier(identifier: string): { id: number; role: AdminRole } | null {
+  const admin = db
+    .prepare("SELECT id, role FROM admins WHERE username = ? OR email = ?")
+    .get(identifier, identifier) as { id: number; role: string } | undefined;
   if (!admin) return null;
   return { id: admin.id, role: (admin.role as AdminRole) || "admin" };
 }

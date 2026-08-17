@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyPassword, createSessionToken, authCookie, getAdminByUsername } from "@/lib/auth";
+import { verifyPassword, createSessionToken, authCookie, getAdminByIdentifier } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { hashSync } from "bcryptjs";
 
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   if (!verifyPassword(username, password)) {
     return NextResponse.json({ error: "Credenciais inválidas." }, { status: 401 });
   }
-  const admin = getAdminByUsername(username);
+  const admin = getAdminByIdentifier(username);
   if (!admin) {
     return NextResponse.json({ error: "Credenciais inválidas." }, { status: 401 });
   }

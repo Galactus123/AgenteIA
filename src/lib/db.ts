@@ -280,8 +280,14 @@ function seed() {
 }
 
 migrate();
-try {
-  seed();
-} catch {
-  // se já foi populado por outro processo concorrente, ignora
+// Durante o build (next build), os workers coletam dados das rotas em paralelo e o
+// seed usa uma transação de escrita (BEGIN IMMEDIATE) — isso causa "database is locked"
+// quando vários processos tentam popular o mesmo arquivo ao mesmo tempo.
+// O seed é executado apenas em tempo de execução.
+if (process.env.NEXT_PHASE !== "phase-production-build") {
+  try {
+    seed();
+  } catch {
+    // se já foi populado por outro processo concorrente, ignora
+  }
 }
