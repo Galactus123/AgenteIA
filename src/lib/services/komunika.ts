@@ -221,10 +221,12 @@ export function parseKomunikaInbound(body: Record<string, unknown>): KomunikaInb
       ""
   ).trim();
 
+   // Prioriza o remetente (from / sender) — NÃO o destinatário (to) da instância.
    const phone = String(
-     data.phone ??
-       data.from ??
+     data.from ??
+       (data.sender as { phone?: string } | undefined)?.phone ??
        (data.contact as { phone?: string } | undefined)?.phone ??
+       data.phone ??
        ""
    ).replace(/\D/g, "");
 

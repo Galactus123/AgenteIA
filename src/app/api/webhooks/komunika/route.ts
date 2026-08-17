@@ -129,6 +129,7 @@ async function processInboundMessage(inbound: KomunikaInboundMessage): Promise<v
         return;
       }
       console.log("[komunika] Enviando resposta final para o número:", inbound.phone);
+      console.log("[DEBUG 4] Enviando resposta para o CLIENTE:", inbound.phone);
       const sendResult = await sendKomunikaMessage(inbound.phone, cleanReply, { type: "text" });
       console.log("[DEBUG 4] Resultado envio Komunika:", JSON.stringify(sendResult, null, 2));
       console.log("[komunika] Resposta final enviada. phone=", inbound.phone, "status=", sendResult.status);
