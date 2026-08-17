@@ -43,6 +43,55 @@ export interface KomunikaSendResult {
   rawBody?: unknown;
 }
 
+export interface KomunikaNumberCheckResult {
+  ok: boolean;
+  exists?: boolean;
+  status?: number;
+  error?: string;
+}
+
+// Verifica se o número existe no WhatsApp antes de enviar. A API da Komunika
+// devolve 500 quando tenta enviar para um número inexistente, então essa
+// verificação prévia evita o erro e mensagens desperdiçadas.
+export async function checkKomunikaNumber(phone: string): Promise<KomunikaNumberCheckResult> {
+  if (!isKomunikaConfigured()) {
+    return { ok: false, error: "Komunika não configurado." };
+  }
+  try {
+    const res = await fetch(`${baseUrl()}/messages/check-number`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiToken()}`,
+      },
+      body: JSON.stringify({
+        instanceId: process.env.KOMUNIKA_INSTANCE_ID,
+        phone,
+      }),
+    });
+    const body = (await res.json().catch(() => null)) as {
+      success?: boolean;
+      data?: Array<{ exists?: boolean; number?: string }>;
+      message?: string;
+      error?: string;
+    } | null;
+    if (!res.ok || !body?.success) {
+      console.error(
+        `[komunika] Erro ao verificar número: status=${res.status} body=${JSON.stringify(body)}`
+      );
+      return { ok: false, status: res.status, error: body?.message ?? body?.error ?? res.statusText };
+    }
+    const exists = body.data?.[0]?.exists ?? false;
+    if (!exists) {
+      console.log(`[komunika] Número ${phone} não existe no WhatsApp — envio ignorado.`);
+    }
+    return { ok: true, exists };
+  } catch (err) {
+    console.error(`[komunika] Exceção ao verificar número:`, err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export async function sendKomunikaMessage(
   to: string,
   content: string,

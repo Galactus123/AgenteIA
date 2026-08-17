@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { handlePatientMessage } from "@/lib/agent/agent";
 import {
+  checkKomunikaNumber,
   parseKomunikaInbound,
   sendKomunikaMessage,
   verifyKomunikaSignature,
   cleanResponseText,
 } from "@/lib/services/komunika";
+import type { KomunikaInboundMessage } from "@/lib/services/komunika";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,61 +37,73 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
-  const rawBody = await request.text().catch(() => "");
-  console.log("[webhook] Payload recebido:", rawBody);
-
-  const signature = request.headers.get("x-komunika-signature");
-  console.log("[webhook] Assinatura recebida:", signature ?? "(nenhuma)");
-  console.log("[webhook] KOMUNIKA_WEBHOOK_SECRET definido:", Boolean(process.env.KOMUNIKA_WEBHOOK_SECRET));
-
-  if (!verifyKomunikaSignature(rawBody, signature)) {
-    console.error("[webhook] Assinatura inválida — rejeitando requisição");
-    return NextResponse.json({ error: "Assinatura inválida." }, { status: 401 });
-  }
-
-  let body: Record<string, unknown>;
   try {
-    body = JSON.parse(rawBody);
-  } catch (err) {
-    console.error("[webhook] Body inválido — JSON parse falhou:", err);
-    return NextResponse.json({ error: "Body inválido." }, { status: 400 });
-  }
+    const rawBody = await request.text().catch(() => "");
+    console.log("[DEBUG 1] Chegada do payload no webhook:", rawBody);
 
-  console.log("[webhook] Body recebido:", JSON.stringify(body, null, 2));
+    const signature = request.headers.get("x-komunika-signature");
+    console.log("[webhook] Assinatura recebida:", signature ?? "(nenhuma)");
 
-  const event = String(body.event ?? body.type ?? "");
-  console.log("[webhook] Evento:", event || "(vazio)");
-  if (event && !RECEIVED_EVENTS.has(event)) {
-    console.log("[webhook] Evento ignorado:", event);
-    return NextResponse.json({ received: true, ignored: true });
-  }
+    if (!verifyKomunikaSignature(rawBody, signature)) {
+      console.error("[webhook] Assinatura inválida — rejeitando requisição");
+      return NextResponse.json({ error: "Assinatura inválida." }, { status: 401 });
+    }
 
-  const inbound = parseKomunikaInbound(body);
-  if (!inbound) {
-    const data = (body.data ?? body) as Record<string, unknown>;
-    console.log("[webhook] parseKomunikaInbound retornou null", {
-      fromMe: data.fromMe ?? body.fromMe,
-      phone: data.phone ?? data.from,
-      text: data.text ?? data.content,
+    let body: Record<string, unknown>;
+    try {
+      body = JSON.parse(rawBody);
+    } catch (err) {
+      console.error("[webhook] Body inválido — JSON parse falhou:", err);
+      return NextResponse.json({ error: "Body inválido." }, { status: 400 });
+    }
+
+    const eventType = String(body.event ?? body.type ?? "");
+    if (eventType && !RECEIVED_EVENTS.has(eventType)) {
+      console.log("[webhook] Evento ignorado:", eventType);
+      return NextResponse.json({ received: true, ignored: true });
+    }
+
+    const inbound = parseKomunikaInbound(body);
+    if (!inbound) {
+      console.log("[webhook] parseKomunikaInbound retornou null (mensagem do próprio bot ou incompleta).");
+      return NextResponse.json({ received: true, ignored: true });
+    }
+
+    // Retorna 200 imediatamente para a Komunika (evita timeout) e processa
+    // o fluxo da IA + envio da resposta em background via after().
+    after(() => {
+      void processInboundMessage(inbound);
     });
-    return NextResponse.json({ received: true, ignored: true });
+    return NextResponse.json({ received: true });
+  } catch (error) {
+    console.error("[ERRO WEBHOOK FATAL]:", error);
+    return NextResponse.json({ received: true });
   }
+}
 
-  console.log("[webhook] Mensagem válida:", { phone: inbound.phone, text: inbound.text.slice(0, 100) });
-
+async function processInboundMessage(inbound: KomunikaInboundMessage): Promise<void> {
   try {
+    console.log("[DEBUG 2] Início da chamada da OpenAI. phone=", inbound.phone);
     const result = await handlePatientMessage(inbound.phone, inbound.text);
-    console.log("[webhook] Resposta do agente:", { reply: result.reply?.slice(0, 150), transferred: result.transferred });
+    console.log("[DEBUG 3] Resposta retornada da OpenAI:", {
+      reply: result.reply?.slice(0, 150),
+      transferred: result.transferred,
+    });
 
     if (result.reply) {
       const cleanReply = cleanResponseText(result.reply);
       if (!cleanReply) {
         console.error("[webhook] Resposta da IA vazia após limpeza para phone=", inbound.phone);
-        return NextResponse.json({ received: true, error: "empty_reply" });
+        return;
+      }
+      console.log("[DEBUG 4] Disparo de envio da mensagem para a API da Komunika. phone=", inbound.phone);
+      const check = await checkKomunikaNumber(inbound.phone);
+      if (check.ok && check.exists === false) {
+        console.log(`[webhook] Número ${inbound.phone} sem WhatsApp — resposta da IA não enviada.`);
+        return;
       }
       const sendResult = await sendKomunikaMessage(inbound.phone, cleanReply, { type: "text" });
       console.log("[webhook] Status Komunika:", sendResult.status);
-      console.log("[webhook] Body Komunika:", JSON.stringify(sendResult.rawBody ?? { messageId: sendResult.messageId }));
       if (!sendResult.ok) {
         console.error(
           `[webhook] Falha ao enviar resposta para ${inbound.phone}: status=${sendResult.status} error=${sendResult.error}`
@@ -98,13 +112,21 @@ export async function POST(request: NextRequest) {
     }
 
     if (result.transferred) {
+      console.log("[DEBUG 4] Disparo de envio da mensagem para a API da Komunika (transferência). phone=", inbound.phone);
+      const transferCheck = await checkKomunikaNumber(inbound.phone);
+      if (transferCheck.ok && transferCheck.exists === false) {
+        console.log(`[webhook] Número ${inbound.phone} sem WhatsApp — aviso de transferência não enviado.`);
+        return;
+      }
       const transferResult = await sendKomunikaMessage(inbound.phone, HUMAN_TRANSFER_NOTICE, { type: "text" });
       console.log("[webhook] Status Komunika (transfer):", transferResult.status);
-      console.log("[webhook] Body Komunika (transfer):", JSON.stringify(transferResult.rawBody ?? { messageId: transferResult.messageId }));
+      if (!transferResult.ok) {
+        console.error(
+          `[webhook] Falha ao enviar aviso de transferência para ${inbound.phone}: status=${transferResult.status} error=${transferResult.error}`
+        );
+      }
     }
-  } catch (err) {
-    console.error(`[webhook] Erro ao processar mensagem de ${inbound.phone}:`, err);
+  } catch (error) {
+    console.error("[ERRO WEBHOOK FATAL]:", error);
   }
-
-  return NextResponse.json({ received: true });
 }
