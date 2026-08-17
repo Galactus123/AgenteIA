@@ -44,6 +44,7 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.text().catch(() => "");
+    console.log("[PAYLOAD COMPLETO]:", rawBody);
     console.log("[DEBUG 1] Chegada do payload no webhook:", rawBody);
 
     const signature = request.headers.get("x-komunika-signature");
@@ -62,11 +63,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Body inválido." }, { status: 400 });
     }
 
-    const eventType = String(body.event ?? body.type ?? "");
-    if (eventType && !RECEIVED_EVENTS.has(eventType)) {
-      console.log("[webhook] Evento ignorado:", eventType);
-      return NextResponse.json({ received: true, ignored: true });
-    }
+    // TEMPORÁRIO: remoção da verificação que ignora message.sent para
+    // inspecionar o payload real enviado pela Komunika.
+    // const eventType = String(body.event ?? body.type ?? "");
+    // if (eventType && !RECEIVED_EVENTS.has(eventType)) {
+    //   console.log("[webhook] Evento ignorado:", eventType);
+    //   return NextResponse.json({ received: true, ignored: true });
+    // }
 
     const inbound = parseKomunikaInbound(body);
     if (!inbound) {
