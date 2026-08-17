@@ -145,6 +145,10 @@ export async function sendKomunikaMessage(
   if (!isKomunikaConfigured()) {
     return { ok: false, error: "Komunika não configurado." };
   }
+  // Normaliza o destinatário: apenas dígitos, com código do país (ex.: 258...).
+  // Remove espaços, +, - e outros caracteres especiais do payload do webhook.
+  const normalizedTo = to.replace(/\D/g, "");
+  console.log(`[DEBUG 4] Número normalizado para envio: "${to}" -> "${normalizedTo}"`);
   try {
     const res = await fetch(`${baseUrl()}/messages/send`, {
       method: "POST",
@@ -154,7 +158,7 @@ export async function sendKomunikaMessage(
       },
       body: JSON.stringify({
         instanceId: process.env.KOMUNIKA_INSTANCE_ID,
-        to,
+        to: normalizedTo,
         type: opts.type ?? "text",
         content,
       }),
@@ -164,6 +168,7 @@ export async function sendKomunikaMessage(
       message?: string;
       error?: string;
     } | null;
+    console.log("[DEBUG 4] Resposta Komunika:", body);
     if (!res.ok) {
       console.error(
         `[komunika] Erro ao enviar mensagem: status=${res.status} body=${JSON.stringify(body)} texto=${content.slice(0, 100)}`
