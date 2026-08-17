@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, requireInternalAuth } from "@/lib/api-auth";
 import { isKomunikaConfigured } from "@/lib/services/komunika";
 
 export const runtime = "nodejs";
@@ -7,7 +8,20 @@ const baseUrl = () =>
   (process.env.KOMUNIKA_BASE_URL ?? "https://api.komunika.site/api/v1").replace(/\/+$/, "");
 
 // Registra (ou atualiza) o endpoint de webhook da Komunika apontando para /api/webhooks/komunika
+// Aceita autenticação via cookie de sessão do painel OU via Bearer token (INTERNAL_API_TOKEN)
 export async function POST(request: NextRequest) {
+  if (process.env.INTERNAL_API_TOKEN) {
+    const internalAuthError = requireInternalAuth(request);
+    if (!internalAuthError) {
+      // autenticou via INTERNAL_API_TOKEN — segue
+    } else {
+      const sessionAuthError = requireAuth(request);
+      if (sessionAuthError) return sessionAuthError;
+    }
+  } else {
+    const sessionAuthError = requireAuth(request);
+    if (sessionAuthError) return sessionAuthError;
+  }
   if (!isKomunikaConfigured()) {
     return NextResponse.json({ ok: false, error: "Komunika não configurado." }, { status: 400 });
   }
@@ -28,7 +42,6 @@ export async function POST(request: NextRequest) {
     const items = ((await existing.json().catch(() => [])) as { id?: string }[]) ?? [];
     const itemsArr = Array.isArray(items) ? items : (items as { data?: { id?: string }[] }).data ?? [];
 
-    let endpointId: string | undefined;
     for (const item of itemsArr) {
       await fetch(`${baseUrl()}/webhooks/${item.id}`, {
         method: "DELETE",
@@ -46,7 +59,7 @@ export async function POST(request: NextRequest) {
       }),
     });
     const createdBody = (await created.json().catch(() => ({}))) as { id?: string; secret?: string };
-    endpointId = createdBody.id;
+    const endpointId = createdBody.id;
 
     if (createdBody.secret) {
       console.log(`[komunika/setup] Novo webhook secret recebido. Atualize KOMUNIKA_WEBHOOK_SECRET nas variáveis de ambiente da Vercel.`);

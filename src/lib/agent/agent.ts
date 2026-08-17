@@ -2,6 +2,7 @@ import { callLlm, isLlmConfigured, type LlmMessage } from "@/lib/agent/llm";
 import { toolDefinitions, executeTool } from "@/lib/agent/tools";
 import { buildSystemPrompt } from "@/lib/agent/prompts";
 import { addMessage, getMessages, getConversation, updateConversation, getOrCreateConversation } from "@/lib/services/conversations";
+import { blockForQuota, consumeTokens, hasAiQuota } from "@/lib/services/subscriptions";
 
 const MAX_ITERATIONS = 8;
 
@@ -10,6 +11,9 @@ const NO_KEY_MESSAGE =
 
 const LLM_ERROR_MESSAGE =
   "Desculpe, tive um problema momentâneo ao processar sua mensagem. Pode tentar novamente? Se preferir, um atendente da recepção pode te ajudar agora.";
+
+const QUOTA_EXHAUSTED_MESSAGE =
+  "Olá! Para te dar o melhor atendimento, estou transferindo sua conversa para a nossa equipe de recepção. Um de nossos atendentes falará com você em instantes!";
 
 const FALLBACK_BASE =
   "Ainda estou aqui! 😊 Para te ajudar a marcar uma consulta, me conta o que você está sentindo ou qual especialidade você procura. Se preferir, posso transferir para um atendente.";
@@ -36,6 +40,12 @@ export async function handlePatientMessage(phone: string, text: string): Promise
     log("LLM não configurado (OPENAI_API_KEY ausente). Retornando NO_KEY_MESSAGE.");
     addMessage(conversation.id, "bot", NO_KEY_MESSAGE);
     return { reply: NO_KEY_MESSAGE, conversationId: conversation.id, transferred: false };
+  }
+
+  // Guard pré-chamada: bloqueia a chamada de IA quando a cota de tokens da clínica está esgotada.
+  if (!hasAiQuota()) {
+    log(`Cota de tokens esgotada para phone=${phone}. Transferindo para atendimento humano.`);
+    return blockConversationForQuota(conversation.id, phone);
   }
 
   const history = getMessages(conversation.id);
@@ -69,9 +79,19 @@ export async function handlePatientMessage(phone: string, text: string): Promise
 
   try {
     for (let i = 0; i < MAX_ITERATIONS; i++) {
+      if (!hasAiQuota()) {
+        log(`Cota de tokens esgotada na iteração ${i + 1}. Transferindo para atendimento humano.`);
+        return blockConversationForQuota(conversation.id, phone);
+      }
       log(`Iteração ${i + 1}/${MAX_ITERATIONS}: chamando LLM (${messages.length} mensagens no payload).`);
       const response = await callLlm(messages, toolDefinitions);
-      log(`LLM respondeu na iteração ${i + 1}: content=${response.content ? `"${response.content.slice(0, 120)}"` : null}, toolCalls=${response.toolCalls.length}`);
+      if (response.totalTokens > 0) {
+        const { nearLimitAlert } = consumeTokens(response.totalTokens);
+        if (nearLimitAlert) {
+          log(`Alerta de 80% da cota emitido para a clínica (${response.totalTokens} tokens consumidos nesta chamada).`);
+        }
+      }
+      log(`LLM respondeu na iteração ${i + 1}: content=${response.content ? `"${response.content.slice(0, 120)}"` : null}, toolCalls=${response.toolCalls.length}, totalTokens=${response.totalTokens}`);
 
       if (response.toolCalls.length > 0) {
         log(`Processando ${response.toolCalls.length} tool call(s) na iteração ${i + 1}: ${response.toolCalls.map((t) => t.function.name).join(", ")}`);
@@ -132,6 +152,18 @@ export async function handlePatientMessage(phone: string, text: string): Promise
 
 // Em vez de repetir a mesma mensagem genérica, tenta produzir uma resposta útil
 // baseada no fluxo real da conversa (evita o fallback genérico repetitivo).
+function blockConversationForQuota(conversationId: number, phone: string): {
+  reply: string;
+  conversationId: number;
+  transferred: boolean;
+} {
+  addMessage(conversationId, "bot", QUOTA_EXHAUSTED_MESSAGE);
+  updateConversation(conversationId, { status: "WAITING_HUMAN_INTERVENTION" });
+  blockForQuota(phone);
+  log(`Conversa ${conversationId} marcada como WAITING_HUMAN_INTERVENTION por cota esgotada.`);
+  return { reply: QUOTA_EXHAUSTED_MESSAGE, conversationId, transferred: true };
+}
+
 function buildContextAwareFallback(history: { sender: string; content: string }[]): string {
   const hasPatientName = history.some(
     (m) => m.sender === "patient" && /\b(meu nome|sou|é o|me chamo|chamo-me|chamo me)\b/i.test(m.content)

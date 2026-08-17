@@ -2,6 +2,7 @@ import { getStats } from "@/lib/services/stats";
 import { todayStr } from "@/lib/datetime";
 import AnimatedEntry from "@/components/animated-entry";
 import AnimatedTableRows from "@/components/animated-table-rows";
+import SubscriptionPanel from "@/components/subscription-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,8 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+
+        <SubscriptionPanel />
 
         <div className="bg-white rounded-2xl border border-slate-200 p-6">
           <div className="flex items-center justify-between mb-4">

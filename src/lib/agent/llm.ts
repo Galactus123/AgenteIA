@@ -26,6 +26,7 @@ export interface LlmToolDefinition {
 export interface LlmResponse {
   content: string | null;
   toolCalls: LlmToolCall[];
+  totalTokens: number;
 }
 
 export function isLlmConfigured(): boolean {
@@ -65,6 +66,7 @@ export async function callLlm(
   }
 
   const data = (await response.json()) as {
+    usage?: { total_tokens?: number };
     choices: {
       message: {
         content?: string | null;
@@ -77,5 +79,6 @@ export async function callLlm(
   return {
     content: message?.content ?? null,
     toolCalls: message?.tool_calls ?? [],
+    totalTokens: data.usage?.total_tokens ?? 0,
   };
 }

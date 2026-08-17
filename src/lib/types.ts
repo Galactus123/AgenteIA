@@ -9,6 +9,38 @@ export interface Clinic {
   opening_hours: string;
   location: string;
   social_media: string;
+  token_limit: number;
+  base_token_limit: number;
+  current_token_usage: number;
+  near_limit_notified: number;
+  overage_blocks_purchased: number;
+  subscription_status: string;
+  billing_cycle_day: number;
+  last_reset_at: string | null;
+}
+
+export interface SubscriptionInfo extends Clinic {
+  usagePercent: number;
+  quotaExhausted: boolean;
+  nearLimit: boolean;
+}
+
+export interface ClinicAlert {
+  id: number;
+  clinic_id: number;
+  type: string;
+  message: string;
+  created_at: string;
+}
+
+export interface BillingEvent {
+  id: number;
+  clinic_id: number;
+  type: string;
+  amount: number;
+  tokens: number;
+  description: string;
+  created_at: string;
 }
 
 export interface Specialty {

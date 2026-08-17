@@ -23,7 +23,33 @@ export function migrate() {
       whatsapp TEXT DEFAULT '',
       opening_hours TEXT DEFAULT '',
       location TEXT DEFAULT '',
-      social_media TEXT DEFAULT '{}'
+      social_media TEXT DEFAULT '{}',
+      token_limit INTEGER NOT NULL DEFAULT 100000,
+      base_token_limit INTEGER NOT NULL DEFAULT 100000,
+      current_token_usage INTEGER NOT NULL DEFAULT 0,
+      near_limit_notified INTEGER NOT NULL DEFAULT 0,
+      overage_blocks_purchased INTEGER NOT NULL DEFAULT 0,
+      subscription_status TEXT NOT NULL DEFAULT 'active',
+      billing_cycle_day INTEGER NOT NULL DEFAULT 1,
+      last_reset_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS clinic_alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clinic_id INTEGER NOT NULL REFERENCES clinics(id),
+      type TEXT NOT NULL,
+      message TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS billing_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clinic_id INTEGER NOT NULL REFERENCES clinics(id),
+      type TEXT NOT NULL,
+      amount REAL NOT NULL DEFAULT 0,
+      tokens INTEGER NOT NULL DEFAULT 0,
+      description TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS admins (
@@ -119,6 +145,24 @@ export function migrate() {
   } catch {
     // Column already exists
   }
+  // Migrations de cota/uso de tokens da clínica (tenancy)
+  const clinicColumns: [string, string][] = [
+    ["token_limit", "INTEGER NOT NULL DEFAULT 100000"],
+    ["base_token_limit", "INTEGER NOT NULL DEFAULT 100000"],
+    ["current_token_usage", "INTEGER NOT NULL DEFAULT 0"],
+    ["near_limit_notified", "INTEGER NOT NULL DEFAULT 0"],
+    ["overage_blocks_purchased", "INTEGER NOT NULL DEFAULT 0"],
+    ["subscription_status", "TEXT NOT NULL DEFAULT 'active'"],
+    ["billing_cycle_day", "INTEGER NOT NULL DEFAULT 1"],
+    ["last_reset_at", "TEXT"],
+  ];
+  for (const [name, def] of clinicColumns) {
+    try {
+      db.exec(`ALTER TABLE clinics ADD COLUMN ${name} ${def}`);
+    } catch {
+      // Column already exists
+    }
+  }
 }
 
 function seed() {
@@ -130,7 +174,7 @@ function seed() {
   }
 
   db.prepare(
-    "INSERT INTO clinics (name, address, phone, whatsapp, opening_hours, location, social_media) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO clinics (name, address, phone, whatsapp, opening_hours, location, social_media, token_limit, base_token_limit, current_token_usage, near_limit_notified, overage_blocks_purchased, subscription_status, billing_cycle_day, last_reset_at) VALUES (?, ?, ?, ?, ?, ?, ?, 100000, 100000, 0, 0, 0, 'active', 1, NULL)"
   ).run(
     "Clínica Vida",
     "Av. Julius Nyerere 1234, Maputo",
