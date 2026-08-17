@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { getClinic } from "@/lib/services/clinics";
 import { nowStr } from "@/lib/datetime";
 import { sendKomunikaMessage } from "@/lib/services/komunika";
+import { renderOverageReceiptText, type OverageReceiptData } from "@/lib/email-templates/overage-receipt";
 import type { BillingEvent, Clinic, ClinicAlert, SubscriptionInfo } from "@/lib/types";
 
 export const OVERAGE_PACK_TOKENS = 50_000;
@@ -110,6 +111,7 @@ export function buyOveragePack(): { clinic: Clinic | null; billingEvent: Billing
   const clinic = getClinic();
   if (!clinic) throw new Error("Clínica não encontrada.");
 
+  const newTokenLimit = clinic.token_limit + OVERAGE_PACK_TOKENS;
   db.prepare(
     "UPDATE clinics SET token_limit = token_limit + ?, overage_blocks_purchased = overage_blocks_purchased + 1, subscription_status = 'active' WHERE id = ?"
   ).run(OVERAGE_PACK_TOKENS, clinic.id);
@@ -133,10 +135,26 @@ export function buyOveragePack(): { clinic: Clinic | null; billingEvent: Billing
 
   createAlert("overage_pack", "Pacote excedente de 50.000 tokens adquirido. Atendimento automático por IA reativado.");
   console.log(
-    `[subscriptions] Pacote excedente adquirido: token_limit=${(clinic.token_limit + OVERAGE_PACK_TOKENS).toLocaleString("pt-BR")}, blocos=${clinic.overage_blocks_purchased + 1}`
+    `[subscriptions] Pacote excedente adquirido: token_limit=${newTokenLimit.toLocaleString("pt-BR")}, blocos=${clinic.overage_blocks_purchased + 1}`
   );
 
+  sendReceiptByWhatsApp(clinic, billingEvent, newTokenLimit);
+
   return { clinic: getClinic(), billingEvent };
+}
+
+function sendReceiptByWhatsApp(clinic: Clinic, billingEvent: BillingEvent, newTokenLimit: number): void {
+  if (!clinic.whatsapp) return;
+  const receiptData: OverageReceiptData = {
+    clinicName: clinic.name,
+    paymentMethod: "M-Pesa / eMola",
+    transactionId: `SS-${clinic.id}-${billingEvent.id}`,
+    amount: overagePackPrice(),
+    currency: OVERAGE_PACK_CURRENCY,
+    tokens: OVERAGE_PACK_TOKENS,
+    newTokenLimit,
+  };
+  void sendKomunikaMessage(clinic.whatsapp, renderOverageReceiptText(receiptData), { type: "text" });
 }
 
 // Reset mensal de ciclo de faturamento (cron job no scheduler do processo).
