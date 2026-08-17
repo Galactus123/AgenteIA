@@ -146,37 +146,48 @@ export async function sendKomunikaMessage(
     return { ok: false, error: "Komunika não configurado." };
   }
   // Normaliza o destinatário: apenas dígitos, com código do país (ex.: 258...).
-  // Remove espaços, +, - e outros caracteres especiais do payload do webhook.
   const normalizedTo = to.replace(/\D/g, "");
   console.log(`[DEBUG 4] Número normalizado para envio: "${to}" -> "${normalizedTo}"`);
+
+  const token = apiToken();
+  const maskedToken = token ? `${token.slice(0, 6)}...${token.slice(-4)}` : "(vazio)";
+  console.log(`[DEBUG 4] Token Komunika configurado: ${maskedToken}`);
+
   try {
+    const bodyPayload = {
+      instanceId: process.env.KOMUNIKA_INSTANCE_ID,
+      to: normalizedTo,
+      phone: normalizedTo,
+      type: opts.type ?? "text",
+      text: content,
+      message: content,
+      content,
+    };
+    console.log("[DEBUG 4] Body enviado à Komunika:", JSON.stringify(bodyPayload, null, 2));
+
     const res = await fetch(`${baseUrl()}/messages/send`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiToken()}`,
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        instanceId: process.env.KOMUNIKA_INSTANCE_ID,
-        to: normalizedTo,
-        type: opts.type ?? "text",
-        content,
-      }),
+      body: JSON.stringify(bodyPayload),
     });
-    const body = (await res.json().catch(() => null)) as {
-      messageId?: string;
-      message?: string;
-      error?: string;
-    } | null;
-    console.log("[DEBUG 4] Resposta Komunika:", body);
-    if (!res.ok) {
-      console.error(
-        `[komunika] Erro ao enviar mensagem: status=${res.status} body=${JSON.stringify(body)} texto=${content.slice(0, 100)}`
-      );
-      return { ok: false, status: res.status, error: body?.message ?? body?.error ?? res.statusText, rawBody: body };
+
+    const rawText = await res.text();
+    let parsed: { messageId?: string; message?: string; error?: string; statusCode?: number } | null = null;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      // resposta não-JSON
     }
-    console.log(`[komunika] Mensagem enviada com sucesso: status=${res.status} messageId=${body?.messageId}`);
-    return { ok: true, status: res.status, messageId: body?.messageId, rawBody: body };
+    console.log("[DEBUG 4] Resposta Komunika:", rawText);
+    if (!res.ok) {
+      console.error("[KOMUNIKA ERROR]:", res.status, rawText);
+      return { ok: false, status: res.status, error: parsed?.message ?? parsed?.error ?? (rawText || res.statusText), rawBody: parsed };
+    }
+    console.log(`[komunika] Mensagem enviada com sucesso: status=${res.status} messageId=${parsed?.messageId}`);
+    return { ok: true, status: res.status, messageId: parsed?.messageId, rawBody: parsed };
   } catch (err) {
     console.error(`[komunika] Exceção ao enviar mensagem:`, err);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
