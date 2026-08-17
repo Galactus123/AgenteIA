@@ -38,6 +38,7 @@ export interface BillingEvent {
   clinic_id: number;
   type: string;
   amount: number;
+  currency: string;
   tokens: number;
   description: string;
   created_at: string;

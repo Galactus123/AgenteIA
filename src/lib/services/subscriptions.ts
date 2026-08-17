@@ -5,9 +5,14 @@ import { sendKomunikaMessage } from "@/lib/services/komunika";
 import type { BillingEvent, Clinic, ClinicAlert, SubscriptionInfo } from "@/lib/types";
 
 export const OVERAGE_PACK_TOKENS = 50_000;
+export const OVERAGE_PACK_PRICE_MZN = 300;
+export const OVERAGE_PACK_CURRENCY = "MZN";
 export const NEAR_LIMIT_THRESHOLD = 0.8;
 
-const overagePackPrice = () => Number(process.env.OVERAGE_PACK_PRICE ?? 0);
+const overagePackPrice = () => {
+  const configured = Number(process.env.OVERAGE_PACK_PRICE);
+  return Number.isFinite(configured) && configured > 0 ? configured : OVERAGE_PACK_PRICE_MZN;
+};
 
 export function getSubscription(): SubscriptionInfo | null {
   const clinic = getClinic();
@@ -111,12 +116,13 @@ export function buyOveragePack(): { clinic: Clinic | null; billingEvent: Billing
 
   const eventResult = db
     .prepare(
-      "INSERT INTO billing_events (clinic_id, type, amount, tokens, description, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+      "INSERT INTO billing_events (clinic_id, type, amount, currency, tokens, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
     )
     .run(
       clinic.id,
       "overage_pack",
       overagePackPrice(),
+      OVERAGE_PACK_CURRENCY,
       OVERAGE_PACK_TOKENS,
       `Pacote excedente de ${OVERAGE_PACK_TOKENS.toLocaleString("pt-BR")} tokens`,
       nowStr()

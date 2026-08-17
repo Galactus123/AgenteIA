@@ -47,6 +47,7 @@ export function migrate() {
       clinic_id INTEGER NOT NULL REFERENCES clinics(id),
       type TEXT NOT NULL,
       amount REAL NOT NULL DEFAULT 0,
+      currency TEXT NOT NULL DEFAULT 'MZN',
       tokens INTEGER NOT NULL DEFAULT 0,
       description TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL
@@ -142,6 +143,11 @@ export function migrate() {
   }
   try {
     db.exec("ALTER TABLE admins ADD COLUMN email TEXT DEFAULT ''");
+  } catch {
+    // Column already exists
+  }
+  try {
+    db.exec("ALTER TABLE billing_events ADD COLUMN currency TEXT NOT NULL DEFAULT 'MZN'");
   } catch {
     // Column already exists
   }
