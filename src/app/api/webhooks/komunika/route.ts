@@ -13,6 +13,16 @@ export const dynamic = "force-dynamic";
 const HUMAN_TRANSFER_NOTICE =
   "Se preferir falar com um atendente agora, a recepcionista vai te atender em breve. Obrigado pela paciência!";
 
+// Tipos de evento de mensagens RECEBIDAS do cliente que disparam o fluxo da IA.
+// "message.sent" ou from_me==true (mensagens do próprio bot) continuam ignorados.
+const RECEIVED_EVENTS = new Set([
+  "message.received",
+  "message.inbound",
+  "message.created",
+  "incoming_message",
+  "message",
+]);
+
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
@@ -26,7 +36,7 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text().catch(() => "");
-  console.log("[webhook] Payload recebido:", rawBody.slice(0, 2000));
+  console.log("[webhook] Payload recebido:", rawBody);
 
   const signature = request.headers.get("x-komunika-signature");
   console.log("[webhook] Assinatura recebida:", signature ?? "(nenhuma)");
@@ -45,9 +55,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Body inválido." }, { status: 400 });
   }
 
+  console.log("[webhook] Body recebido:", JSON.stringify(body, null, 2));
+
   const event = String(body.event ?? body.type ?? "");
   console.log("[webhook] Evento:", event || "(vazio)");
-  if (event && event !== "message.received" && event !== "message.inbound" && event !== "message") {
+  if (event && !RECEIVED_EVENTS.has(event)) {
     console.log("[webhook] Evento ignorado:", event);
     return NextResponse.json({ received: true, ignored: true });
   }

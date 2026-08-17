@@ -107,8 +107,10 @@ export interface KomunikaInboundMessage {
 export function parseKomunikaInbound(body: Record<string, unknown>): KomunikaInboundMessage | null {
   const data = (body.data ?? body) as Record<string, unknown>;
 
-  // Ignora mensagens enviadas pelo próprio bot — evita loop infinito
-  if (data.fromMe === true || data.fromMe === "true" || body.fromMe === true || body.fromMe === "true") {
+  // Ignora mensagens enviadas pelo próprio bot — evita loop infinito.
+  // Aceita tanto camelCase (fromMe) quanto snake_case (from_me), e também true como string.
+  const fromMe = data.fromMe ?? data.from_me ?? body.fromMe ?? body.from_me;
+  if (fromMe === true || fromMe === "true" || fromMe === "1" || fromMe === 1) {
     return null;
   }
 
