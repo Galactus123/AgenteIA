@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse, after } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { handlePatientMessage } from "@/lib/agent/agent";
 import {
   checkKomunikaNumber,
   parseKomunikaInbound,
   sendKomunikaMessage,
+  sendKomunikaTyping,
   verifyKomunikaSignature,
   cleanResponseText,
 } from "@/lib/services/komunika";
@@ -11,6 +13,9 @@ import type { KomunikaInboundMessage } from "@/lib/services/komunika";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Estende o tempo máximo de execução para o fluxo (typing + OpenAI + envio)
+// rodar em background sem ser cancelado pelo runtime serverless.
+export const maxDuration = 60;
 
 const HUMAN_TRANSFER_NOTICE =
   "Se preferir falar com um atendente agora, a recepcionista vai te atender em breve. Obrigado pela paciência!";
@@ -69,11 +74,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true, ignored: true });
     }
 
-    // Retorna 200 imediatamente para a Komunika (evita timeout) e processa
-    // o fluxo da IA + envio da resposta em background via after().
-    after(() => {
-      void processInboundMessage(inbound);
-    });
+    // Garante que o processamento da IA + envio da Komunika não seja cancelado
+    // pelo runtime serverless. No Vercel usa waitUntil() (@vercel/functions),
+    // que estende a vida da invocação até o promise resolver; em dev local cai
+    // no after() do Next.js (que internamente também usa waitUntil no Vercel).
+    const task = processInboundMessage(inbound);
+    const hasVercelCtx = Boolean(
+      (globalThis as Record<symbol, unknown>)[Symbol.for("@vercel/request-context")]
+    );
+    if (hasVercelCtx) {
+      waitUntil(task);
+    } else {
+      after(() => task);
+    }
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error("[ERRO WEBHOOK FATAL]:", error);
@@ -83,6 +96,16 @@ export async function POST(request: NextRequest) {
 
 async function processInboundMessage(inbound: KomunikaInboundMessage): Promise<void> {
   try {
+    // Envia o indicador "digitando..." e AGUARDA a confirmação antes de chamar a OpenAI.
+    console.log("[DEBUG 2] Disparo de typing para a API da Komunika. phone=", inbound.phone);
+    const typingResult = await sendKomunikaTyping(inbound.phone, { type: "composing" });
+    console.log("[webhook] Status Typing Komunika:", typingResult.status);
+    if (!typingResult.ok) {
+      console.error(
+        `[webhook] Falha ao enviar typing para ${inbound.phone}: status=${typingResult.status} error=${typingResult.error}`
+      );
+    }
+
     console.log("[DEBUG 2] Início da chamada da OpenAI. phone=", inbound.phone);
     const result = await handlePatientMessage(inbound.phone, inbound.text);
     console.log("[DEBUG 3] Resposta retornada da OpenAI:", {
@@ -102,7 +125,9 @@ async function processInboundMessage(inbound: KomunikaInboundMessage): Promise<v
         console.log(`[webhook] Número ${inbound.phone} sem WhatsApp — resposta da IA não enviada.`);
         return;
       }
+      console.log("[komunika] Enviando resposta final para o número:", inbound.phone);
       const sendResult = await sendKomunikaMessage(inbound.phone, cleanReply, { type: "text" });
+      console.log("[komunika] Resposta final enviada. phone=", inbound.phone, "status=", sendResult.status);
       console.log("[webhook] Status Komunika:", sendResult.status);
       if (!sendResult.ok) {
         console.error(
@@ -118,7 +143,9 @@ async function processInboundMessage(inbound: KomunikaInboundMessage): Promise<v
         console.log(`[webhook] Número ${inbound.phone} sem WhatsApp — aviso de transferência não enviado.`);
         return;
       }
+      console.log("[komunika] Enviando resposta final (transferência) para o número:", inbound.phone);
       const transferResult = await sendKomunikaMessage(inbound.phone, HUMAN_TRANSFER_NOTICE, { type: "text" });
+      console.log("[komunika] Resposta final (transferência) enviada. phone=", inbound.phone, "status=", transferResult.status);
       console.log("[webhook] Status Komunika (transfer):", transferResult.status);
       if (!transferResult.ok) {
         console.error(

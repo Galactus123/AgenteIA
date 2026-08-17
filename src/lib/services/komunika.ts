@@ -92,6 +92,51 @@ export async function checkKomunikaNumber(phone: string): Promise<KomunikaNumber
   }
 }
 
+export interface KomunikaTypingResult {
+  ok: boolean;
+  status?: number;
+  error?: string;
+}
+
+// Envia o indicador "digitando..." (typing) para o WhatsApp antes de processar a IA.
+export async function sendKomunikaTyping(
+  to: string,
+  opts: { type?: string } = {}
+): Promise<KomunikaTypingResult> {
+  if (!isKomunikaConfigured()) {
+    return { ok: false, error: "Komunika não configurado." };
+  }
+  try {
+    const res = await fetch(`${baseUrl()}/messages/typing`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiToken()}`,
+      },
+      body: JSON.stringify({
+        instanceId: process.env.KOMUNIKA_INSTANCE_ID,
+        to,
+        type: opts.type ?? "composing",
+      }),
+    });
+    const body = (await res.json().catch(() => null)) as {
+      message?: string;
+      error?: string;
+    } | null;
+    if (!res.ok) {
+      console.error(
+        `[komunika] Erro ao enviar typing: status=${res.status} body=${JSON.stringify(body)}`
+      );
+      return { ok: false, status: res.status, error: body?.message ?? body?.error ?? res.statusText };
+    }
+    console.log(`[komunika] Typing enviado com sucesso: status=${res.status}`);
+    return { ok: true, status: res.status };
+  } catch (err) {
+    console.error(`[komunika] Exceção ao enviar typing:`, err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export async function sendKomunikaMessage(
   to: string,
   content: string,
