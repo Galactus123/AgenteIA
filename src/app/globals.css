@@ -6,6 +6,7 @@
 }
 
 @theme inline {
+  --breakpoint-xs: 480px;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-primary: #4f6df5;
@@ -44,4 +45,8 @@ body {
 .scrollbar-thin::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 3px;
+}
+
+@utility safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }

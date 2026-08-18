@@ -25,13 +25,13 @@ export default function DashboardPage() {
 
   return (
     <AnimatedEntry>
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-sm text-slate-500 mt-1">Visão geral da clínica e do atendimento com IA.</p>
+          <h1 className="text-lg sm:text-xl font-bold text-slate-900">Dashboard</h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">Visão geral da clínica e do atendimento com IA.</p>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+        <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4">
           {kpis.map((kpi) => (
             <KPICard
               key={kpi.label}
@@ -44,15 +44,15 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="lg:col-span-2">
             <AppointmentsList
               appointments={stats.todayAppointments}
               dateLabel={dateLabel}
             />
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <AppointmentRequestsCard requests={stats.pendingRequests} />
             <DoctorStatusList doctors={stats.doctors} />
           </div>

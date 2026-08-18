@@ -15,7 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <AuthGuard>
-      <div className="flex min-h-screen bg-background">
+      <div className="flex min-h-screen bg-background overflow-x-hidden">
         <Sidebar session={session} />
         <DashboardShell>{children}</DashboardShell>
       </div>
