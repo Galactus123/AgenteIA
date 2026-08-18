@@ -10,6 +10,8 @@ export interface DashboardStats {
   conversionRate: number;
   activeDoctors: number;
   todayAppointments: { id: number; patient_name: string; doctor_name: string; specialty_name: string; starts_at: string; status: string }[];
+  pendingRequests: { id: number; patient_name: string; patient_phone: string; specialty_name: string; preferred_date: string; preferred_time: string; reason: string; source: string; created_at: string }[];
+  doctors: { id: number; name: string; specialty_name: string; status: string; schedule: { weekday: number; start_time: string; end_time: string }[] }[];
 }
 
 export function getStats(): DashboardStats {
@@ -52,6 +54,36 @@ export function getStats(): DashboardStats {
     )
     .all(`${today} 00:00`, `${tomorrow} 00:00`) as unknown as DashboardStats["todayAppointments"];
 
+  const pendingRequests = db
+    .prepare(
+      `SELECT a.id, a.patient_name, a.patient_phone, s.name AS specialty_name,
+              substr(a.starts_at, 1, 10) AS preferred_date,
+              substr(a.starts_at, 12, 5) AS preferred_time,
+              a.reason, a.source, a.created_at
+       FROM appointments a
+       JOIN specialties s ON s.id = a.specialty_id
+       WHERE a.status = 'scheduled' AND a.starts_at >= ? AND a.starts_at < ?
+       ORDER BY a.starts_at ASC
+       LIMIT 5`
+    )
+    .all(`${today} 00:00`, `${tomorrow} 00:00`) as unknown as DashboardStats["pendingRequests"];
+
+  const doctorRows = db
+    .prepare(
+      `SELECT d.id, d.name, s.name AS specialty_name, d.status
+       FROM doctors d
+       JOIN specialties s ON s.id = d.specialty_id
+       ORDER BY d.name`
+    )
+    .all() as { id: number; name: string; specialty_name: string; status: string }[];
+
+  const doctors = doctorRows.map((doc) => {
+    const schedule = db
+      .prepare("SELECT weekday, start_time, end_time FROM doctor_schedule WHERE doctor_id = ?")
+      .all(doc.id) as { weekday: number; start_time: string; end_time: string }[];
+    return { ...doc, schedule };
+  });
+
   return {
     scheduled: scheduled.c,
     cancelled: cancelled.c,
@@ -61,5 +93,7 @@ export function getStats(): DashboardStats {
     conversionRate,
     activeDoctors: activeDoctors.c,
     todayAppointments,
+    pendingRequests,
+    doctors,
   };
 }

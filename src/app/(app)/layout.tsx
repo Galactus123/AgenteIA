@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { authCookie, readSessionToken } from "@/lib/auth";
 import Sidebar from "@/components/sidebar";
 import AuthGuard from "@/components/auth-guard";
+import DashboardShell from "@/components/dashboard/dashboard-shell";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
@@ -14,11 +15,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <AuthGuard>
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen bg-background">
         <Sidebar session={session} />
-        <main className="flex-1 min-w-0 flex flex-col">
-          <div className="flex-1 p-6 lg:p-8 overflow-auto">{children}</div>
-        </main>
+        <DashboardShell>{children}</DashboardShell>
       </div>
     </AuthGuard>
   );
