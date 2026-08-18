@@ -51,7 +51,7 @@ export default function LoginPage() {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin ou admin@saudesync.mz"
+              placeholder="Digite seu e-mail ou usuário"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               required
             />
@@ -62,6 +62,7 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               required
             />
@@ -75,9 +76,7 @@ export default function LoginPage() {
             {loading ? "Entrando..." : "Entrar"}
           </button>
         </form>
-        <p className="text-xs text-slate-400 text-center mt-4">
-          Acesso inicial: admin / admin123
-        </p>
+
       </div>
     </div>
   );
