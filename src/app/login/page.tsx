@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,8 +34,15 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-accent text-sidebar text-2xl font-bold mb-4">
-            S
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/icon.png"
+              alt="Logotipo SaúdeSync"
+              width={56}
+              height={56}
+              className="rounded-2xl"
+              priority
+            />
           </div>
           <h1 className="text-2xl font-bold text-slate-900">SaúdeSync</h1>
           <p className="text-sm text-slate-500 mt-1">
