@@ -123,3 +123,18 @@ export interface AvailableSlot {
   ends_at: string;
   price: number;
 }
+
+export type NotificationType = "scheduled" | "cancelled" | "rescheduled" | "reminder";
+export type NotificationChannelStatus = "pending" | "sent" | "failed";
+
+export interface Notification {
+  id: number;
+  type: NotificationType;
+  title: string;
+  message: string;
+  appointment_id: number | null;
+  doctor_id: number | null;
+  read: number;
+  channel_status: NotificationChannelStatus;
+  created_at: string;
+}

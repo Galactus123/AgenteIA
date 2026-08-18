@@ -128,6 +128,18 @@ export function migrate() {
       type TEXT NOT NULL,
       sent_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      appointment_id INTEGER REFERENCES appointments(id) ON DELETE SET NULL,
+      doctor_id INTEGER REFERENCES doctors(id) ON DELETE SET NULL,
+      read INTEGER NOT NULL DEFAULT 0,
+      channel_status TEXT NOT NULL DEFAULT 'pending',
+      created_at TEXT NOT NULL
+    );
   `);
 
   // Migrations for existing databases

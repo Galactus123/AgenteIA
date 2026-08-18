@@ -10,6 +10,11 @@ import {
   todayStr,
   weekdayOf,
 } from "@/lib/datetime";
+import {
+  notifyDoctorNewAppointment,
+  notifyDoctorCancelled,
+  notifyDoctorRescheduled,
+} from "@/lib/services/notifications";
 
 const CANCEL_WINDOW_HOURS = 4;
 const MAX_RESCHEDULES = 1;
@@ -222,7 +227,33 @@ export function createAppointment(data: {
       nowStr(),
       nowStr()
     );
-  return getAppointmentView(Number(result.lastInsertRowid))!;
+  const view = getAppointmentView(Number(result.lastInsertRowid))!;
+  triggerNewAppointmentNotification(view);
+  return view;
+}
+
+function getDoctorPhone(doctorId: number): string {
+  const row = db.prepare("SELECT phone FROM doctors WHERE id = ?").get(doctorId) as { phone: string } | undefined;
+  return row?.phone ?? "";
+}
+
+function triggerNewAppointmentNotification(appointment: AppointmentView): void {
+  try {
+    const phone = getDoctorPhone(appointment.doctor_id);
+    if (phone) {
+      notifyDoctorNewAppointment(
+        appointment.doctor_id,
+        appointment.doctor_name,
+        phone,
+        appointment.patient_name,
+        appointment.specialty_name,
+        appointment.starts_at,
+        appointment.id
+      );
+    }
+  } catch {
+    // fire-and-forget
+  }
 }
 
 export function canCancel(appointment: Appointment): { ok: boolean; reason?: string } {
@@ -245,7 +276,24 @@ export function cancelAppointment(id: number): AppointmentView {
   db.prepare(
     "UPDATE appointments SET status = 'cancelled', cancelled_at = ?, updated_at = ? WHERE id = ?"
   ).run(nowStr(), nowStr(), id);
-  return getAppointmentView(id)!;
+  const view = getAppointmentView(id)!;
+  try {
+    const phone = getDoctorPhone(view.doctor_id);
+    if (phone) {
+      notifyDoctorCancelled(
+        view.doctor_id,
+        view.doctor_name,
+        phone,
+        view.patient_name,
+        view.specialty_name,
+        view.starts_at,
+        view.id
+      );
+    }
+  } catch {
+    // fire-and-forget
+  }
+  return view;
 }
 
 export function canReschedule(appointment: Appointment): { ok: boolean; reason?: string } {
@@ -279,7 +327,25 @@ export function rescheduleAppointment(id: number, newStartsAt: string): Appointm
   db.prepare(
     "UPDATE appointments SET starts_at = ?, ends_at = ?, rescheduled = 1, reschedule_count = reschedule_count + 1, updated_at = ? WHERE id = ?"
   ).run(newStartsAt, formatDateTime(endsAt), nowStr(), id);
-  return getAppointmentView(id)!;
+  const view = getAppointmentView(id)!;
+  try {
+    const phone = getDoctorPhone(view.doctor_id);
+    if (phone) {
+      notifyDoctorRescheduled(
+        view.doctor_id,
+        view.doctor_name,
+        phone,
+        view.patient_name,
+        view.specialty_name,
+        appointment.starts_at,
+        newStartsAt,
+        view.id
+      );
+    }
+  } catch {
+    // fire-and-forget
+  }
+  return view;
 }
 
 export function listAppointmentsByDate(dateStr: string): AppointmentView[] {

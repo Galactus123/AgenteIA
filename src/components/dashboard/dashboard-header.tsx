@@ -1,6 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import NotificationBell from "@/components/dashboard/notification-bell";
+import NotificationPanel from "@/components/dashboard/notification-panel";
 
 interface DashboardHeaderProps {
   userName?: string;
@@ -8,6 +11,8 @@ interface DashboardHeaderProps {
 }
 
 export default function DashboardHeader({ userName = "Admin", clinicName = "SaúdeSync" }: DashboardHeaderProps) {
+  const [panelOpen, setPanelOpen] = useState(false);
+
   return (
     <header className="bg-white border border-slate-200 rounded-2xl px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3 sm:gap-4">
       <div className="flex items-center gap-3 flex-1 min-w-0 pl-10 lg:pl-0">
@@ -23,13 +28,7 @@ export default function DashboardHeader({ userName = "Admin", clinicName = "Saú
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        <button
-          className="relative p-2.5 rounded-xl hover:bg-slate-100 transition-colors text-slate-500 hover:text-slate-700 min-w-[44px] min-h-[44px] flex items-center justify-center"
-          aria-label="Notificações"
-        >
-          <span className="text-lg">🔔</span>
-          <span className="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full" aria-hidden="true"></span>
-        </button>
+        <NotificationBell onToggle={() => setPanelOpen(!panelOpen)} />
 
         <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
 
@@ -47,6 +46,8 @@ export default function DashboardHeader({ userName = "Admin", clinicName = "Saú
           </div>
         </Link>
       </div>
+
+      {panelOpen && <NotificationPanel onClose={() => setPanelOpen(false)} />}
     </header>
   );
 }

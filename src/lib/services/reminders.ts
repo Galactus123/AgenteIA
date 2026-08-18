@@ -3,6 +3,7 @@ import type { AppointmentView } from "@/lib/types";
 import { parseDatetime, nowStr } from "@/lib/datetime";
 import { getOrCreateConversation, addMessage } from "@/lib/services/conversations";
 import { isKomunikaConfigured, sendKomunikaMessage } from "@/lib/services/komunika";
+import { notifyDoctorReminder } from "@/lib/services/notifications";
 
 function loadAppointments(): AppointmentView[] {
   return db
@@ -42,6 +43,24 @@ function sendReminder(appointment: AppointmentView, type: "24h" | "2h"): void {
 
   if (isKomunikaConfigured()) {
     sendKomunikaMessage(appointment.patient_phone, text);
+  }
+
+  // Notifica o médico sobre a consulta upcoming
+  try {
+    const doctor = db.prepare("SELECT phone FROM doctors WHERE id = ?").get(appointment.doctor_id) as { phone: string } | undefined;
+    if (doctor?.phone) {
+      notifyDoctorReminder(
+        appointment.doctor_id,
+        appointment.doctor_name,
+        doctor.phone,
+        appointment.patient_name,
+        appointment.specialty_name,
+        appointment.starts_at,
+        appointment.id
+      );
+    }
+  } catch {
+    // fire-and-forget
   }
 }
 
