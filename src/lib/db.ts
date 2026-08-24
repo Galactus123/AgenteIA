@@ -140,6 +140,18 @@ export function migrate() {
       channel_status TEXT NOT NULL DEFAULT 'pending',
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      phone TEXT DEFAULT '',
+      password_hash TEXT NOT NULL,
+      lojou_order_id TEXT DEFAULT '',
+      product_id TEXT DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL
+    );
   `);
 
   // Migrations for existing databases

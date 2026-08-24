@@ -138,3 +138,15 @@ export interface Notification {
   channel_status: NotificationChannelStatus;
   created_at: string;
 }
+
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  password_hash: string;
+  lojou_order_id: string;
+  product_id: string;
+  status: "active" | "inactive";
+  created_at: string;
+}
