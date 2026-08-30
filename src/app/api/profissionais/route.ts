@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   const { data, error } = await supabaseAdmin
-    .from("profissionais")
+    .from("medicos")
     .select("*")
     .order("nome", { ascending: true });
 
@@ -23,26 +23,29 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   const body = await request.json().catch(() => null);
-  if (!body?.nome || !body?.especialidade) {
+  if (!body?.nome) {
     return NextResponse.json(
-      { error: "Nome e especialidade são obrigatórios." },
+      { error: "Nome é obrigatório." },
       { status: 400 }
     );
   }
 
   const { data, error } = await supabaseAdmin
-    .from("profissionais")
+    .from("medicos")
     .insert({
       nome: String(body.nome),
-      especialidade: String(body.especialidade),
+      especialidade_id: body.especialidade_id ? String(body.especialidade_id) : null,
       telefone: body.telefone ? String(body.telefone) : null,
-      email: body.email ? String(body.email) : null,
-      horarios: body.horarios ?? null,
+      duracao_consulta: body.duracao_consulta ? Number(body.duracao_consulta) : 30,
+      valor_consulta: body.valor_consulta !== undefined ? Number(body.valor_consulta) : 0,
+      status: body.status ?? "Ativo",
+      dias_atendimento: body.dias_atendimento ?? [],
     })
     .select()
     .single();
 
   if (error) {
+    console.error("Erro ao cadastrar médico no Supabase:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

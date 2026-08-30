@@ -54,6 +54,7 @@ export default function MedicosPage() {
   const [schedule, setSchedule] = useState<ScheduleRow[]>(EMPTY_SCHEDULE);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
@@ -80,6 +81,7 @@ export default function MedicosPage() {
     });
     setSchedule(rows);
     setError("");
+    setSuccess("");
   }
 
   function resetForm() {
@@ -87,6 +89,7 @@ export default function MedicosPage() {
     setForm(EMPTY);
     setSchedule(EMPTY_SCHEDULE);
     setError("");
+    setSuccess("");
   }
 
   function updateScheduleRow(weekday: number, patch: Partial<ScheduleRow>) {
@@ -97,35 +100,50 @@ export default function MedicosPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
+
+    const diasAtendimento = schedule
+      .filter((r) => r.enabled)
+      .map((r) => DAY_LABELS[r.weekday]);
+
     const payload = {
-      name: form.name,
-      specialty_id: form.specialty_id,
-      consultation_duration: form.consultation_duration,
-      price: form.price,
-      status: form.status,
-      phone: form.phone,
-      schedule: schedule
-        .filter((r) => r.enabled && r.start_time && r.end_time)
-        .map((r) => ({ weekday: r.weekday, start_time: r.start_time, end_time: r.end_time })),
+      nome: form.name,
+      especialidade_id: form.specialty_id || undefined,
+      telefone: form.phone || undefined,
+      duracao_consulta: form.consultation_duration,
+      valor_consulta: form.price,
+      status: form.status === "active" ? "Ativo" : "Inativo",
+      dias_atendimento: diasAtendimento,
     };
-    const res = editing
-      ? await fetch(`/api/medicos/${form.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        })
-      : await fetch("/api/medicos", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-    const data = await res.json().catch(() => null);
-    if (res.ok) {
-      resetForm();
-      load();
-    } else {
-      setError(data?.error ?? "Erro ao salvar.");
+
+    try {
+      const res = editing
+        ? await fetch(`/api/medicos/${form.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await fetch("/api/profissionais", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+      const data = await res.json().catch(() => null);
+
+      if (res.ok) {
+        resetForm();
+        setSuccess("Médico cadastrado com sucesso!");
+        load();
+        setTimeout(() => setSuccess(""), 3000);
+      } else {
+        setError(data?.error ?? "Erro ao salvar.");
+      }
+    } catch (err) {
+      console.error("Erro ao enviar formulário de médico:", err);
+      setError("Erro de conexão ao salvar médico.");
     }
+
     setLoading(false);
   }
 
@@ -280,6 +298,7 @@ export default function MedicosPage() {
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
+        {success && <p className="text-sm text-emerald-600">{success}</p>}
         <button
           type="submit"
           disabled={loading}
