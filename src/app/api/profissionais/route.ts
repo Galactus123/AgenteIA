@@ -7,13 +7,9 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   const { data, error } = await supabaseAdmin
-    .from("consultas")
-    .select(`
-      *,
-      paciente:pacientes(id, nome, telefone),
-      profissional:profissionais(id, nome, especialidade)
-    `)
-    .order("data_hora", { ascending: false });
+    .from("profissionais")
+    .select("*")
+    .order("nome", { ascending: true });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -27,27 +23,23 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   const body = await request.json().catch(() => null);
-  if (!body?.paciente_id || !body?.profissional_id || !body?.data_hora) {
+  if (!body?.nome || !body?.especialidade) {
     return NextResponse.json(
-      { error: "paciente_id, profissional_id e data_hora são obrigatórios." },
+      { error: "Nome e especialidade são obrigatórios." },
       { status: 400 }
     );
   }
 
   const { data, error } = await supabaseAdmin
-    .from("consultas")
+    .from("profissionais")
     .insert({
-      paciente_id: Number(body.paciente_id),
-      profissional_id: Number(body.profissional_id),
-      data_hora: String(body.data_hora),
-      motivo: body.motivo ? String(body.motivo) : null,
-      status: body.status ?? "agendada",
+      nome: String(body.nome),
+      especialidade: String(body.especialidade),
+      telefone: body.telefone ? String(body.telefone) : null,
+      email: body.email ? String(body.email) : null,
+      horarios: body.horarios ?? null,
     })
-    .select(`
-      *,
-      paciente:pacientes(id, nome, telefone),
-      profissional:profissionais(id, nome, especialidade)
-    `)
+    .select()
     .single();
 
   if (error) {
