@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, FormEvent } from "react";
+import { supabase } from "@/lib/supabase";
 
 interface ScheduleRow {
   weekday: number;
@@ -11,19 +12,19 @@ interface ScheduleRow {
 
 interface Doctor {
   id: number;
-  name: string;
-  specialty_id: number;
-  specialty_name: string;
-  consultation_duration: number;
-  price: number;
+  nome: string;
+  especialidade_id: number;
+  especialidade_nome: string;
+  duracao_consulta: number;
+  valor_consulta: number;
   status: string;
-  phone: string;
-  schedule: { id: number; doctor_id: number; weekday: number; start_time: string; end_time: string }[];
+  telefone: string;
+  dias_atendimento: string[];
 }
 
 interface Specialty {
   id: number;
-  name: string;
+  nome: string;
 }
 
 const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -35,35 +36,65 @@ const EMPTY_SCHEDULE: ScheduleRow[] = Array.from({ length: 7 }, (_, weekday) => 
   end_time: "12:00",
 }));
 
-const EMPTY: Doctor = {
-  id: 0,
-  name: "",
-  specialty_id: 0,
-  specialty_name: "",
-  consultation_duration: 30,
-  price: 0,
-  status: "active",
-  phone: "",
-  schedule: [],
+const EMPTY_FORM = {
+  nome: "",
+  especialidade_id: 0,
+  telefone: "",
+  duracao_consulta: 30,
+  valor_consulta: 0,
+  status: "Ativo",
 };
 
 export default function MedicosPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
-  const [form, setForm] = useState<Doctor>(EMPTY);
+  const [form, setForm] = useState(EMPTY_FORM);
   const [schedule, setSchedule] = useState<ScheduleRow[]>(EMPTY_SCHEDULE);
-  const [editing, setEditing] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
 
   const load = useCallback(async () => {
+    setFetching(true);
+
     const [docRes, specRes] = await Promise.all([
-      fetch("/api/medicos"),
-      fetch("/api/especialidades"),
+      supabase
+        .from("medicos")
+        .select("*, especialidades(nome)")
+        .order("nome", { ascending: true }),
+      supabase
+        .from("especialidades")
+        .select("id, nome")
+        .order("nome", { ascending: true }),
     ]);
-    if (docRes.ok) setDoctors(await docRes.json());
-    if (specRes.ok) setSpecialties(await specRes.json());
+
+    if (docRes.data) {
+      setDoctors(
+        docRes.data.map((d: Record<string, unknown>) => ({
+          id: d.id as number,
+          nome: d.nome as string,
+          especialidade_id: d.especialidade_id as number,
+          especialidade_nome: (d.especialidades as { nome: string } | null)?.nome ?? "—",
+          duracao_consulta: (d.duracao_consulta as number) ?? 30,
+          valor_consulta: (d.valor_consulta as number) ?? 0,
+          status: (d.status as string) ?? "Ativo",
+          telefone: (d.telefone as string) ?? "",
+          dias_atendimento: (d.dias_atendimento as string[]) ?? [],
+        }))
+      );
+    }
+    if (specRes.data) {
+      setSpecialties(
+        specRes.data.map((s: { id: number; nome: string }) => ({
+          id: s.id,
+          nome: s.nome,
+        }))
+      );
+    }
+
+    setFetching(false);
   }, []);
 
   useEffect(() => {
@@ -71,22 +102,27 @@ export default function MedicosPage() {
   }, [load]);
 
   function startEdit(d: Doctor) {
-    setEditing(true);
-    setForm({ ...d });
-    const rows = EMPTY_SCHEDULE.map((row) => {
-      const match = d.schedule.find((s) => s.weekday === row.weekday);
-      return match
-        ? { ...row, enabled: true, start_time: match.start_time, end_time: match.end_time }
-        : row;
+    setEditingId(d.id);
+    setForm({
+      nome: d.nome,
+      especialidade_id: d.especialidade_id,
+      telefone: d.telefone,
+      duracao_consulta: d.duracao_consulta,
+      valor_consulta: d.valor_consulta,
+      status: d.status,
     });
+    const rows = EMPTY_SCHEDULE.map((row) => ({
+      ...row,
+      enabled: d.dias_atendimento.includes(DAY_LABELS[row.weekday]),
+    }));
     setSchedule(rows);
     setError("");
     setSuccess("");
   }
 
   function resetForm() {
-    setEditing(false);
-    setForm(EMPTY);
+    setEditingId(null);
+    setForm(EMPTY_FORM);
     setSchedule(EMPTY_SCHEDULE);
     setError("");
     setSuccess("");
@@ -107,37 +143,41 @@ export default function MedicosPage() {
       .map((r) => DAY_LABELS[r.weekday]);
 
     const payload = {
-      nome: form.name,
-      especialidade_id: form.specialty_id || undefined,
-      telefone: form.phone || undefined,
-      duracao_consulta: form.consultation_duration,
-      valor_consulta: form.price,
-      status: form.status === "active" ? "Ativo" : "Inativo",
+      nome: form.nome,
+      especialidade_id: form.especialidade_id || null,
+      telefone: form.telefone || null,
+      duracao_consulta: form.duracao_consulta,
+      valor_consulta: form.valor_consulta,
+      status: form.status,
       dias_atendimento: diasAtendimento,
     };
 
     try {
-      const res = editing
-        ? await fetch(`/api/medicos/${form.id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-        : await fetch("/api/profissionais", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
+      let result;
 
-      const data = await res.json().catch(() => null);
+      if (editingId) {
+        result = await supabase
+          .from("medicos")
+          .update(payload)
+          .eq("id", editingId)
+          .select()
+          .single();
+      } else {
+        result = await supabase
+          .from("medicos")
+          .insert([payload])
+          .select()
+          .single();
+      }
 
-      if (res.ok) {
+      if (result.error) {
+        console.error("Erro ao salvar médico:", result.error);
+        setError(result.error.message ?? "Erro ao salvar médico.");
+      } else {
         resetForm();
-        setSuccess("Médico cadastrado com sucesso!");
+        setSuccess(editingId ? "Médico atualizado com sucesso!" : "Médico cadastrado com sucesso!");
         load();
         setTimeout(() => setSuccess(""), 3000);
-      } else {
-        setError(data?.error ?? "Erro ao salvar.");
       }
     } catch (err) {
       console.error("Erro ao enviar formulário de médico:", err);
@@ -149,16 +189,13 @@ export default function MedicosPage() {
 
   async function handleDelete(id: number) {
     if (!confirm("Excluir este médico?")) return;
-    const res = await fetch(`/api/medicos/${id}`, { method: "DELETE" });
-    if (res.ok) load();
+    const { error: delError } = await supabase.from("medicos").delete().eq("id", id);
+    if (!delError) load();
   }
 
   async function toggleStatus(d: Doctor) {
-    await fetch(`/api/medicos/${d.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: d.status === "active" ? "inactive" : "active" }),
-    });
+    const newStatus = d.status === "Ativo" ? "Inativo" : "Ativo";
+    await supabase.from("medicos").update({ status: newStatus }).eq("id", d.id);
     load();
   }
 
@@ -173,8 +210,8 @@ export default function MedicosPage() {
 
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-slate-900">{editing ? "Editar médico" : "Novo médico"}</h2>
-          {editing && (
+          <h2 className="font-semibold text-slate-900">{editingId ? "Editar médico" : "Novo médico"}</h2>
+          {editingId && (
             <button type="button" onClick={resetForm} className="text-sm text-slate-500 hover:text-slate-700">
               Cancelar edição
             </button>
@@ -186,8 +223,8 @@ export default function MedicosPage() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Nome</label>
             <input
               type="text"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              value={form.nome}
+              onChange={(e) => setForm({ ...form, nome: e.target.value })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               required
             />
@@ -195,8 +232,8 @@ export default function MedicosPage() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
             <select
-              value={form.specialty_id}
-              onChange={(e) => setForm({ ...form, specialty_id: Number(e.target.value) })}
+              value={form.especialidade_id}
+              onChange={(e) => setForm({ ...form, especialidade_id: Number(e.target.value) })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               required
             >
@@ -205,7 +242,7 @@ export default function MedicosPage() {
               </option>
               {specialties.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name}
+                  {s.nome}
                 </option>
               ))}
             </select>
@@ -218,8 +255,8 @@ export default function MedicosPage() {
               type="number"
               min={10}
               step={5}
-              value={form.consultation_duration}
-              onChange={(e) => setForm({ ...form, consultation_duration: Number(e.target.value) })}
+              value={form.duracao_consulta}
+              onChange={(e) => setForm({ ...form, duracao_consulta: Number(e.target.value) })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               required
             />
@@ -230,8 +267,8 @@ export default function MedicosPage() {
               type="number"
               min={0}
               step={10}
-              value={form.price}
-              onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
+              value={form.valor_consulta}
+              onChange={(e) => setForm({ ...form, valor_consulta: Number(e.target.value) })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               required
             />
@@ -243,8 +280,8 @@ export default function MedicosPage() {
               onChange={(e) => setForm({ ...form, status: e.target.value })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             >
-              <option value="active">Ativo</option>
-              <option value="inactive">Inativo</option>
+              <option value="Ativo">Ativo</option>
+              <option value="Inativo">Inativo</option>
             </select>
           </div>
           <div>
@@ -253,8 +290,8 @@ export default function MedicosPage() {
             </label>
             <input
               type="tel"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              value={form.telefone}
+              onChange={(e) => setForm({ ...form, telefone: e.target.value })}
               placeholder="+258 8X XXX XXXX"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
@@ -304,12 +341,18 @@ export default function MedicosPage() {
           disabled={loading}
           className="rounded-lg bg-primary hover:bg-primary-dark text-white font-medium px-4 py-2 text-sm disabled:opacity-50 transition-colors"
         >
-          {loading ? "Salvando..." : editing ? "Salvar alterações" : "Cadastrar"}
+          {loading ? "Salvando..." : editingId ? "Salvar alterações" : "Cadastrar"}
         </button>
       </form>
 
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        {doctors.length === 0 ? (
+        {fetching ? (
+          <div className="p-6 space-y-3">
+            <div className="h-4 bg-slate-100 rounded animate-pulse w-1/3" />
+            <div className="h-4 bg-slate-100 rounded animate-pulse w-1/2" />
+            <div className="h-4 bg-slate-100 rounded animate-pulse w-2/5" />
+          </div>
+        ) : doctors.length === 0 ? (
           <p className="p-6 text-sm text-slate-400">Nenhum médico cadastrado.</p>
         ) : (
           <div className="overflow-x-auto">
@@ -328,23 +371,23 @@ export default function MedicosPage() {
               <tbody>
                 {doctors.map((d) => (
                   <tr key={d.id} className="border-t border-slate-100">
-                    <td className="px-4 py-3 font-medium text-slate-900">{d.name}</td>
-                    <td className="px-4 py-3 text-slate-600">{d.specialty_name}</td>
-                    <td className="px-4 py-3 text-slate-600">{d.phone || "—"}</td>
-                    <td className="px-4 py-3 text-slate-600">{d.consultation_duration} min</td>
+                    <td className="px-4 py-3 font-medium text-slate-900">{d.nome}</td>
+                    <td className="px-4 py-3 text-slate-600">{d.especialidade_nome}</td>
+                    <td className="px-4 py-3 text-slate-600">{d.telefone || "—"}</td>
+                    <td className="px-4 py-3 text-slate-600">{d.duracao_consulta} min</td>
                     <td className="px-4 py-3 text-slate-600">
-                      {d.price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                      {d.valor_consulta.toLocaleString("pt-BR", { style: "currency", currency: "MZN" })}
                     </td>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => toggleStatus(d)}
                         className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          d.status === "active"
+                          d.status === "Ativo"
                             ? "bg-emerald-50 text-emerald-700"
                             : "bg-slate-100 text-slate-500"
                         }`}
                       >
-                        {d.status === "active" ? "Ativo" : "Inativo"}
+                        {d.status}
                       </button>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
