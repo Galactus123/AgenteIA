@@ -17,6 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: "▦" },
   { href: "/consultas", label: "Consultas", icon: "🗓" },
   { href: "/chat", label: "Atendimento IA", icon: "💬", superAdminOnly: true },
+  { href: "/pacientes", label: "Pacientes", icon: "👥" },
   { href: "/medicos", label: "Médicos", icon: "🩺" },
   { href: "/especialidades", label: "Especialidades", icon: "🏷" },
   { href: "/clinica", label: "Clínica", icon: "🏥" },
