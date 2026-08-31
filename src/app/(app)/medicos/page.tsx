@@ -84,9 +84,15 @@ export default function MedicosPage() {
           id: d.id as number,
           nome: d.nome as string,
           especialidade_id: d.especialidade_id as number,
-          especialidade_nome: (d.especialidades as Record<string, unknown>)?.nome
-            || (d.especialidades as Record<string, unknown>)?.name
-            || "—",
+          especialidade_nome: String(
+            (d.especialidades && typeof d.especialidades === "object" && "nome" in d.especialidades
+              ? (d.especialidades as Record<string, unknown>).nome
+              : null) ??
+              (d.especialidades && typeof d.especialidades === "object" && "name" in d.especialidades
+                ? (d.especialidades as Record<string, unknown>).name
+                : null) ??
+              ""
+          ),
           duracao_consulta: (d.duracao_consulta as number) ?? 30,
           valor_consulta: (d.valor_consulta as number) ?? 0,
           status: (d.status as string) ?? "Ativo",
@@ -241,8 +247,8 @@ export default function MedicosPage() {
             >
               <option value="">Selecione...</option>
               {especialidades && especialidades.map((item) => (
-                <option key={item.id || String(item)} value={item.id || String(item)}>
-                  {(item as Record<string, unknown>).nome || (item as Record<string, unknown>).name || String(item)}
+                <option key={item.id} value={item.id}>
+                  {String(item.nome ?? item.name ?? "")}
                 </option>
               ))}
             </select>
