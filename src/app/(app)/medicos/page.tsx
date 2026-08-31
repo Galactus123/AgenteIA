@@ -24,7 +24,7 @@ interface Doctor {
 
 interface Specialty {
   id: number;
-  nome: string;
+  name: string;
 }
 
 const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -62,12 +62,12 @@ export default function MedicosPage() {
     const [docRes, specRes] = await Promise.all([
       supabase
         .from("medicos")
-        .select("*, especialidades(nome)")
+        .select("*, especialidades(name)")
         .order("nome", { ascending: true }),
       supabase
         .from("especialidades")
-        .select("id, nome")
-        .order("nome", { ascending: true }),
+        .select("id, name")
+        .order("name", { ascending: true }),
     ]);
 
     if (docRes.data) {
@@ -76,7 +76,7 @@ export default function MedicosPage() {
           id: d.id as number,
           nome: d.nome as string,
           especialidade_id: d.especialidade_id as number,
-          especialidade_nome: (d.especialidades as { nome: string } | null)?.nome ?? "—",
+          especialidade_nome: (d.especialidades as { name: string } | null)?.name ?? "—",
           duracao_consulta: (d.duracao_consulta as number) ?? 30,
           valor_consulta: (d.valor_consulta as number) ?? 0,
           status: (d.status as string) ?? "Ativo",
@@ -87,9 +87,9 @@ export default function MedicosPage() {
     }
     if (specRes.data) {
       setSpecialties(
-        specRes.data.map((s: { id: number; nome: string }) => ({
+        specRes.data.map((s: { id: number; name: string }) => ({
           id: s.id,
-          nome: s.nome,
+          name: s.name,
         }))
       );
     }
@@ -242,7 +242,7 @@ export default function MedicosPage() {
               </option>
               {specialties.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.nome}
+                  {s.name}
                 </option>
               ))}
             </select>
