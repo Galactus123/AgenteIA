@@ -40,7 +40,7 @@ const EMPTY_SCHEDULE: ScheduleRow[] = Array.from({ length: 7 }, (_, weekday) => 
 
 const EMPTY_FORM = {
   nome: "",
-  especialidade_id: 0,
+  especialidade_id: "",
   telefone: "",
   duracao_consulta: 30,
   valor_consulta: 0,
@@ -113,7 +113,7 @@ export default function MedicosPage() {
     setEditingId(d.id);
     setForm({
       nome: d.nome,
-      especialidade_id: d.especialidade_id,
+      especialidade_id: String(d.especialidade_id || ""),
       telefone: d.telefone,
       duracao_consulta: d.duracao_consulta,
       valor_consulta: d.valor_consulta,
@@ -152,7 +152,7 @@ export default function MedicosPage() {
 
     const payload = {
       nome: form.nome,
-      especialidade_id: form.especialidade_id || null,
+      especialidade_id: form.especialidade_id ? Number(form.especialidade_id) : null,
       telefone: form.telefone || null,
       duracao_consulta: form.duracao_consulta,
       valor_consulta: form.valor_consulta,
@@ -241,14 +241,14 @@ export default function MedicosPage() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
             <select
               value={form.especialidade_id || ""}
-              onChange={(e) => setForm({ ...form, especialidade_id: Number(e.target.value) })}
+              onChange={(e) => setForm({ ...form, especialidade_id: e.target.value })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               required
             >
               <option value="">Selecione...</option>
-              {especialidades && especialidades.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {String(item.nome ?? item.name ?? "")}
+              {especialidades.map((esp) => (
+                <option key={esp.id} value={esp.id}>
+                  {String(esp.nome ?? esp.name ?? "")}
                 </option>
               ))}
             </select>
