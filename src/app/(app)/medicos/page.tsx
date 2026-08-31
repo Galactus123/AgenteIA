@@ -24,7 +24,9 @@ interface Doctor {
 
 interface Specialty {
   id: number;
-  name: string;
+  name?: string;
+  nome?: string;
+  [key: string]: unknown;
 }
 
 const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -47,7 +49,7 @@ const EMPTY_FORM = {
 
 export default function MedicosPage() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [specialties, setSpecialties] = useState<Specialty[]>([]);
+  const [especialidades, setEspecialidades] = useState<Specialty[]>([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [schedule, setSchedule] = useState<ScheduleRow[]>(EMPTY_SCHEDULE);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -56,40 +58,40 @@ export default function MedicosPage() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
 
+  useEffect(() => {
+    async function carregarEspecialidades() {
+      const { data, error } = await supabase.from("especialidades").select("*");
+      if (error) console.error("Erro ao buscar especialidades:", error);
+      else {
+        console.log("Especialidades carregadas:", data);
+        setEspecialidades(data || []);
+      }
+    }
+    carregarEspecialidades();
+  }, []);
+
   const load = useCallback(async () => {
     setFetching(true);
 
-    const [docRes, specRes] = await Promise.all([
-      supabase
-        .from("medicos")
-        .select("*, especialidades(name)")
-        .order("nome", { ascending: true }),
-      supabase
-        .from("especialidades")
-        .select("id, name")
-        .order("name", { ascending: true }),
-    ]);
+    const { data: docRes } = await supabase
+      .from("medicos")
+      .select("*, especialidades(name)")
+      .order("nome", { ascending: true });
 
-    if (docRes.data) {
+    if (docRes) {
       setDoctors(
-        docRes.data.map((d: Record<string, unknown>) => ({
+        docRes.map((d: Record<string, unknown>) => ({
           id: d.id as number,
           nome: d.nome as string,
           especialidade_id: d.especialidade_id as number,
-          especialidade_nome: (d.especialidades as { name: string } | null)?.name ?? "—",
+          especialidade_nome: (d.especialidades as Record<string, unknown>)?.nome
+            || (d.especialidades as Record<string, unknown>)?.name
+            || "—",
           duracao_consulta: (d.duracao_consulta as number) ?? 30,
           valor_consulta: (d.valor_consulta as number) ?? 0,
           status: (d.status as string) ?? "Ativo",
           telefone: (d.telefone as string) ?? "",
           dias_atendimento: (d.dias_atendimento as string[]) ?? [],
-        }))
-      );
-    }
-    if (specRes.data) {
-      setSpecialties(
-        specRes.data.map((s: { id: number; name: string }) => ({
-          id: s.id,
-          name: s.name,
         }))
       );
     }
@@ -232,17 +234,15 @@ export default function MedicosPage() {
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
             <select
-              value={form.especialidade_id}
+              value={form.especialidade_id || ""}
               onChange={(e) => setForm({ ...form, especialidade_id: Number(e.target.value) })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               required
             >
-              <option value={0} disabled>
-                Selecione...
-              </option>
-              {specialties.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
+              <option value="">Selecione...</option>
+              {especialidades && especialidades.map((item) => (
+                <option key={item.id || String(item)} value={item.id || String(item)}>
+                  {(item as Record<string, unknown>).nome || (item as Record<string, unknown>).name || String(item)}
                 </option>
               ))}
             </select>
