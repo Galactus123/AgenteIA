@@ -75,27 +75,19 @@ export default function MedicosPage() {
   const load = useCallback(async () => {
     setFetching(true);
 
-    const { data: docRes } = await supabase
+    const { data, error } = await supabase
       .from("medicos")
-      .select("*, especialidades(name)")
-      .order("nome", { ascending: true });
+      .select("*, especialidades(nome)")
+      .order("created_at", { ascending: false });
 
-    if (docRes) {
+    if (!error && data) {
       setDoctors(
-        docRes.map((d: Record<string, unknown>) => ({
+        data.map((d: Record<string, unknown>) => ({
           id: d.id as number,
           nome: d.nome as string,
           email: (d.email as string) ?? "",
           especialidade_id: d.especialidade_id as number,
-          especialidade_nome: String(
-            (d.especialidades && typeof d.especialidades === "object" && "nome" in d.especialidades
-              ? (d.especialidades as Record<string, unknown>).nome
-              : null) ??
-              (d.especialidades && typeof d.especialidades === "object" && "name" in d.especialidades
-                ? (d.especialidades as Record<string, unknown>).name
-                : null) ??
-              ""
-          ),
+          especialidade_nome: (d.especialidade as string) ?? "",
           duracao_consulta: (d.duracao_consulta as number) ?? 30,
           valor_consulta: (d.valor_consulta as number) ?? 0,
           status: (d.status as string) ?? "Ativo",
@@ -161,14 +153,14 @@ export default function MedicosPage() {
     const payload = {
       nome: form.nome,
       email: form.email || null,
+      telefone: form.telefone || null,
+      especialidade_id: form.especialidade_id ? Number(form.especialidade_id) : null,
       especialidade: especialidadeSelecionada
         ? String(especialidadeSelecionada.nome ?? especialidadeSelecionada.name ?? "")
         : "",
-      especialidade_id: form.especialidade_id ? Number(form.especialidade_id) : null,
-      telefone: form.telefone || null,
-      duracao_consulta: form.duracao_consulta,
-      valor_consulta: form.valor_consulta,
-      status: form.status,
+      duracao_consulta: Number(form.duracao_consulta || 30),
+      valor_consulta: Number(form.valor_consulta || 0),
+      status: form.status || "Ativo",
       dias_atendimento: diasAtendimento,
     };
 
@@ -196,7 +188,7 @@ export default function MedicosPage() {
       } else {
         resetForm();
         setSuccess(editingId ? "Médico atualizado com sucesso!" : "Médico cadastrado com sucesso!");
-        load();
+        await load();
         setTimeout(() => setSuccess(""), 3000);
       }
     } catch (err) {
