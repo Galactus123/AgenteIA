@@ -13,6 +13,7 @@ interface ScheduleRow {
 interface Doctor {
   id: number;
   nome: string;
+  email: string;
   especialidade_id: number;
   especialidade_nome: string;
   duracao_consulta: number;
@@ -40,6 +41,7 @@ const EMPTY_SCHEDULE: ScheduleRow[] = Array.from({ length: 7 }, (_, weekday) => 
 
 const EMPTY_FORM = {
   nome: "",
+  email: "",
   especialidade_id: "",
   telefone: "",
   duracao_consulta: 30,
@@ -83,6 +85,7 @@ export default function MedicosPage() {
         docRes.map((d: Record<string, unknown>) => ({
           id: d.id as number,
           nome: d.nome as string,
+          email: (d.email as string) ?? "",
           especialidade_id: d.especialidade_id as number,
           especialidade_nome: String(
             (d.especialidades && typeof d.especialidades === "object" && "nome" in d.especialidades
@@ -113,6 +116,7 @@ export default function MedicosPage() {
     setEditingId(d.id);
     setForm({
       nome: d.nome,
+      email: d.email || "",
       especialidade_id: String(d.especialidade_id || ""),
       telefone: d.telefone,
       duracao_consulta: d.duracao_consulta,
@@ -156,6 +160,7 @@ export default function MedicosPage() {
 
     const payload = {
       nome: form.nome,
+      email: form.email || null,
       especialidade: especialidadeSelecionada
         ? String(especialidadeSelecionada.nome ?? especialidadeSelecionada.name ?? "")
         : "",
@@ -240,6 +245,17 @@ export default function MedicosPage() {
               type="text"
               value={form.nome}
               onChange={(e) => setForm({ ...form, nome: e.target.value })}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              placeholder="medico@exemplo.com"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               required
             />
