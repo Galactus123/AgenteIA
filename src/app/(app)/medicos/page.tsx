@@ -150,8 +150,15 @@ export default function MedicosPage() {
       .filter((r) => r.enabled)
       .map((r) => DAY_LABELS[r.weekday]);
 
+    const especialidadeSelecionada = especialidades.find(
+      (e) => e.id === Number(form.especialidade_id)
+    );
+
     const payload = {
       nome: form.nome,
+      especialidade: especialidadeSelecionada
+        ? String(especialidadeSelecionada.nome ?? especialidadeSelecionada.name ?? "")
+        : "",
       especialidade_id: form.especialidade_id ? Number(form.especialidade_id) : null,
       telefone: form.telefone || null,
       duracao_consulta: form.duracao_consulta,
