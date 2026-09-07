@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { getStats } from "@/lib/services/stats";
 import { displayDate } from "@/lib/datetime";
 import AnimatedEntry from "@/components/animated-entry";
@@ -9,7 +10,13 @@ import DoctorStatusList from "@/components/dashboard/doctor-status-list";
 export const dynamic = "force-dynamic";
 
 export default function DashboardPage() {
-  const stats = getStats();
+  let stats;
+  try {
+    stats = getStats();
+  } catch {
+    redirect("/login");
+  }
+
   const today = new Date();
   const dateLabel = displayDate(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`);
 

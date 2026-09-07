@@ -4,7 +4,21 @@ import { displayDateTime } from "@/lib/datetime";
 export const dynamic = "force-dynamic";
 
 export default function ConsultasPage() {
-  const appointments = listAppointments();
+  let appointments;
+  try {
+    appointments = listAppointments();
+  } catch {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">Consultas</h1>
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <p className="text-sm text-red-600">Erro ao carregar consultas. Tente novamente mais tarde.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
