@@ -101,7 +101,7 @@ export default function AuthPage() {
   if (isMobile) {
     return (
       <div
-        className={`relative flex flex-col overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 ${inter.variable}`}
+        className={`relative flex flex-col overflow-hidden bg-gradient-to-br from-[#0B0D14] via-[#0D1020] to-[#0F1328] ${inter.variable}`}
         style={{
           fontFamily: "var(--font-inter), sans-serif",
           minHeight: "100dvh",
@@ -126,12 +126,12 @@ export default function AuthPage() {
             <div className="flex items-center justify-center h-11 w-11 rounded-xl bg-primary text-white text-lg font-bold">
               S
             </div>
-            <span className="text-xl font-semibold text-slate-800">SaudeSync</span>
+            <span className="text-xl font-semibold text-white">SaudeSync</span>
           </div>
 
           {/* ── Tab switcher ─────────────────────────────────────────── */}
           <div
-            className="flex rounded-2xl bg-white/60 backdrop-blur-md border border-white/60 shadow-sm p-1 mb-6"
+            className="flex rounded-2xl bg-[#161926]/80 backdrop-blur-md border border-[rgba(99,102,241,0.15)] shadow-sm p-1 mb-6"
             role="tablist"
           >
             <button
@@ -164,7 +164,7 @@ export default function AuthPage() {
 
           {/* ── Forms (scrollable area) ──────────────────────────────── */}
           <div
-            className="flex-1 rounded-3xl bg-white/80 backdrop-blur-xl shadow-2xl shadow-slate-200/50 border border-white/60 p-6"
+            className="flex-1 rounded-3xl bg-[#161926]/80 backdrop-blur-xl shadow-2xl shadow-black/30 border border-[rgba(99,102,241,0.15)] p-6"
             style={{ overflowY: "auto", WebkitOverflowScrolling: "touch" }}
           >
             {/* ── Sign In ──────────────────────────────────────────── */}
@@ -175,12 +175,12 @@ export default function AuthPage() {
                   transition: "opacity 0.3s ease",
                 }}
               >
-                <h2 className="text-xl font-semibold text-slate-900 mb-1">Bem-vindo de volta</h2>
-                <p className="text-sm text-slate-500 mb-6">Entre na sua conta para continuar.</p>
+                <h2 className="text-xl font-semibold text-white mb-1">Bem-vindo de volta</h2>
+                <p className="text-sm text-slate-400 mb-6">Entre na sua conta para continuar.</p>
 
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500">
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                       </svg>
@@ -190,14 +190,14 @@ export default function AuthPage() {
                       value={loginUser}
                       onChange={(e) => setLoginUser(e.target.value)}
                       placeholder="Usuário ou e-mail"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                      className="w-full rounded-xl border border-[rgba(99,102,241,0.15)] bg-[rgba(255,255,255,0.04)] pl-10 pr-4 text-sm text-white placeholder:text-slate-500 placeholder:font-normal focus:border-[#4f6df5] focus:ring-2 focus:ring-[#4f6df5]/20 focus:outline-none transition-all"
                       style={{ fontWeight: 400, fontSize: "16px", height: "48px" }}
                       required
                     />
                   </div>
 
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500">
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                       </svg>
@@ -207,14 +207,14 @@ export default function AuthPage() {
                       value={loginPass}
                       onChange={(e) => setLoginPass(e.target.value)}
                       placeholder="Senha"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                      className="w-full rounded-xl border border-[rgba(99,102,241,0.15)] bg-[rgba(255,255,255,0.04)] pl-10 pr-4 text-sm text-white placeholder:text-slate-500 placeholder:font-normal focus:border-[#4f6df5] focus:ring-2 focus:ring-[#4f6df5]/20 focus:outline-none transition-all"
                       style={{ fontWeight: 400, fontSize: "16px", height: "48px" }}
                       required
                     />
                   </div>
 
                   {loginError && (
-                    <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{loginError}</p>
+                    <p className="text-sm text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{loginError}</p>
                   )}
 
                   <button
@@ -242,12 +242,12 @@ export default function AuthPage() {
                   transition: "opacity 0.3s ease",
                 }}
               >
-                <h2 className="text-xl font-semibold text-slate-900 mb-1">Criar conta</h2>
-                <p className="text-sm text-slate-500 mb-6">Preencha os dados para começar.</p>
+                <h2 className="text-xl font-semibold text-white mb-1">Criar conta</h2>
+                <p className="text-sm text-slate-400 mb-6">Preencha os dados para começar.</p>
 
                 <form onSubmit={handleSignUp} className="space-y-3">
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500">
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                       </svg>
@@ -257,14 +257,14 @@ export default function AuthPage() {
                       value={signupName}
                       onChange={(e) => setSignupName(e.target.value)}
                       placeholder="Nome completo"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                      className="w-full rounded-xl border border-[rgba(99,102,241,0.15)] bg-[rgba(255,255,255,0.04)] pl-10 pr-4 text-sm text-white placeholder:text-slate-500 placeholder:font-normal focus:border-[#4f6df5] focus:ring-2 focus:ring-[#4f6df5]/20 focus:outline-none transition-all"
                       style={{ fontWeight: 400, fontSize: "16px", height: "48px" }}
                       required
                     />
                   </div>
 
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500">
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                       </svg>
@@ -274,14 +274,14 @@ export default function AuthPage() {
                       value={signupEmail}
                       onChange={(e) => setSignupEmail(e.target.value)}
                       placeholder="E-mail"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                      className="w-full rounded-xl border border-[rgba(99,102,241,0.15)] bg-[rgba(255,255,255,0.04)] pl-10 pr-4 text-sm text-white placeholder:text-slate-500 placeholder:font-normal focus:border-[#4f6df5] focus:ring-2 focus:ring-[#4f6df5]/20 focus:outline-none transition-all"
                       style={{ fontWeight: 400, fontSize: "16px", height: "48px" }}
                       required
                     />
                   </div>
 
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500">
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                       </svg>
@@ -291,7 +291,7 @@ export default function AuthPage() {
                       value={signupPass}
                       onChange={(e) => setSignupPass(e.target.value)}
                       placeholder="Senha (mín. 8 caracteres)"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                      className="w-full rounded-xl border border-[rgba(99,102,241,0.15)] bg-[rgba(255,255,255,0.04)] pl-10 pr-4 text-sm text-white placeholder:text-slate-500 placeholder:font-normal focus:border-[#4f6df5] focus:ring-2 focus:ring-[#4f6df5]/20 focus:outline-none transition-all"
                       style={{ fontWeight: 400, fontSize: "16px", height: "48px" }}
                       required
                       minLength={8}
@@ -299,7 +299,7 @@ export default function AuthPage() {
                   </div>
 
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500">
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
                       </svg>
@@ -309,7 +309,7 @@ export default function AuthPage() {
                       value={signupPassConfirm}
                       onChange={(e) => setSignupPassConfirm(e.target.value)}
                       placeholder="Confirmar senha"
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                      className="w-full rounded-xl border border-[rgba(99,102,241,0.15)] bg-[rgba(255,255,255,0.04)] pl-10 pr-4 text-sm text-white placeholder:text-slate-500 placeholder:font-normal focus:border-[#4f6df5] focus:ring-2 focus:ring-[#4f6df5]/20 focus:outline-none transition-all"
                       style={{ fontWeight: 400, fontSize: "16px", height: "48px" }}
                       required
                       minLength={8}
@@ -317,7 +317,7 @@ export default function AuthPage() {
                   </div>
 
                   {signupError && (
-                    <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{signupError}</p>
+                    <p className="text-sm text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{signupError}</p>
                   )}
 
                   <button
@@ -340,13 +340,13 @@ export default function AuthPage() {
             {/* ── Signup success ──────────────────────────────────── */}
             {isSignup && signupSuccess && (
               <div className="text-center py-8">
-                <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-green-100 text-green-600 mb-4">
+                <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-emerald-500/15 text-emerald-400 mb-4">
                   <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                   </svg>
                 </div>
-                <h3 className="text-xl font-semibold text-slate-900">Conta criada!</h3>
-                <p className="text-sm text-slate-500 mt-2 mb-6">Agora faça login para acessar o painel.</p>
+                <h3 className="text-xl font-semibold text-white">Conta criada!</h3>
+                <p className="text-sm text-slate-400 mt-2 mb-6">Agora faça login para acessar o painel.</p>
                 <button
                   onClick={() => {
                     setSignupSuccess(false);
@@ -356,7 +356,7 @@ export default function AuthPage() {
                     setSignupPass("");
                     setSignupPassConfirm("");
                   }}
-                  className="rounded-xl border-2 border-primary text-primary hover:bg-primary hover:text-white font-medium px-8 py-3 text-sm transition-all duration-200"
+                  className="rounded-xl border-2 border-[#4f6df5] text-primary hover:bg-primary hover:text-white font-medium px-8 py-3 text-sm transition-all duration-200"
                 >
                   Ir para o Login
                 </button>
@@ -382,7 +382,7 @@ export default function AuthPage() {
      ═══════════════════════════════════════════════════════════════════ */
   return (
     <div
-      className={`relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 ${inter.variable}`}
+      className={`relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-[#0B0D14] via-[#0D1020] to-[#0F1328] ${inter.variable}`}
       style={{ fontFamily: "var(--font-inter), sans-serif" }}
     >
       {/* ── Background geometric shapes ────────────────────────────── */}
@@ -394,15 +394,15 @@ export default function AuthPage() {
           backgroundImage: "radial-gradient(circle, #4f6df5 1px, transparent 1px)",
           backgroundSize: "32px 32px",
         }} />
-        <div className="absolute top-20 right-[15%] h-16 w-16 rounded-2xl border border-primary/10 rotate-12 animate-[spin_40s_linear_infinite]" />
+        <div className="absolute top-20 right-[15%] h-16 w-16 rounded-2xl border border-[#4f6df5]/10 rotate-12 animate-[spin_40s_linear_infinite]" />
         <div className="absolute bottom-32 left-[10%] h-12 w-12 rounded-full border border-highlight/15 animate-[spin_30s_linear_infinite_reverse]" />
-        <div className="absolute top-1/2 left-[20%] h-8 w-8 rounded-lg border border-primary/10 rotate-45 animate-[pulse_4s_ease-in-out_infinite]" />
+        <div className="absolute top-1/2 left-[20%] h-8 w-8 rounded-lg border border-[#4f6df5]/10 rotate-45 animate-[pulse_4s_ease-in-out_infinite]" />
       </div>
 
       {/* ── Main card ──────────────────────────────────────────────── */}
       <div className="relative z-10 w-full max-w-4xl mx-4">
         <div
-          className="relative flex min-h-[540px] rounded-3xl bg-white/80 backdrop-blur-xl shadow-2xl shadow-slate-200/50 border border-white/60"
+          className="relative flex min-h-[540px] rounded-3xl bg-[#161926]/80 backdrop-blur-xl shadow-2xl shadow-black/30 border border-[rgba(99,102,241,0.15)]"
           style={{ overflow: "hidden" }}
         >
           {/* ── Left half: Sign In form ──────────────────────────────── */}
@@ -425,15 +425,15 @@ export default function AuthPage() {
                   <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-primary text-white text-lg font-bold">
                     S
                   </div>
-                  <span className="text-lg font-semibold text-slate-800">SaudeSync</span>
+                  <span className="text-lg font-semibold text-white">SaudeSync</span>
                 </div>
-                <h2 className="text-2xl font-semibold text-slate-900">Bem-vindo de volta</h2>
-                <p className="text-sm text-slate-500 mt-1">Entre na sua conta para continuar.</p>
+                <h2 className="text-2xl font-semibold text-white">Bem-vindo de volta</h2>
+                <p className="text-sm text-slate-400 mt-1">Entre na sua conta para continuar.</p>
               </div>
 
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500">
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                     </svg>
@@ -443,14 +443,14 @@ export default function AuthPage() {
                     value={loginUser}
                     onChange={(e) => setLoginUser(e.target.value)}
                     placeholder="Usuário ou e-mail"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                    className="w-full rounded-xl border border-[rgba(99,102,241,0.15)] bg-[rgba(255,255,255,0.04)] pl-10 pr-4 py-3 text-sm text-white placeholder:text-slate-500 placeholder:font-normal focus:border-[#4f6df5] focus:ring-2 focus:ring-[#4f6df5]/20 focus:outline-none transition-all"
                     style={{ fontWeight: 400 }}
                     required
                   />
                 </div>
 
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500">
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                     </svg>
@@ -460,14 +460,14 @@ export default function AuthPage() {
                     value={loginPass}
                     onChange={(e) => setLoginPass(e.target.value)}
                     placeholder="Senha"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                    className="w-full rounded-xl border border-[rgba(99,102,241,0.15)] bg-[rgba(255,255,255,0.04)] pl-10 pr-4 py-3 text-sm text-white placeholder:text-slate-500 placeholder:font-normal focus:border-[#4f6df5] focus:ring-2 focus:ring-[#4f6df5]/20 focus:outline-none transition-all"
                     style={{ fontWeight: 400 }}
                     required
                   />
                 </div>
 
                 {loginError && (
-                  <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{loginError}</p>
+                  <p className="text-sm text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{loginError}</p>
                 )}
 
                 <button
@@ -508,15 +508,15 @@ export default function AuthPage() {
                       <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-primary text-white text-lg font-bold">
                         S
                       </div>
-                      <span className="text-lg font-semibold text-slate-800">SaudeSync</span>
+                      <span className="text-lg font-semibold text-white">SaudeSync</span>
                     </div>
-                    <h2 className="text-2xl font-semibold text-slate-900">Criar conta</h2>
-                    <p className="text-sm text-slate-500 mt-1">Preencha os dados para começar.</p>
+                    <h2 className="text-2xl font-semibold text-white">Criar conta</h2>
+                    <p className="text-sm text-slate-400 mt-1">Preencha os dados para começar.</p>
                   </div>
 
                   <form onSubmit={handleSignUp} className="space-y-3">
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500">
                         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                         </svg>
@@ -526,14 +526,14 @@ export default function AuthPage() {
                         value={signupName}
                         onChange={(e) => setSignupName(e.target.value)}
                         placeholder="Nome completo"
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                        className="w-full rounded-xl border border-[rgba(99,102,241,0.15)] bg-[rgba(255,255,255,0.04)] pl-10 pr-4 py-3 text-sm text-white placeholder:text-slate-500 placeholder:font-normal focus:border-[#4f6df5] focus:ring-2 focus:ring-[#4f6df5]/20 focus:outline-none transition-all"
                         style={{ fontWeight: 400 }}
                         required
                       />
                     </div>
 
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500">
                         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                         </svg>
@@ -543,14 +543,14 @@ export default function AuthPage() {
                         value={signupEmail}
                         onChange={(e) => setSignupEmail(e.target.value)}
                         placeholder="E-mail"
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                        className="w-full rounded-xl border border-[rgba(99,102,241,0.15)] bg-[rgba(255,255,255,0.04)] pl-10 pr-4 py-3 text-sm text-white placeholder:text-slate-500 placeholder:font-normal focus:border-[#4f6df5] focus:ring-2 focus:ring-[#4f6df5]/20 focus:outline-none transition-all"
                         style={{ fontWeight: 400 }}
                         required
                       />
                     </div>
 
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500">
                         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                         </svg>
@@ -560,7 +560,7 @@ export default function AuthPage() {
                         value={signupPass}
                         onChange={(e) => setSignupPass(e.target.value)}
                         placeholder="Senha (mín. 8 caracteres)"
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                        className="w-full rounded-xl border border-[rgba(99,102,241,0.15)] bg-[rgba(255,255,255,0.04)] pl-10 pr-4 py-3 text-sm text-white placeholder:text-slate-500 placeholder:font-normal focus:border-[#4f6df5] focus:ring-2 focus:ring-[#4f6df5]/20 focus:outline-none transition-all"
                         style={{ fontWeight: 400 }}
                         required
                         minLength={8}
@@ -568,7 +568,7 @@ export default function AuthPage() {
                     </div>
 
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-500">
                         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
                         </svg>
@@ -578,7 +578,7 @@ export default function AuthPage() {
                         value={signupPassConfirm}
                         onChange={(e) => setSignupPassConfirm(e.target.value)}
                         placeholder="Confirmar senha"
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                        className="w-full rounded-xl border border-[rgba(99,102,241,0.15)] bg-[rgba(255,255,255,0.04)] pl-10 pr-4 py-3 text-sm text-white placeholder:text-slate-500 placeholder:font-normal focus:border-[#4f6df5] focus:ring-2 focus:ring-[#4f6df5]/20 focus:outline-none transition-all"
                         style={{ fontWeight: 400 }}
                         required
                         minLength={8}
@@ -586,7 +586,7 @@ export default function AuthPage() {
                     </div>
 
                     {signupError && (
-                      <p className="text-sm text-red-500 bg-red-50 rounded-lg px-3 py-2">{signupError}</p>
+                      <p className="text-sm text-red-500 bg-red-500/10 rounded-lg px-3 py-2">{signupError}</p>
                     )}
 
                     <button
@@ -607,13 +607,13 @@ export default function AuthPage() {
 
               {signupSuccess && (
                 <div className="text-center py-8">
-                  <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-green-100 text-green-600 mb-4">
+                  <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-emerald-500/15 text-emerald-400 mb-4">
                     <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-semibold text-slate-900">Conta criada!</h3>
-                  <p className="text-sm text-slate-500 mt-2 mb-6">Agora faça login para acessar o painel.</p>
+                  <h3 className="text-xl font-semibold text-white">Conta criada!</h3>
+                  <p className="text-sm text-slate-400 mt-2 mb-6">Agora faça login para acessar o painel.</p>
                   <button
                     onClick={() => {
                       setSignupSuccess(false);
@@ -623,7 +623,7 @@ export default function AuthPage() {
                       setSignupPass("");
                       setSignupPassConfirm("");
                     }}
-                    className="rounded-xl border-2 border-primary text-primary hover:bg-primary hover:text-white font-medium px-8 py-3 text-sm transition-all duration-200"
+                    className="rounded-xl border-2 border-[#4f6df5] text-primary hover:bg-primary hover:text-white font-medium px-8 py-3 text-sm transition-all duration-200"
                   >
                     Ir para o Login
                   </button>
