@@ -6,7 +6,7 @@ export default function ChatLoading() {
       <div className="flex items-center gap-4 mb-4">
         <Skeleton className="h-7 w-32" />
       </div>
-      <div className="flex-1 rounded-2xl border border-slate-200 bg-white p-4 space-y-4">
+      <div className="flex-1 rounded-2xl p-4 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
         <div className="flex gap-3">
           <Skeleton className="h-10 w-10 rounded-full shrink-0" />
           <div className="flex-1 space-y-2">

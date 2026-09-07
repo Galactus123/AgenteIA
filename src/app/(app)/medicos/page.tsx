@@ -214,17 +214,17 @@ export default function MedicosPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">Médicos</h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Médicos</h1>
+        <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
           Cadastro de médicos, especialidades, valores e horários de atendimento.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+      <form onSubmit={handleSubmit} className="rounded-2xl p-5 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-slate-900">{editingId ? "Editar médico" : "Novo médico"}</h2>
+          <h2 className="font-semibold" style={{ color: "var(--text-primary)" }}>{editingId ? "Editar médico" : "Novo médico"}</h2>
           {editingId && (
-            <button type="button" onClick={resetForm} className="text-sm text-slate-500 hover:text-slate-700">
+            <button type="button" onClick={resetForm} className="text-sm hover:underline" style={{ color: "var(--text-muted)" }}>
               Cancelar edição
             </button>
           )}
@@ -232,32 +232,32 @@ export default function MedicosPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Nome</label>
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Nome</label>
             <input
               type="text"
               value={form.nome}
               onChange={(e) => setForm({ ...form, nome: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Email</label>
             <input
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               placeholder="medico@exemplo.com"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Especialidade</label>
             <select
               value={form.especialidade_id || ""}
               onChange={(e) => setForm({ ...form, especialidade_id: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             >
               <option value="">Selecione...</option>
@@ -269,7 +269,7 @@ export default function MedicosPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
               Duração da consulta (minutos)
             </label>
             <input
@@ -278,35 +278,35 @@ export default function MedicosPage() {
               step={5}
               value={form.duracao_consulta}
               onChange={(e) => setForm({ ...form, duracao_consulta: Number(e.target.value) })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Valor da consulta</label>
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Valor da consulta</label>
             <input
               type="number"
               min={0}
               step={10}
               value={form.valor_consulta}
               onChange={(e) => setForm({ ...form, valor_consulta: Number(e.target.value) })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Status</label>
             <select
               value={form.status}
               onChange={(e) => setForm({ ...form, status: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
             >
               <option value="Ativo">Ativo</option>
               <option value="Inativo">Inativo</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
               Telefone / WhatsApp
             </label>
             <input
@@ -314,13 +314,13 @@ export default function MedicosPage() {
               value={form.telefone}
               onChange={(e) => setForm({ ...form, telefone: e.target.value })}
               placeholder="+258 8X XXX XXXX"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Dias e horários de atendimento</label>
+          <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>Dias e horários de atendimento</label>
           <div className="space-y-1.5">
             {schedule.map((row) => (
               <div key={row.weekday} className="flex items-center gap-3 text-sm">
@@ -329,7 +329,7 @@ export default function MedicosPage() {
                     type="checkbox"
                     checked={row.enabled}
                     onChange={(e) => updateScheduleRow(row.weekday, { enabled: e.target.checked })}
-                    className="rounded border-slate-300 text-primary focus:ring-primary"
+                    className="rounded border-[rgba(99,102,241,0.1)] text-primary focus:ring-primary"
                   />
                   {DAY_LABELS[row.weekday]}
                 </label>
@@ -339,14 +339,14 @@ export default function MedicosPage() {
                       type="time"
                       value={row.start_time}
                       onChange={(e) => updateScheduleRow(row.weekday, { start_time: e.target.value })}
-                      className="rounded-lg border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="rounded-lg px-2 py-1 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
                     />
-                    <span className="text-slate-400">até</span>
+                    <span style={{ color: "var(--text-faint)" }}>até</span>
                     <input
                       type="time"
                       value={row.end_time}
                       onChange={(e) => updateScheduleRow(row.weekday, { end_time: e.target.value })}
-                      className="rounded-lg border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="rounded-lg px-2 py-1 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
                     />
                   </div>
                 )}
@@ -366,7 +366,7 @@ export default function MedicosPage() {
         </button>
       </form>
 
-      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <div className="rounded-2xl overflow-hidden" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
         {fetching ? (
           <div className="p-6 space-y-3">
             <div className="h-4 bg-slate-100 rounded animate-pulse w-1/3" />
@@ -374,7 +374,7 @@ export default function MedicosPage() {
             <div className="h-4 bg-slate-100 rounded animate-pulse w-2/5" />
           </div>
         ) : doctors.length === 0 ? (
-          <p className="p-6 text-sm text-slate-400">Nenhum médico cadastrado.</p>
+          <p className="p-6 text-sm" style={{ color: "var(--text-faint)" }}>Nenhum médico cadastrado.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -391,12 +391,12 @@ export default function MedicosPage() {
               </thead>
               <tbody>
                 {doctors.map((d) => (
-                  <tr key={d.id} className="border-t border-slate-100">
-                    <td className="px-4 py-3 font-medium text-slate-900">{d.nome}</td>
-                    <td className="px-4 py-3 text-slate-600">{d.especialidade_nome}</td>
-                    <td className="px-4 py-3 text-slate-600">{d.telefone || "—"}</td>
-                    <td className="px-4 py-3 text-slate-600">{d.duracao_consulta} min</td>
-                    <td className="px-4 py-3 text-slate-600">
+                  <tr key={d.id} style={{ borderTop: "1px solid var(--surface-border)" }}>
+                    <td className="px-4 py-3 font-medium" style={{ color: "var(--text-primary)" }}>{d.nome}</td>
+                    <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{d.especialidade_nome}</td>
+                    <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{d.telefone || "—"}</td>
+                    <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{d.duracao_consulta} min</td>
+                    <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>
                       {d.valor_consulta.toLocaleString("pt-BR", { style: "currency", currency: "MZN" })}
                     </td>
                     <td className="px-4 py-3">
@@ -405,8 +405,9 @@ export default function MedicosPage() {
                         className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                           d.status === "Ativo"
                             ? "bg-emerald-50 text-emerald-700"
-                            : "bg-slate-100 text-slate-500"
+                            : "bg-slate-100"
                         }`}
+                        style={d.status !== "Ativo" ? { color: "var(--text-muted)" } : undefined}
                       >
                         {d.status}
                       </button>

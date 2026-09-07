@@ -86,18 +86,18 @@ export default function PerfilPage() {
   return (
     <div className="space-y-6 max-w-xl">
       <div>
-        <h1 className="text-xl font-bold text-slate-900">Perfil</h1>
+        <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Perfil</h1>
         <p className="text-sm text-slate-500 mt-1">
           Gerencie suas credenciais de acesso.
         </p>
       </div>
 
       {admin && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <div className="rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
           <p className="text-sm text-slate-500">Usuário</p>
-          <p className="font-medium text-slate-900">{admin.username}</p>
+          <p className="font-medium" style={{ color: "var(--text-primary)" }}>{admin.username}</p>
           <p className="text-sm text-slate-500 mt-2">Função</p>
-          <p className="font-medium text-slate-900 capitalize">
+          <p className="font-medium capitalize" style={{ color: "var(--text-primary)" }}>
             {admin.role.replace("_", " ")}
           </p>
         </div>
@@ -106,12 +106,13 @@ export default function PerfilPage() {
       {/* Alterar E-mail */}
       <form
         onSubmit={handleEmailSubmit}
-        className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4"
+        className="rounded-2xl p-5 space-y-4"
+        style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
       >
-        <h2 className="font-semibold text-slate-900">Alterar E-mail</h2>
+        <h2 className="font-semibold" style={{ color: "var(--text-primary)" }}>Alterar E-mail</h2>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
             Novo E-mail
           </label>
           <input
@@ -119,20 +120,20 @@ export default function PerfilPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="novo@email.com"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full rounded-lg px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
             Senha Atual (confirmação)
           </label>
           <input
             type="password"
             value={emailPassword}
             onChange={(e) => setEmailPassword(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full rounded-lg px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
             required
           />
         </div>
@@ -159,25 +160,26 @@ export default function PerfilPage() {
       {/* Alterar Senha */}
       <form
         onSubmit={handlePasswordSubmit}
-        className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4"
+        className="rounded-2xl p-5 space-y-4"
+        style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
       >
-        <h2 className="font-semibold text-slate-900">Alterar Senha</h2>
+        <h2 className="font-semibold" style={{ color: "var(--text-primary)" }}>Alterar Senha</h2>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
             Senha Atual
           </label>
           <input
             type="password"
             value={currentPw}
             onChange={(e) => setCurrentPw(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full rounded-lg px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
             Nova Senha
           </label>
           <input
@@ -185,14 +187,14 @@ export default function PerfilPage() {
             value={newPw}
             onChange={(e) => setNewPw(e.target.value)}
             minLength={8}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full rounded-lg px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
             required
           />
           <p className="text-xs text-slate-400 mt-1">Mínimo de 8 caracteres.</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
             Confirmar Nova Senha
           </label>
           <input
@@ -200,7 +202,7 @@ export default function PerfilPage() {
             value={confirmPw}
             onChange={(e) => setConfirmPw(e.target.value)}
             minLength={8}
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full rounded-lg px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
             required
           />
         </div>

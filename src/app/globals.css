@@ -261,3 +261,53 @@ body {
 @utility safe-area-pb {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+/* ── Global Dark Theme Form Styles ────────────────────────────── */
+.dark input,
+.dark textarea,
+.dark select {
+  background: var(--input-bg) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--input-border) !important;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--text-faint) !important;
+}
+
+.dark input:focus,
+.dark textarea:focus,
+.dark select:focus {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 1px var(--color-primary) !important;
+  outline: none !important;
+}
+
+.dark label {
+  color: var(--text-secondary) !important;
+}
+
+.dark .dark-card {
+  background: var(--card) !important;
+  border: 1px solid var(--card-border) !important;
+}
+
+.dark .dark-table {
+  background: var(--card) !important;
+  border: 1px solid var(--card-border) !important;
+}
+
+.dark .dark-table th {
+  background: var(--surface) !important;
+  color: var(--text-secondary) !important;
+}
+
+.dark .dark-table td {
+  border-color: var(--surface-border) !important;
+  color: var(--text-secondary) !important;
+}
+
+.dark .dark-table tr {
+  border-color: var(--surface-border) !important;
+}
