@@ -1,3 +1,5 @@
+"use client";
+
 interface Doctor {
   id: number;
   name: string;
