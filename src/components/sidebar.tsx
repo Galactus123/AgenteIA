@@ -18,6 +18,7 @@ import {
   Menu,
   X,
   ChevronLeft,
+  Activity,
 } from "lucide-react";
 
 interface NavItem {
@@ -157,15 +158,16 @@ function SidebarInner({ session }: { session?: SessionData }) {
         <div className="flex items-center gap-3 px-4 py-5" style={{ borderBottom: `1px solid ${sidebarBorder}` }}>
           <Link href="/dashboard" prefetch={true} className="flex items-center gap-3 min-w-0">
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0"
-              style={{ background: "linear-gradient(135deg, #4f6df5, #6366f1)" }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-gradient-to-tr from-indigo-600 to-violet-500 shadow-[0_0_12px_rgba(99,102,241,0.35)]"
             >
-              S
+              <Activity size={16} strokeWidth={2} className="text-white" />
             </div>
             {!collapsed && (
               <div className="min-w-0">
-                <p className="font-semibold leading-tight text-sm truncate" style={{ color: "var(--text-primary)" }}>SaúdeSync</p>
-                <p className="text-[10px] truncate" style={{ color: "var(--text-faint)" }}>Recepção virtual IA</p>
+                <p className="font-semibold leading-tight text-sm truncate dark:text-white text-slate-900">
+                  Saúde<span className="text-indigo-500">Sync</span>
+                </p>
+                <p className="text-[10px] truncate dark:text-slate-500 text-slate-400">Recepção virtual IA</p>
               </div>
             )}
           </Link>
@@ -246,14 +248,15 @@ function SidebarInner({ session }: { session?: SessionData }) {
         <div className="flex items-center justify-between px-4 py-5" style={{ borderBottom: `1px solid ${sidebarBorder}` }}>
           <Link href="/dashboard" prefetch={true} className="flex items-center gap-3 min-w-0" onClick={closeMobile}>
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0"
-              style={{ background: "linear-gradient(135deg, #4f6df5, #6366f1)" }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-gradient-to-tr from-indigo-600 to-violet-500 shadow-[0_0_12px_rgba(99,102,241,0.35)]"
             >
-              S
+              <Activity size={16} strokeWidth={2} className="text-white" />
             </div>
             <div className="min-w-0">
-              <p className="font-semibold leading-tight text-sm truncate" style={{ color: "var(--text-primary)" }}>SaúdeSync</p>
-              <p className="text-[10px] truncate" style={{ color: "var(--text-faint)" }}>Recepção virtual IA</p>
+              <p className="font-semibold leading-tight text-sm truncate dark:text-white text-slate-900">
+                Saúde<span className="text-indigo-500">Sync</span>
+              </p>
+              <p className="text-[10px] truncate dark:text-slate-500 text-slate-400">Recepção virtual IA</p>
             </div>
           </Link>
           <button

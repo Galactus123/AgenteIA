@@ -3,6 +3,7 @@
 import { useState, FormEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
+import { Activity } from "lucide-react";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -123,10 +124,12 @@ export default function AuthPage() {
         <div className="relative z-10 flex flex-1 flex-col">
           {/* ── Logo ─────────────────────────────────────────────────── */}
           <div className="flex items-center justify-center gap-3 mb-6">
-            <div className="flex items-center justify-center h-11 w-11 rounded-xl bg-primary text-white text-lg font-bold">
-              S
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 shadow-[0_0_15px_rgba(99,102,241,0.4)]">
+              <Activity className="w-5 h-5 text-white" strokeWidth={2} />
             </div>
-            <span className="text-xl font-semibold dark:text-white text-slate-900">SaudeSync</span>
+            <span className="text-xl font-bold tracking-tight dark:text-white text-slate-900">
+              Saúde<span className="text-indigo-500">Sync</span>
+            </span>
           </div>
 
           {/* ── Tab switcher ─────────────────────────────────────────── */}
@@ -422,10 +425,12 @@ export default function AuthPage() {
             >
               <div className="mb-8">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-primary text-white text-lg font-bold">
-                    S
+                  <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 shadow-[0_0_15px_rgba(99,102,241,0.4)]">
+                    <Activity className="w-5 h-5 text-white" strokeWidth={2} />
                   </div>
-                  <span className="text-lg font-semibold dark:text-white text-slate-900">SaudeSync</span>
+                  <span className="text-lg font-bold tracking-tight dark:text-white text-slate-900">
+                    Saúde<span className="text-indigo-500">Sync</span>
+                  </span>
                 </div>
                 <h2 className="text-2xl font-semibold dark:text-white text-slate-900">Bem-vindo de volta</h2>
                 <p className="text-sm dark:text-slate-400 text-slate-500 mt-1">Entre na sua conta para continuar.</p>
@@ -505,10 +510,12 @@ export default function AuthPage() {
                 <>
                   <div className="mb-8">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-primary text-white text-lg font-bold">
-                        S
+                      <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 shadow-[0_0_15px_rgba(99,102,241,0.4)]">
+                        <Activity className="w-5 h-5 text-white" strokeWidth={2} />
                       </div>
-                      <span className="text-lg font-semibold dark:text-white text-slate-900">SaudeSync</span>
+                      <span className="text-lg font-bold tracking-tight dark:text-white text-slate-900">
+                        Saúde<span className="text-indigo-500">Sync</span>
+                      </span>
                     </div>
                     <h2 className="text-2xl font-semibold dark:text-white text-slate-900">Criar conta</h2>
                     <p className="text-sm dark:text-slate-400 text-slate-500 mt-1">Preencha os dados para começar.</p>

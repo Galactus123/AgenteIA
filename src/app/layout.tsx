@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   title: "SaúdeSync",
   description: "Sistema inteligente de gestão clínica",
   icons: {
-    icon: "/icon.png",
+    icon: "/icon.svg",
   },
 };
 
