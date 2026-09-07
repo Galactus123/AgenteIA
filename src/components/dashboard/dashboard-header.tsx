@@ -17,7 +17,7 @@ export default function DashboardHeader({ userName = "Admin", clinicName = "Saú
 
   return (
     <header
-      className="rounded-2xl px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3 sm:gap-4"
+      className="relative z-50 rounded-2xl px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-3 sm:gap-4"
       style={{
         background: "var(--card)",
         border: "1px solid var(--card-border)",
