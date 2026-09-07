@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
-import ThemeProvider from "@/providers/theme-provider";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -30,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt" className={`${jakarta.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
+    <html lang="pt-BR" className={`${jakarta.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="min-h-full bg-background text-foreground">
         <Script
           id="theme-init"
@@ -53,7 +53,9 @@ export default function RootLayout({
             `,
           }}
         />
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api-auth";
 import { updateSpecialty, deleteSpecialty, getSpecialty } from "@/lib/services/specialties";
 
-export async function PUT(request: NextRequest, ctx: RouteContext<"/api/especialidades/[id]">) {
+type RouteContext = { params: Promise<{ id: string }> };
+
+export async function PUT(request: NextRequest, ctx: RouteContext) {
   const authError = requireAuth(request);
   if (authError) return authError;
   const { id } = await ctx.params;
@@ -21,7 +23,7 @@ export async function PUT(request: NextRequest, ctx: RouteContext<"/api/especial
   }
 }
 
-export async function DELETE(request: NextRequest, ctx: RouteContext<"/api/especialidades/[id]">) {
+export async function DELETE(request: NextRequest, ctx: RouteContext) {
   const authError = requireAuth(request);
   if (authError) return authError;
   const { id } = await ctx.params;
