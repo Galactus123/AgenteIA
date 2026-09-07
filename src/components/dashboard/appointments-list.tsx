@@ -36,6 +36,7 @@ interface AppointmentsListProps {
 }
 
 export default function AppointmentsList({ appointments, dateLabel }: AppointmentsListProps) {
+  const list = Array.isArray(appointments) ? appointments : [];
   return (
     <div className="neon-card p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4 sm:mb-5">
@@ -51,7 +52,7 @@ export default function AppointmentsList({ appointments, dateLabel }: Appointmen
         </a>
       </div>
 
-      {appointments.length === 0 ? (
+      {list.length === 0 ? (
         <div className="text-center py-8 sm:py-10">
           <span className="text-3xl block mb-2">📋</span>
           <p className="text-sm" style={{ color: "var(--text-faint)" }}>Nenhuma consulta agendada para hoje.</p>
@@ -63,7 +64,7 @@ export default function AppointmentsList({ appointments, dateLabel }: Appointmen
             animate="visible"
             variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
           >
-            {appointments.map((a) => (
+            {list.map((a) => (
               <motion.div
                 key={a.id}
                 className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 sm:p-3 rounded-xl transition-colors min-h-[56px]"

@@ -23,7 +23,8 @@ function isAvailableToday(schedule?: { weekday: number; start_time: string; end_
 }
 
 export default function DoctorStatusList({ doctors }: DoctorStatusListProps) {
-  const activeDoctors = doctors.filter((d) => d.status === "active");
+  const list = Array.isArray(doctors) ? doctors : [];
+  const activeDoctors = list.filter((d) => d.status === "active");
   const today = getDayOfWeek();
   const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 

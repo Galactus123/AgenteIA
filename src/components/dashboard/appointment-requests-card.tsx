@@ -15,26 +15,27 @@ interface AppointmentRequestsCardProps {
 }
 
 export default function AppointmentRequestsCard({ requests }: AppointmentRequestsCardProps) {
+  const list = Array.isArray(requests) ? requests : [];
   return (
     <div className="neon-card p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4 sm:mb-5">
         <div>
           <h2 className="font-semibold text-base" style={{ color: "var(--text-primary)" }}>Solicitações</h2>
-          <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{requests.length} pendente{requests.length !== 1 ? "s" : ""}</p>
+          <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{list.length} pendente{list.length !== 1 ? "s" : ""}</p>
         </div>
         <span className="neon-badge-warning text-xs font-medium px-2 py-0.5 rounded-full">
-          {requests.length}
+          {list.length}
         </span>
       </div>
 
-      {requests.length === 0 ? (
+      {list.length === 0 ? (
         <div className="text-center py-6 sm:py-8">
           <span className="text-3xl block mb-2">✅</span>
           <p className="text-sm" style={{ color: "var(--text-faint)" }}>Nenhuma solicitação pendente.</p>
         </div>
       ) : (
         <div className="space-y-2.5 sm:space-y-3">
-          {requests.map((req) => (
+          {list.map((req) => (
             <div
               key={req.id}
               className="p-3 sm:p-3 rounded-xl transition-colors"
