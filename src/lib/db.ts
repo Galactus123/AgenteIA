@@ -175,7 +175,6 @@ export function migrate() {
   } catch {
     // Column already exists
   }
-  // Migrations de cota/uso de tokens da clínica (tenancy)
   const clinicColumns: [string, string][] = [
     ["token_limit", "INTEGER NOT NULL DEFAULT 100000"],
     ["base_token_limit", "INTEGER NOT NULL DEFAULT 100000"],
@@ -206,12 +205,12 @@ function seed() {
   db.prepare(
     "INSERT INTO clinics (name, address, phone, whatsapp, opening_hours, location, social_media, token_limit, base_token_limit, current_token_usage, near_limit_notified, overage_blocks_purchased, subscription_status, billing_cycle_day, last_reset_at) VALUES (?, ?, ?, ?, ?, ?, ?, 100000, 100000, 0, 0, 0, 'active', 1, NULL)"
   ).run(
-    "Clínica Vida",
+    "Clinica Vida",
     "Av. Julius Nyerere 1234, Maputo",
     "+258 21 300 000",
     "+258 84 000 0000",
-    "Segunda a Sexta: 08h às 18h | Sábado: 08h às 13h",
-    "Maputo, Moçambique",
+    "Segunda a Sexta: 08h as 18h | Sabado: 08h as 13h",
+    "Maputo, Mocambique",
     JSON.stringify({ facebook: "", instagram: "" })
   );
 
@@ -224,44 +223,44 @@ function seed() {
 
   const specialties: [string, string, string[]][] = [
     [
-      "Clínica Geral",
-      "Atendimento médico geral para adultos e crianças acima de 2 anos. Primeira avaliação de qualquer problema de saúde.",
-      ["dor de cabeça", "febre", "gripe", "dor de garganta", "dores no corpo", "pressão alta", "diabetes", "mal estar", "fadiga", "tosse"],
+      "Clinica Geral",
+      "Atendimento medico geral para adultos e criancas acima de 2 anos.",
+      ["dor de cabeca", "febre", "gripe", "dor de garganta", "dores no corpo", "pressao alta", "diabetes", "mal estar", "fadiga", "tosse"],
     ],
     [
       "Pediatria",
-      "Atendimento médico para bebês e crianças, acompanhamento do crescimento e desenvolvimento.",
-      ["filho", "bebê", "bebe", "criança", "crianca", "febre na criança", "crescimento", "vacinas", "refluxo do bebê"],
+      "Atendimento medico para bebes e criancas, acompanhamento do crescimento.",
+      ["filho", "bebe", "crianca", "febre na crianca", "crescimento", "vacinas", "refluxo do bebe"],
     ],
     [
       "Ginecologia",
-      "Saúde da mulher: consultas de rotina, planejamento familiar, exames ginecológicos.",
-      ["menstruação", "menstruacao", "gravidez", "corrimento", "cólica", "colica", "papanicolau", "planejamento familiar", "mama"],
+      "Saude da mulher: consultas de rotina, planejamento familiar.",
+      ["menstruacao", "gravidez", "corrimento", "colica", "papanicolau", "planejamento familiar", "mama"],
     ],
     [
       "Dermatologia",
-      "Tratamento de problemas de pele, cabelo e unhas: acne, manchas, alergias, queda de cabelo.",
-      ["acne", "pele", "manchas", "coceira", "vermelhidão", "queda de cabelo", "caspa", "verruga", "micose", "alergia na pele"],
+      "Tratamento de problemas de pele, cabelo e unhas.",
+      ["acne", "pele", "manchas", "coceira", "vermelhidao", "queda de cabelo", "caspa", "verruga", "micose", "alergia na pele"],
     ],
     [
       "Odontologia",
-      "Saúde bucal: limpeza, restaurações, extrações, clareamento e tratamento de canal.",
-      ["dente", "dor de dente", "gengiva", "sangramento na gengiva", "cárie", "carie", "limpeza dental", "canal", "aparelho", "prótese"],
+      "Saude bucal: limpeza, restauracoes, extracoes, clareamento.",
+      ["dente", "dor de dente", "gengiva", "sangramento na gengiva", "carie", "limpeza dental", "canal", "aparelho", "protese"],
     ],
     [
       "Oftalmologia",
-      "Exames de visão, consultas de rotina e tratamento de doenças dos olhos.",
-      ["visão", "visao", "olho", "vista", "óculos", "oculos", "lente", "coceira nos olhos", "vermelhidão nos olhos", "miopia"],
+      "Exames de visao, consultas de rotina e tratamento de doencas dos olhos.",
+      ["visao", "olho", "vista", "oculos", "lente", "coceira nos olhos", "vermelhidao nos olhos", "miopia"],
     ],
     [
       "Fisioterapia",
-      "Reabilitação e tratamento de dores musculares, articulares e recuperação de lesões.",
-      ["dor nas costas", "coluna", "joelho", "ombro", "lesão", "lesao", "entorse", "reabilitação", "reabilitacao", "torcicolo", "hérnia"],
+      "Reabilitacao e tratamento de dores musculares, articulares.",
+      ["dor nas costas", "coluna", "joelho", "ombro", "lesao", "entorse", "reabilitacao", "torcicolo", "hernia"],
     ],
     [
       "Psicologia",
-      "Acompanhamento psicológico para ansiedade, estresse, depressão, luto e outras questões emocionais.",
-      ["ansiedade", "estresse", "depressão", "depressao", "angústia", "angustia", "insônia", "insonia", "luto", "medo", "terapia", "pânico"],
+      "Acompanhamento psicologico para ansiedade, estresse, depressao.",
+      ["ansiedade", "estresse", "depressao", "angustia", "insonia", "luto", "medo", "terapia", "panico"],
     ],
   ];
 
@@ -273,10 +272,10 @@ function seed() {
   }
 
   const doctors: [string, string, number, number, string, [number, string, string][]][] = [
-    ["Dra. Ana Martins", "Clínica Geral", 30, 800, "+258 84 123 4567", [[1, "08:00", "12:00"], [1, "14:00", "17:00"], [3, "08:00", "12:00"], [5, "08:00", "12:00"]]],
+    ["Dra. Ana Martins", "Clinica Geral", 30, 800, "+258 84 123 4567", [[1, "08:00", "12:00"], [1, "14:00", "17:00"], [3, "08:00", "12:00"], [5, "08:00", "12:00"]]],
     ["Dr. Carlos Mendes", "Pediatria", 30, 900, "+258 85 234 5678", [[2, "08:00", "12:00"], [4, "08:00", "12:00"], [4, "14:00", "17:00"], [6, "08:00", "11:00"]]],
     ["Dra. Beatriz Lopes", "Ginecologia", 40, 1200, "+258 86 345 6789", [[1, "08:00", "12:00"], [2, "14:00", "17:00"], [3, "08:00", "12:00"], [5, "14:00", "17:00"]]],
-    ["Dr. João Ferreira", "Dermatologia", 30, 1000, "+258 84 456 7890", [[2, "08:00", "12:00"], [3, "14:00", "17:00"], [6, "08:00", "11:00"]]],
+    ["Dr. Joao Ferreira", "Dermatologia", 30, 1000, "+258 84 456 7890", [[2, "08:00", "12:00"], [3, "14:00", "17:00"], [6, "08:00", "11:00"]]],
     ["Dr. Miguel Sousa", "Odontologia", 45, 700, "+258 85 567 8901", [[1, "08:00", "12:00"], [2, "08:00", "12:00"], [4, "14:00", "17:00"], [5, "08:00", "12:00"]]],
     ["Dra. Sofia Nunes", "Oftalmologia", 30, 1000, "+258 86 678 9012", [[3, "08:00", "12:00"], [4, "08:00", "12:00"], [6, "08:00", "11:00"]]],
     ["Dr. Pedro Almeida", "Fisioterapia", 40, 600, "+258 84 789 0123", [[1, "08:00", "12:00"], [2, "14:00", "17:00"], [4, "08:00", "12:00"], [5, "08:00", "12:00"]]],
@@ -303,15 +302,21 @@ function seed() {
   db.exec("COMMIT");
 }
 
-migrate();
 // Durante o build (next build), os workers coletam dados das rotas em paralelo e o
-// seed usa uma transação de escrita (BEGIN IMMEDIATE) — isso causa "database is locked"
-// quando vários processos tentam popular o mesmo arquivo ao mesmo tempo.
-// O seed é executado apenas em tempo de execução.
-if (process.env.NEXT_PHASE !== "phase-production-build") {
+// migrate/seed usa transacoes de escrita — isso causa "database is locked" quando
+// varios processos tentam acessar o mesmo arquivo ao mesmo tempo.
+// Tanto migrate quanto seed sao executados apenas em tempo de execucao.
+const isBuild = process.env.NEXT_PHASE === "phase-production-build";
+
+if (!isBuild) {
+  try {
+    migrate();
+  } catch (err) {
+    console.error("[db] Erro no migrate:", err);
+  }
   try {
     seed();
   } catch {
-    // se já foi populado por outro processo concorrente, ignora
+    // se ja foi populado por outro processo concorrente, ignora
   }
 }

@@ -83,7 +83,7 @@ export async function checkKomunikaNumber(phone: string): Promise<KomunikaNumber
     }
     const exists = body.data?.[0]?.exists ?? false;
     if (!exists) {
-      console.log(`[komunika] Número ${phone} não existe no WhatsApp — envio ignorado.`);
+      console.log(`[komunika] Numero nao existe no WhatsApp — envio ignorado.`);
     }
     return { ok: true, exists };
   } catch (err) {
@@ -147,11 +147,10 @@ export async function sendKomunikaMessage(
   }
   // Normaliza o destinatário: apenas dígitos, com código do país (ex.: 258...).
   const normalizedTo = to.replace(/\D/g, "");
-  console.log(`[DEBUG 4] Número normalizado para envio: "${to}" -> "${normalizedTo}"`);
+  console.log(`[komunika] Normalizando numero: ${to.replace(/\D/g, "").length} digitos`);
 
   const token = apiToken();
-  const maskedToken = token ? `${token.slice(0, 6)}...${token.slice(-4)}` : "(vazio)";
-  console.log(`[DEBUG 4] Token Komunika configurado: ${maskedToken}`);
+  console.log(`[komunika] Token configurado: ${token ? "sim" : "nao"}`);
 
   try {
     const bodyPayload = {
@@ -163,7 +162,7 @@ export async function sendKomunikaMessage(
       message: content,
       content,
     };
-    console.log("[DEBUG 4] Body enviado à Komunika:", JSON.stringify(bodyPayload, null, 2));
+    console.log("[komunika] Enviando mensagem: tipo=", bodyPayload.type, "tamanho=", content.length);
 
     const res = await fetch(`${baseUrl()}/messages/send`, {
       method: "POST",
@@ -179,11 +178,11 @@ export async function sendKomunikaMessage(
     try {
       parsed = JSON.parse(rawText);
     } catch {
-      // resposta não-JSON
+      // resposta nao-JSON
     }
-    console.log("[DEBUG 4] Resposta Komunika:", rawText);
+    console.log("[komunika] Resposta:", res.status, res.ok ? "ok" : "erro");
     if (!res.ok) {
-      console.error("[KOMUNIKA ERROR]:", res.status, rawText);
+      console.error("[komunika] Erro:", res.status);
       return { ok: false, status: res.status, error: parsed?.message ?? parsed?.error ?? (rawText || res.statusText), rawBody: parsed };
     }
     console.log(`[komunika] Mensagem enviada com sucesso: status=${res.status} messageId=${parsed?.messageId}`);

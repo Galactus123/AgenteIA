@@ -4,6 +4,7 @@ import { hashSync } from "bcryptjs";
 import { db } from "@/lib/db";
 import { nowStr } from "@/lib/datetime";
 import { isKomunikaConfigured, sendKomunikaMessage } from "@/lib/services/komunika";
+import { isValidPayloadSize } from "@/lib/agent/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -132,6 +133,13 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   try {
+    // 0. Validar tamanho do payload (anti-DoS)
+    const rawBody = await request.clone().text().catch(() => "");
+    if (!isValidPayloadSize(rawBody)) {
+      console.error("[lojou-webhook] Payload excede tamanho maximo (100KB)");
+      return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+    }
+
     // 1. Validar secret via query string
     const secret = extractSecret(request);
     const expectedSecret = process.env.LOJOU_WEBHOOK_SECRET ?? "";
@@ -149,7 +157,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    console.log("[lojou-webhook] Payload recebido:", JSON.stringify(body, null, 2));
+    console.log("[lojou-webhook] Payload recebido, tipo:", resolveEventName(body) || "desconhecido");
 
     // 3. Verificar se é evento de pedido aprovado
     const eventName = resolveEventName(body);
@@ -180,16 +188,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing customer email" }, { status: 422 });
     }
 
-    console.log("[lojou-webhook] Dados extraídos:", { name, email, phone, orderId, productId });
+    console.log("[lojou-webhook] Dados extraidos: orderId=", orderId ? "presente" : "ausente", "email=", email ? "presente" : "ausente", "phone=", phone ? "presente" : "ausente");
 
-    // 5. Verificar se o utilizador já existe
+    // 5. Verificar idempotencia: se ja existe um utilizador com este order_id, ignorar
+    //    (previne duplicacao por reenvio do webhook)
+    if (orderId) {
+      const existingByOrder = db.prepare("SELECT id FROM users WHERE lojou_order_id = ?").get(orderId) as { id: number } | undefined;
+      if (existingByOrder) {
+        console.log("[lojou-webhook] Pedido ja processado (order_id), ignorando.");
+        return NextResponse.json({ success: true, user_id: existingByOrder.id, created: false });
+      }
+    }
+
+    // 6. Verificar se o utilizador ja existe por email
     const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email) as { id: number } | undefined;
     if (existing) {
-      console.log("[lojou-webhook] Utilizador já existe, ignorando. email:", email);
+      console.log("[lojou-webhook] Utilizador ja existe, ignorando.");
       return NextResponse.json({ success: true, user_id: existing.id, created: false });
     }
 
-    // 6. Criar utilizador com senha provisória
+    // 7. Criar utilizador com senha provisoria
     const tempPassword = generateTempPassword();
     const passwordHash = hashSync(tempPassword, 10);
 
@@ -201,7 +219,7 @@ export async function POST(request: NextRequest) {
       .run(name, email, phone, passwordHash, orderId, productId, nowStr());
 
     const userId = Number(result.lastInsertRowid);
-    console.log("[lojou-webhook] Utilizador criado:", { userId, email });
+    console.log("[lojou-webhook] Utilizador criado: id=", userId);
 
     // 7. Enviar credenciais via Komunika WhatsApp
     if (phone && isKomunikaConfigured()) {
@@ -224,7 +242,7 @@ export async function POST(request: NextRequest) {
       if (!sendResult.ok) {
         console.error("[lojou-webhook] Falha ao enviar credenciais via WhatsApp:", sendResult.error);
       } else {
-        console.log("[lojou-webhook] Credenciais enviadas via WhatsApp para:", phone);
+        console.log("[lojou-webhook] Credenciais enviadas via WhatsApp");
       }
     } else if (!phone) {
       console.warn("[lojou-webhook] Telefone não informado — credenciais não enviadas via WhatsApp");

@@ -3,6 +3,7 @@ import { toolDefinitions, executeTool } from "@/lib/agent/tools";
 import { buildSystemPrompt } from "@/lib/agent/prompts";
 import { addMessage, getMessages, getConversation, updateConversation, getOrCreateConversation } from "@/lib/services/conversations";
 import { blockForQuota, consumeTokens, hasAiQuota } from "@/lib/services/subscriptions";
+import { sanitizePatientInput } from "@/lib/agent/security";
 
 const MAX_ITERATIONS = 8;
 
@@ -31,10 +32,20 @@ export async function handlePatientMessage(phone: string, text: string): Promise
   conversationId: number;
   transferred: boolean;
 }> {
+  // Sanitizar input do paciente contra prompt injection
+  const sanitizedText = sanitizePatientInput(text);
+  if (!sanitizedText) {
+    log("Mensagem rejeitada por seguranca (prompt injection detectado).");
+    const safeReply = "Desculpe, nao consegui processar sua mensagem. Pode reformular?";
+    const conversation = getOrCreateConversation(phone);
+    addMessage(conversation.id, "bot", safeReply);
+    return { reply: safeReply, conversationId: conversation.id, transferred: false };
+  }
+
   const conversation = getOrCreateConversation(phone);
-  log(`Conversa carregada/criada para phone=${phone} → id=${conversation.id}, status="${conversation.status}"`);
-  addMessage(conversation.id, "patient", text);
-  log(`Mensagem do paciente [${conversation.id}] gravada: "${text}"`);
+  log(`Conversa carregada/criada para phone=${phone} id=${conversation.id}, status="${conversation.status}"`);
+  addMessage(conversation.id, "patient", sanitizedText);
+  log(`Mensagem do paciente [${conversation.id}] gravada (tamanho=${sanitizedText.length})`);
 
   if (!isLlmConfigured()) {
     log("LLM não configurado (OPENAI_API_KEY ausente). Retornando NO_KEY_MESSAGE.");
@@ -51,8 +62,8 @@ export async function handlePatientMessage(phone: string, text: string): Promise
   const history = getMessages(conversation.id);
   log(`Histórico completo carregado: ${history.length} mensagens para conversation_id=${conversation.id}`);
 
-  // Monta o contexto completo: system prompt + histórico integral + nova mensagem
-  const hasHistory = history.length > 1; // mais de 1 = já teve interações anteriores
+  // Monta o contexto completo: system prompt + historico integral + nova mensagem
+  const hasHistory = history.length > 1;
   const systemPrompt = buildSystemPrompt(hasHistory);
   const messages: LlmMessage[] = [{ role: "system", content: systemPrompt }];
 
@@ -60,7 +71,9 @@ export async function handlePatientMessage(phone: string, text: string): Promise
   let botCount = 0;
   for (const msg of history) {
     if (msg.sender === "patient") {
-      messages.push({ role: "user", content: msg.content });
+      // Aplicar sanitizacao tambem no historico carregado do banco
+      const safeContent = sanitizePatientInput(msg.content) ?? msg.content;
+      messages.push({ role: "user", content: safeContent });
       patientCount++;
     } else if (msg.sender === "bot") {
       messages.push({ role: "assistant", content: msg.content });

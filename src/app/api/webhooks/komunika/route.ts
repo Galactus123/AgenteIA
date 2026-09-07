@@ -10,6 +10,7 @@ import {
   cleanResponseText,
 } from "@/lib/services/komunika";
 import type { KomunikaInboundMessage } from "@/lib/services/komunika";
+import { isValidPayloadSize } from "@/lib/agent/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,11 +45,16 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.text().catch(() => "");
-    console.log("[PAYLOAD COMPLETO]:", rawBody);
-    console.log("[DEBUG 1] Chegada do payload no webhook:", rawBody);
+    console.log("[webhook] Payload recebido, tamanho:", rawBody.length);
+
+    // Validar tamanho maximo do payload (anti-DoS)
+    if (!isValidPayloadSize(rawBody)) {
+      console.error("[webhook] Payload excede tamanho maximo (100KB)");
+      return NextResponse.json({ error: "Payload muito grande." }, { status: 413 });
+    }
 
     const signature = request.headers.get("x-komunika-signature");
-    console.log("[webhook] Assinatura recebida:", signature ?? "(nenhuma)");
+    console.log("[webhook] Assinatura:", signature ? "presente" : "ausente");
 
     if (!verifyKomunikaSignature(rawBody, signature)) {
       console.error("[webhook] Assinatura inválida — rejeitando requisição");
@@ -63,13 +69,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Body inválido." }, { status: 400 });
     }
 
-    // TEMPORÁRIO: remoção da verificação que ignora message.sent para
-    // inspecionar o payload real enviado pela Komunika.
-    // const eventType = String(body.event ?? body.type ?? "");
-    // if (eventType && !RECEIVED_EVENTS.has(eventType)) {
-    //   console.log("[webhook] Evento ignorado:", eventType);
-    //   return NextResponse.json({ received: true, ignored: true });
-    // }
+    // Filtrar tipos de evento: apenas mensagens recebidas disparam o fluxo da IA.
+    // Mensagens enviadas pelo bot (message.sent) ou outros eventos sao ignorados.
+    const eventType = String(body.event ?? body.type ?? "").toLowerCase();
+    if (eventType && !RECEIVED_EVENTS.has(eventType)) {
+      console.log("[webhook] Evento ignorado:", eventType);
+      return NextResponse.json({ received: true, ignored: true });
+    }
 
     const inbound = parseKomunikaInbound(body);
     if (!inbound) {
@@ -100,61 +106,54 @@ export async function POST(request: NextRequest) {
 async function processInboundMessage(inbound: KomunikaInboundMessage): Promise<void> {
   try {
     // Envia o indicador "digitando..." e AGUARDA a confirmação antes de chamar a OpenAI.
-    console.log("[DEBUG 2] Disparo de typing para a API da Komunika. phone=", inbound.phone);
+    console.log("[webhook] Enviando indicador de typing...");
     const typingResult = await sendKomunikaTyping(inbound.phone, { type: "composing" });
-    console.log("[webhook] Status Typing Komunika:", typingResult.status);
+    console.log("[webhook] Typing status:", typingResult.ok ? "ok" : "falhou");
     if (!typingResult.ok) {
       console.error(
-        `[webhook] Falha ao enviar typing para ${inbound.phone}: status=${typingResult.status} error=${typingResult.error}`
+        `[webhook] Falha ao enviar typing: status=${typingResult.status} error=${typingResult.error}`
       );
     }
 
-    console.log("[DEBUG 2] Início da chamada da OpenAI. phone=", inbound.phone);
+    console.log("[webhook] Processando mensagem via IA...");
     const result = await handlePatientMessage(inbound.phone, inbound.text);
-    console.log("[DEBUG 3] Resposta retornada da OpenAI:", {
-      reply: result.reply?.slice(0, 150),
-      transferred: result.transferred,
-    });
+    console.log("[webhook] IA respondeu: transferred=", result.transferred, "reply_len=", result.reply?.length ?? 0);
 
     if (result.reply) {
       const cleanReply = cleanResponseText(result.reply);
       if (!cleanReply) {
-        console.error("[webhook] Resposta da IA vazia após limpeza para phone=", inbound.phone);
+        console.error("[webhook] Resposta da IA vazia apos limpeza.");
         return;
       }
-      console.log("[DEBUG 4] Disparo de envio da mensagem para a API da Komunika. phone=", inbound.phone);
+      console.log("[webhook] Verificando numero antes de enviar resposta...");
       const check = await checkKomunikaNumber(inbound.phone);
       if (check.ok && check.exists === false) {
-        console.log(`[webhook] Número ${inbound.phone} sem WhatsApp — resposta da IA não enviada.`);
+        console.log(`[webhook] Numero sem WhatsApp — resposta nao enviada.`);
         return;
       }
-      console.log("[komunika] Enviando resposta final para o número:", inbound.phone);
-      console.log("[DEBUG 4] Enviando resposta para o CLIENTE:", inbound.phone);
+      console.log("[webhook] Enviando resposta ao paciente...");
       const sendResult = await sendKomunikaMessage(inbound.phone, cleanReply, { type: "text" });
-      console.log("[DEBUG 4] Resultado envio Komunika:", JSON.stringify(sendResult, null, 2));
-      console.log("[komunika] Resposta final enviada. phone=", inbound.phone, "status=", sendResult.status);
-      console.log("[webhook] Status Komunika:", sendResult.status);
+      console.log("[webhook] Envio:", sendResult.ok ? "ok" : "falhou status=" + sendResult.status);
       if (!sendResult.ok) {
         console.error(
-          `[webhook] Falha ao enviar resposta para ${inbound.phone}: status=${sendResult.status} error=${sendResult.error}`
+          `[webhook] Falha ao enviar resposta: status=${sendResult.status} error=${sendResult.error}`
         );
       }
     }
 
     if (result.transferred) {
-      console.log("[DEBUG 4] Disparo de envio da mensagem para a API da Komunika (transferência). phone=", inbound.phone);
+      console.log("[webhook] Verificando numero para transferencia...");
       const transferCheck = await checkKomunikaNumber(inbound.phone);
       if (transferCheck.ok && transferCheck.exists === false) {
-        console.log(`[webhook] Número ${inbound.phone} sem WhatsApp — aviso de transferência não enviado.`);
+        console.log(`[webhook] Numero sem WhatsApp — aviso de transferencia nao enviado.`);
         return;
       }
-      console.log("[komunika] Enviando resposta final (transferência) para o número:", inbound.phone);
+      console.log("[webhook] Enviando aviso de transferencia...");
       const transferResult = await sendKomunikaMessage(inbound.phone, HUMAN_TRANSFER_NOTICE, { type: "text" });
-      console.log("[komunika] Resposta final (transferência) enviada. phone=", inbound.phone, "status=", transferResult.status);
-      console.log("[webhook] Status Komunika (transfer):", transferResult.status);
+      console.log("[webhook] Transferencia:", transferResult.ok ? "ok" : "falhou status=" + transferResult.status);
       if (!transferResult.ok) {
         console.error(
-          `[webhook] Falha ao enviar aviso de transferência para ${inbound.phone}: status=${transferResult.status} error=${transferResult.error}`
+          `[webhook] Falha ao enviar aviso de transferencia: status=${transferResult.status} error=${transferResult.error}`
         );
       }
     }

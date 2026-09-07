@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import { compareSync } from "bcryptjs";
 
@@ -10,8 +10,26 @@ export interface SessionData {
 }
 
 const SESSION_COOKIE = "saudesync_session";
-const SESSION_SECRET =
-  process.env.SESSION_SECRET || "saudesync-dev-secret-change-in-production";
+
+// Em producao, SESSION_SECRET e obrigatorio. Se nao estiver definido,
+// a aplicacao recusa iniciar para evitar sessoes forjaveis.
+// Em dev local, gera uma chave aleatoria segura por processo.
+function resolveSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (secret) return secret;
+
+  if (process.env.VERCEL || process.env.NODE_ENV === "production") {
+    throw new Error(
+      "[AUTH] SESSION_SECRET e obrigatorio em producao. Defina uma chave forte (ex.: openssl rand -hex 32)."
+    );
+  }
+
+  // Dev local: chave aleatoria segura (muda a cada reinicio — sessoes invalidadas)
+  console.warn("[AUTH] SESSION_SECRET nao definido — usando chave aleatoria temporaria (dev apenas)");
+  return randomBytes(32).toString("hex");
+}
+
+const SESSION_SECRET = resolveSessionSecret();
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 
 function base64UrlEncode(input: string): string {

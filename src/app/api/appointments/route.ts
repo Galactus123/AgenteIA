@@ -5,6 +5,9 @@ import {
   createAppointment,
 } from "@/lib/services/appointments";
 import { isSlotAvailable } from "@/lib/services/appointments";
+import { MAX_PATIENT_NAME_LENGTH } from "@/lib/agent/security";
+
+const MAX_REASON_LENGTH = 500;
 
 export async function GET(request: NextRequest) {
   const authError = requireAuth(request);
@@ -26,54 +29,54 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   if (!body) {
     return NextResponse.json(
-      { error: "Corpo da requisição inválido." },
+      { error: "Corpo da requisicao invalido." },
       { status: 400 }
     );
   }
 
-  const patientName = body.patient_name ? String(body.patient_name) : undefined;
+  const patientName = body.patient_name ? String(body.patient_name).slice(0, MAX_PATIENT_NAME_LENGTH) : undefined;
   const patientPhone = body.patient_phone
     ? String(body.patient_phone).replace(/\D/g, "")
     : undefined;
   const specialtyId = body.specialty_id ? Number(body.specialty_id) : undefined;
   const doctorId = body.doctor_id ? Number(body.doctor_id) : undefined;
   const startsAt = body.starts_at ? String(body.starts_at) : undefined;
-  const reason = body.reason !== undefined ? String(body.reason) : "";
+  const reason = body.reason !== undefined ? String(body.reason).slice(0, MAX_REASON_LENGTH) : "";
 
   if (!patientName) {
     return NextResponse.json(
-      { error: "Nome do paciente é obrigatório." },
+      { error: "Nome do paciente e obrigatorio." },
       { status: 400 }
     );
   }
   if (!patientPhone) {
     return NextResponse.json(
-      { error: "Telefone do paciente é obrigatório." },
+      { error: "Telefone do paciente e obrigatorio." },
       { status: 400 }
     );
   }
   if (!specialtyId) {
     return NextResponse.json(
-      { error: "ID da especialidade é obrigatório." },
+      { error: "ID da especialidade e obrigatorio." },
       { status: 400 }
     );
   }
   if (!doctorId) {
     return NextResponse.json(
-      { error: "ID do médico é obrigatório." },
+      { error: "ID do medico e obrigatorio." },
       { status: 400 }
     );
   }
   if (!startsAt) {
     return NextResponse.json(
-      { error: "Data/hora da consulta é obrigatória." },
+      { error: "Data/hora da consulta e obrigatoria." },
       { status: 400 }
     );
   }
 
   if (!isSlotAvailable(doctorId, startsAt)) {
     return NextResponse.json(
-      { error: "Este horário já está ocupado." },
+      { error: "Este horario ja esta ocupado." },
       { status: 409 }
     );
   }
