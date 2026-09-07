@@ -3,18 +3,44 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { hashSync } from "bcryptjs";
 
+const isBuild = process.env.NEXT_PHASE === "phase-production-build";
+
 const isVercel = Boolean(process.env.VERCEL);
 const dataDir = isVercel ? "/tmp" : path.join(process.cwd(), "data");
 mkdirSync(dataDir, { recursive: true });
 
-export const db = new DatabaseSync(path.join(dataDir, "saudesync.db"));
+// Durante o build, usa um arquivo temporario unico por worker para evitar
+// "database is locked" causado por 11 workers abrindo o mesmo SQLite simultaneamente.
+const dbFileName = isBuild
+  ? `saudesync-build-${process.pid}.db`
+  : "saudesync.db";
 
-db.exec("PRAGMA journal_mode = WAL;");
-db.exec("PRAGMA foreign_keys = ON;");
-db.exec("PRAGMA busy_timeout = 10000;");
+let _db: DatabaseSync | null = null;
+
+function getDb(): DatabaseSync {
+  if (_db) return _db;
+  _db = new DatabaseSync(path.join(dataDir, dbFileName));
+  _db.exec("PRAGMA journal_mode = WAL;");
+  _db.exec("PRAGMA foreign_keys = ON;");
+  _db.exec("PRAGMA busy_timeout = 10000;");
+  return _db;
+}
+
+// Proxy que delega ao DB real apenas quando acessado pela primeira vez
+export const db: DatabaseSync = new Proxy({} as DatabaseSync, {
+  get(_target, prop, receiver) {
+    const instance = getDb();
+    const value = Reflect.get(instance, prop, receiver);
+    if (typeof value === "function") {
+      return value.bind(instance);
+    }
+    return value;
+  },
+});
 
 export function migrate() {
-  db.exec(`
+  const d = getDb();
+  d.exec(`
     CREATE TABLE IF NOT EXISTS clinics (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -156,22 +182,22 @@ export function migrate() {
 
   // Migrations for existing databases
   try {
-    db.exec("ALTER TABLE doctors ADD COLUMN phone TEXT DEFAULT ''");
+    d.exec("ALTER TABLE doctors ADD COLUMN phone TEXT DEFAULT ''");
   } catch {
     // Column already exists
   }
   try {
-    db.exec("ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'");
+    d.exec("ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'");
   } catch {
     // Column already exists
   }
   try {
-    db.exec("ALTER TABLE admins ADD COLUMN email TEXT DEFAULT ''");
+    d.exec("ALTER TABLE admins ADD COLUMN email TEXT DEFAULT ''");
   } catch {
     // Column already exists
   }
   try {
-    db.exec("ALTER TABLE billing_events ADD COLUMN currency TEXT NOT NULL DEFAULT 'MZN'");
+    d.exec("ALTER TABLE billing_events ADD COLUMN currency TEXT NOT NULL DEFAULT 'MZN'");
   } catch {
     // Column already exists
   }
@@ -187,7 +213,7 @@ export function migrate() {
   ];
   for (const [name, def] of clinicColumns) {
     try {
-      db.exec(`ALTER TABLE clinics ADD COLUMN ${name} ${def}`);
+      d.exec(`ALTER TABLE clinics ADD COLUMN ${name} ${def}`);
     } catch {
       // Column already exists
     }
@@ -195,14 +221,15 @@ export function migrate() {
 }
 
 function seed() {
-  db.exec("BEGIN IMMEDIATE");
-  const clinicCount = db.prepare("SELECT COUNT(*) AS c FROM clinics").get() as { c: number };
+  const d = getDb();
+  d.exec("BEGIN IMMEDIATE");
+  const clinicCount = d.prepare("SELECT COUNT(*) AS c FROM clinics").get() as { c: number };
   if (clinicCount.c > 0) {
-    db.exec("COMMIT");
+    d.exec("COMMIT");
     return;
   }
 
-  db.prepare(
+  d.prepare(
     "INSERT INTO clinics (name, address, phone, whatsapp, opening_hours, location, social_media, token_limit, base_token_limit, current_token_usage, near_limit_notified, overage_blocks_purchased, subscription_status, billing_cycle_day, last_reset_at) VALUES (?, ?, ?, ?, ?, ?, ?, 100000, 100000, 0, 0, 0, 'active', 1, NULL)"
   ).run(
     "Clinica Vida",
@@ -214,7 +241,7 @@ function seed() {
     JSON.stringify({ facebook: "", instagram: "" })
   );
 
-  db.prepare("INSERT INTO admins (username, password_hash, role, email) VALUES (?, ?, ?, ?)").run(
+  d.prepare("INSERT INTO admins (username, password_hash, role, email) VALUES (?, ?, ?, ?)").run(
     "admin",
     hashSync("admin123", 10),
     "super_admin",
@@ -264,7 +291,7 @@ function seed() {
     ],
   ];
 
-  const insertSpecialty = db.prepare(
+  const insertSpecialty = d.prepare(
     "INSERT INTO specialties (name, description, keywords) VALUES (?, ?, ?)"
   );
   for (const [name, description, keywords] of specialties) {
@@ -282,14 +309,14 @@ function seed() {
     ["Dra. Rita Carvalho", "Psicologia", 50, 1100, "+258 85 890 1234", [[2, "08:00", "12:00"], [3, "14:00", "17:00"], [5, "14:00", "17:00"]]],
   ];
 
-  const insertDoctor = db.prepare(
+  const insertDoctor = d.prepare(
     "INSERT INTO doctors (name, specialty_id, consultation_duration, price, status, phone) VALUES (?, ?, ?, ?, 'active', ?)"
   );
-  const insertSchedule = db.prepare(
+  const insertSchedule = d.prepare(
     "INSERT INTO doctor_schedule (doctor_id, weekday, start_time, end_time) VALUES (?, ?, ?, ?)"
   );
   for (const [name, specialtyName, duration, price, phone, schedule] of doctors) {
-    const spec = db
+    const spec = d
       .prepare("SELECT id FROM specialties WHERE name = ?")
       .get(specialtyName) as { id: number };
     const res = insertDoctor.run(name, spec.id, duration, price, phone);
@@ -299,14 +326,8 @@ function seed() {
     }
   }
 
-  db.exec("COMMIT");
+  d.exec("COMMIT");
 }
-
-// Durante o build (next build), os workers coletam dados das rotas em paralelo e o
-// migrate/seed usa transacoes de escrita — isso causa "database is locked" quando
-// varios processos tentam acessar o mesmo arquivo ao mesmo tempo.
-// Tanto migrate quanto seed sao executados apenas em tempo de execucao.
-const isBuild = process.env.NEXT_PHASE === "phase-production-build";
 
 if (!isBuild) {
   try {
