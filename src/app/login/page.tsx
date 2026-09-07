@@ -2,6 +2,14 @@
 
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Inter } from "next/font/google";
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 type Panel = "signin" | "signup";
 
@@ -48,11 +56,11 @@ export default function AuthPage() {
     setSignupError("");
 
     if (signupPass !== signupPassConfirm) {
-      setSignupError("As senhas nao coincidem.");
+      setSignupError("As senhas não coincidem.");
       return;
     }
     if (signupPass.length < 8) {
-      setSignupError("A senha deve ter no minimo 8 caracteres.");
+      setSignupError("A senha deve ter no mínimo 8 caracteres.");
       return;
     }
 
@@ -79,7 +87,10 @@ export default function AuthPage() {
   const isSignup = activePanel === "signup";
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
+    <div
+      className={`relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 ${inter.variable}`}
+      style={{ fontFamily: "var(--font-inter), sans-serif" }}
+    >
       {/* ── Background geometric shapes ────────────────────────────── */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
         <div className="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
@@ -122,7 +133,7 @@ export default function AuthPage() {
                   </div>
                   <span className="text-lg font-semibold text-slate-800">SaudeSync</span>
                 </div>
-                <h2 className="text-2xl font-bold text-slate-900">Bem-vindo de volta</h2>
+                <h2 className="text-2xl font-semibold text-slate-900">Bem-vindo de volta</h2>
                 <p className="text-sm text-slate-500 mt-1">Entre na sua conta para continuar.</p>
               </div>
 
@@ -137,8 +148,9 @@ export default function AuthPage() {
                     type="text"
                     value={loginUser}
                     onChange={(e) => setLoginUser(e.target.value)}
-                    placeholder="Usuario ou e-mail"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                    placeholder="Usuário ou e-mail"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                    style={{ fontWeight: 400 }}
                     required
                   />
                 </div>
@@ -154,7 +166,8 @@ export default function AuthPage() {
                     value={loginPass}
                     onChange={(e) => setLoginPass(e.target.value)}
                     placeholder="Senha"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                    style={{ fontWeight: 400 }}
                     required
                   />
                 </div>
@@ -166,7 +179,7 @@ export default function AuthPage() {
                 <button
                   type="submit"
                   disabled={loginLoading}
-                  className="w-full rounded-xl bg-primary hover:bg-primary-dark text-white font-semibold py-3 text-sm disabled:opacity-50 transition-all duration-200 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30"
+                  className="w-full rounded-xl bg-primary hover:bg-primary-dark text-white font-medium py-3 text-sm disabled:opacity-50 transition-all duration-200 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30"
                 >
                   {loginLoading ? (
                     <span className="inline-flex items-center gap-2">
@@ -203,8 +216,8 @@ export default function AuthPage() {
                       </div>
                       <span className="text-lg font-semibold text-slate-800">SaudeSync</span>
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-900">Criar conta</h2>
-                    <p className="text-sm text-slate-500 mt-1">Preencha os dados para comecar.</p>
+                    <h2 className="text-2xl font-semibold text-slate-900">Criar conta</h2>
+                    <p className="text-sm text-slate-500 mt-1">Preencha os dados para começar.</p>
                   </div>
 
                   <form onSubmit={handleSignUp} className="space-y-3">
@@ -219,7 +232,8 @@ export default function AuthPage() {
                         value={signupName}
                         onChange={(e) => setSignupName(e.target.value)}
                         placeholder="Nome completo"
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                        style={{ fontWeight: 400 }}
                         required
                       />
                     </div>
@@ -235,7 +249,8 @@ export default function AuthPage() {
                         value={signupEmail}
                         onChange={(e) => setSignupEmail(e.target.value)}
                         placeholder="E-mail"
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                        style={{ fontWeight: 400 }}
                         required
                       />
                     </div>
@@ -250,8 +265,9 @@ export default function AuthPage() {
                         type="password"
                         value={signupPass}
                         onChange={(e) => setSignupPass(e.target.value)}
-                        placeholder="Senha (min. 8 caracteres)"
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                        placeholder="Senha (mín. 8 caracteres)"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                        style={{ fontWeight: 400 }}
                         required
                         minLength={8}
                       />
@@ -268,7 +284,8 @@ export default function AuthPage() {
                         value={signupPassConfirm}
                         onChange={(e) => setSignupPassConfirm(e.target.value)}
                         placeholder="Confirmar senha"
-                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-3 text-sm text-slate-900 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                        style={{ fontWeight: 400 }}
                         required
                         minLength={8}
                       />
@@ -281,7 +298,7 @@ export default function AuthPage() {
                     <button
                       type="submit"
                       disabled={signupLoading}
-                      className="w-full rounded-xl bg-primary hover:bg-primary-dark text-white font-semibold py-3 text-sm disabled:opacity-50 transition-all duration-200 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30"
+                      className="w-full rounded-xl bg-primary hover:bg-primary-dark text-white font-medium py-3 text-sm disabled:opacity-50 transition-all duration-200 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30"
                     >
                       {signupLoading ? (
                         <span className="inline-flex items-center gap-2">
@@ -301,8 +318,8 @@ export default function AuthPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                     </svg>
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900">Conta criada!</h3>
-                  <p className="text-sm text-slate-500 mt-2 mb-6">Agora faca login para acessar o painel.</p>
+                  <h3 className="text-xl font-semibold text-slate-900">Conta criada!</h3>
+                  <p className="text-sm text-slate-500 mt-2 mb-6">Agora faça login para acessar o painel.</p>
                   <button
                     onClick={() => {
                       setSignupSuccess(false);
@@ -312,7 +329,7 @@ export default function AuthPage() {
                       setSignupPass("");
                       setSignupPassConfirm("");
                     }}
-                    className="rounded-xl border-2 border-primary text-primary hover:bg-primary hover:text-white font-semibold px-8 py-3 text-sm transition-all duration-200"
+                    className="rounded-xl border-2 border-primary text-primary hover:bg-primary hover:text-white font-medium px-8 py-3 text-sm transition-all duration-200"
                   >
                     Ir para o Login
                   </button>
@@ -336,7 +353,7 @@ export default function AuthPage() {
             <div className="absolute bottom-12 left-8 h-14 w-14 rounded-full border-2 border-white/10" />
             <div className="absolute top-1/3 -left-4 h-8 w-8 rounded-full bg-white/5" />
 
-            {/* Content with parallax — shifts opposite to panel movement */}
+            {/* Content with parallax */}
             <div
               className="text-center text-white"
               style={{
@@ -361,7 +378,7 @@ export default function AuthPage() {
               {!isSignup ? (
                 <>
                   <h3
-                    className="text-2xl font-bold mb-3"
+                    className="text-2xl font-semibold mb-3"
                     style={{
                       willChange: "transform",
                       transform: isSignup ? "translateX(12px)" : "translateX(0)",
@@ -378,11 +395,11 @@ export default function AuthPage() {
                       transition: "transform 0.6s cubic-bezier(0.65, 0, 0.35, 1)",
                     }}
                   >
-                    Crie sua conta e comece a gerenciar agendamentos com inteligencia artificial.
+                    Crie sua conta e comece a gerenciar agendamentos com inteligência artificial.
                   </p>
                   <button
                     onClick={() => setActivePanel("signup")}
-                    className="rounded-xl border-2 border-white/40 text-white hover:bg-white/10 font-semibold px-10 py-3 text-sm transition-all duration-200 backdrop-blur-sm"
+                    className="rounded-xl border-2 border-white/40 text-white hover:bg-white/10 font-medium px-10 py-3 text-sm transition-all duration-200 backdrop-blur-sm"
                   >
                     Criar conta
                   </button>
@@ -390,14 +407,14 @@ export default function AuthPage() {
               ) : (
                 <>
                   <h3
-                    className="text-2xl font-bold mb-3"
+                    className="text-2xl font-semibold mb-3"
                     style={{
                       willChange: "transform",
                       transform: isSignup ? "translateX(-12px)" : "translateX(0)",
                       transition: "transform 0.6s cubic-bezier(0.65, 0, 0.35, 1)",
                     }}
                   >
-                    Ja tem conta?
+                    Já tem conta?
                   </h3>
                   <p
                     className="text-sm text-white/80 mb-8 max-w-[260px] leading-relaxed"
@@ -407,11 +424,11 @@ export default function AuthPage() {
                       transition: "transform 0.6s cubic-bezier(0.65, 0, 0.35, 1)",
                     }}
                   >
-                    Faca login para acessar seu painel de agendamentos e configuracoes.
+                    Faça login para acessar seu painel de agendamentos e configurações.
                   </p>
                   <button
                     onClick={() => setActivePanel("signin")}
-                    className="rounded-xl border-2 border-white/40 text-white hover:bg-white/10 font-semibold px-10 py-3 text-sm transition-all duration-200 backdrop-blur-sm"
+                    className="rounded-xl border-2 border-white/40 text-white hover:bg-white/10 font-medium px-10 py-3 text-sm transition-all duration-200 backdrop-blur-sm"
                   >
                     Fazer login
                   </button>
@@ -422,7 +439,7 @@ export default function AuthPage() {
         </div>
 
         {/* ── Footer links ────────────────────────────────────────── */}
-        <p className="text-xs text-slate-400 text-center mt-6">
+        <p className="text-xs text-slate-500 text-center mt-6">
           <a href="/landing" className="hover:text-primary transition-colors">Voltar para o site</a>
           <span className="mx-2">·</span>
           <a href="/termos" className="hover:text-primary transition-colors">Termos</a>
