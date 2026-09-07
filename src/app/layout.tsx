@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
-import ThemeProvider from "@/components/theme-provider";
+import ThemeProvider from "@/providers/theme-provider";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -30,9 +31,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt" className={`${jakarta.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
-      <head>
-        {/* Prevent theme flicker: set dark class before paint */}
-        <script
+      <body className="min-h-full bg-background text-foreground">
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
@@ -51,8 +53,6 @@ export default function RootLayout({
             `,
           }}
         />
-      </head>
-      <body className="min-h-full bg-background text-foreground">
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
