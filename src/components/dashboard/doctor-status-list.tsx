@@ -29,8 +29,8 @@ export default function DoctorStatusList({ doctors }: DoctorStatusListProps) {
     <div className="neon-card p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4 sm:mb-5">
         <div>
-          <h2 className="font-semibold text-white text-base">Médicos disponíveis</h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <h2 className="font-semibold text-base" style={{ color: "var(--text-primary)" }}>Médicos disponíveis</h2>
+          <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
             {activeDoctors.length} médico{activeDoctors.length !== 1 ? "s" : ""} ativo{activeDoctors.length !== 1 ? "s" : ""}
           </p>
         </div>
@@ -45,7 +45,7 @@ export default function DoctorStatusList({ doctors }: DoctorStatusListProps) {
       {activeDoctors.length === 0 ? (
         <div className="text-center py-6 sm:py-8">
           <span className="text-3xl block mb-2">🩺</span>
-          <p className="text-sm text-slate-500">Nenhum médico ativo.</p>
+          <p className="text-sm" style={{ color: "var(--text-faint)" }}>Nenhum médico ativo.</p>
         </div>
       ) : (
         <div className="space-y-2 sm:space-y-2.5">
@@ -54,17 +54,20 @@ export default function DoctorStatusList({ doctors }: DoctorStatusListProps) {
             return (
               <div
                 key={doctor.id}
-                className="flex items-center gap-3 p-2.5 sm:p-3 rounded-xl hover:bg-white/[0.03] transition-colors min-h-[48px]"
+                className="flex items-center gap-3 p-2.5 sm:p-3 rounded-xl transition-colors min-h-[48px]"
+                style={{ background: "transparent" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
               >
                 <div
                   className="w-9 h-9 rounded-full flex items-center justify-center text-primary text-sm font-semibold shrink-0"
-                  style={{ background: "rgba(79,109,245,0.12)" }}
+                  style={{ background: "var(--neon-blue)" }}
                 >
                   {doctor.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white truncate">{doctor.name}</p>
-                  <p className="text-xs text-slate-400 truncate">{doctor.specialty_name}</p>
+                  <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{doctor.name}</p>
+                  <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{doctor.specialty_name}</p>
                 </div>
                 <span
                   className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${

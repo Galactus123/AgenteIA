@@ -26,8 +26,8 @@ export default function BottomNav() {
     <nav
       className="lg:hidden fixed bottom-0 inset-x-0 z-50 safe-area-pb"
       style={{
-        background: "rgba(13, 16, 23, 0.95)",
-        borderTop: "1px solid rgba(99, 102, 241, 0.1)",
+        background: "var(--card)",
+        borderTop: "1px solid var(--card-border)",
         backdropFilter: "blur(16px)",
       }}
       role="navigation"
@@ -44,13 +44,13 @@ export default function BottomNav() {
               href={item.href}
               prefetch={true}
               className={`flex flex-col items-center justify-center gap-0.5 min-w-[48px] min-h-[48px] px-2 py-1 rounded-xl transition-all duration-150 ${
-                active
-                  ? "text-primary"
-                  : "text-slate-500 active:text-slate-300"
+                active ? "" : "opacity-60 active:opacity-100"
               }`}
               style={active ? {
-                textShadow: "0 0 12px rgba(79,109,245,0.5)",
-              } : undefined}
+                color: "var(--color-primary)",
+              } : {
+                color: "var(--text-faint)",
+              }}
               aria-current={active ? "page" : undefined}
             >
               <span className="text-xl leading-none">{item.icon}</span>

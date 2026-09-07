@@ -2,7 +2,7 @@ export function Skeleton({ className = "" }: { className?: string }) {
   return (
     <div
       className={`animate-pulse rounded-xl ${className}`}
-      style={{ background: "rgba(255,255,255,0.05)" }}
+      style={{ background: "var(--surface)" }}
       aria-hidden="true"
     />
   );
@@ -16,7 +16,7 @@ export function SkeletonText({ lines = 3, className = "" }: { lines?: number; cl
           key={i}
           className="h-4 animate-pulse rounded-lg"
           style={{
-            background: "rgba(255,255,255,0.05)",
+            background: "var(--surface)",
             width: i === lines - 1 ? "60%" : "100%",
           }}
         />
@@ -43,15 +43,13 @@ export function SkeletonCard({ className = "" }: { className?: string }) {
 export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
   return (
     <div className="neon-card overflow-hidden" aria-hidden="true">
-      {/* Header */}
-      <div className="flex gap-4 px-4 py-3" style={{ background: "rgba(255,255,255,0.03)" }}>
+      <div className="flex gap-4 px-4 py-3" style={{ background: "var(--surface)" }}>
         {Array.from({ length: cols }).map((_, i) => (
           <Skeleton key={i} className="h-4 flex-1" />
         ))}
       </div>
-      {/* Rows */}
       {Array.from({ length: rows }).map((_, row) => (
-        <div key={row} className="flex gap-4 px-4 py-3" style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+        <div key={row} className="flex gap-4 px-4 py-3" style={{ borderTop: "1px solid var(--surface-border)" }}>
           {Array.from({ length: cols }).map((_, col) => (
             <Skeleton key={col} className="h-4 flex-1" />
           ))}
@@ -64,13 +62,11 @@ export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: nu
 export function DashboardSkeleton() {
   return (
     <div className="space-y-6" aria-label="Carregando dashboard...">
-      {/* KPI cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
         {Array.from({ length: 7 }).map((_, i) => (
           <SkeletonCard key={i} />
         ))}
       </div>
-      {/* Content area */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
           <SkeletonCard />

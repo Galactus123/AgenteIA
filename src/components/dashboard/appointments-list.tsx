@@ -40,8 +40,8 @@ export default function AppointmentsList({ appointments, dateLabel }: Appointmen
     <div className="neon-card p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4 sm:mb-5">
         <div>
-          <h2 className="font-semibold text-white text-base">Agenda do dia</h2>
-          <p className="text-xs text-slate-400 mt-0.5">{dateLabel}</p>
+          <h2 className="font-semibold text-base" style={{ color: "var(--text-primary)" }}>Agenda do dia</h2>
+          <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{dateLabel}</p>
         </div>
         <a
           href="/consultas"
@@ -54,7 +54,7 @@ export default function AppointmentsList({ appointments, dateLabel }: Appointmen
       {appointments.length === 0 ? (
         <div className="text-center py-8 sm:py-10">
           <span className="text-3xl block mb-2">📋</span>
-          <p className="text-sm text-slate-500">Nenhuma consulta agendada para hoje.</p>
+          <p className="text-sm" style={{ color: "var(--text-faint)" }}>Nenhuma consulta agendada para hoje.</p>
         </div>
       ) : (
         <div className="space-y-1.5 sm:space-y-2">
@@ -66,20 +66,23 @@ export default function AppointmentsList({ appointments, dateLabel }: Appointmen
             {appointments.map((a) => (
               <motion.div
                 key={a.id}
-                className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 sm:p-3 rounded-xl hover:bg-white/[0.03] transition-colors min-h-[56px]"
+                className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 sm:p-3 rounded-xl transition-colors min-h-[56px]"
+                style={{ background: "transparent" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 variants={rowVariants}
                 transition={{ duration: 0.25, ease: "easeOut" }}
               >
                 <div className="flex items-center gap-3 sm:flex-1 sm:min-w-0">
                   <div
                     className="w-10 h-10 rounded-full flex items-center justify-center text-primary text-sm font-semibold shrink-0"
-                    style={{ background: "rgba(79,109,245,0.12)" }}
+                    style={{ background: "var(--neon-blue)" }}
                   >
                     {a.starts_at.split(" ")[1]}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{a.patient_name}</p>
-                    <p className="text-xs text-slate-400 truncate">
+                    <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{a.patient_name}</p>
+                    <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
                       {a.doctor_name} · {a.specialty_name}
                     </p>
                   </div>

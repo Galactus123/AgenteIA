@@ -27,7 +27,8 @@ export default function NotificationBell({ onToggle }: NotificationBellProps) {
   return (
     <button
       onClick={onToggle}
-      className="relative p-2.5 rounded-xl hover:bg-white/[0.04] transition-colors text-slate-400 hover:text-white min-w-[44px] min-h-[44px] flex items-center justify-center"
+      className="relative p-2.5 rounded-xl hover:opacity-80 transition-opacity min-w-[44px] min-h-[44px] flex items-center justify-center"
+      style={{ color: "var(--text-muted)" }}
       aria-label={`Notificações${unreadCount > 0 ? `, ${unreadCount} não lidas` : ""}`}
     >
       <span className="text-lg">🔔</span>

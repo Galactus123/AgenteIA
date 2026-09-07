@@ -92,14 +92,14 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
       <div
         className="fixed inset-x-0 top-0 sm:inset-auto sm:top-16 sm:right-6 sm:w-96 z-50 sm:rounded-2xl max-h-[100dvh] sm:max-h-[70vh] flex flex-col"
         style={{
-          background: "rgba(22, 25, 38, 0.98)",
-          border: "1px solid rgba(99, 102, 241, 0.12)",
+          background: "var(--card)",
+          border: "1px solid var(--card-border)",
           backdropFilter: "blur(20px)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
         }}
       >
-        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(99, 102, 241, 0.08)" }}>
-          <h3 className="font-semibold text-white text-sm">Notificações</h3>
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--surface-border)" }}>
+          <h3 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>Notificações</h3>
           <div className="flex items-center gap-2">
             <button
               onClick={markAllRead}
@@ -109,7 +109,8 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-white/[0.06] text-slate-400 min-w-[32px] min-h-[32px] flex items-center justify-center"
+              className="p-1.5 rounded-lg hover:opacity-80 min-w-[32px] min-h-[32px] flex items-center justify-center"
+              style={{ color: "var(--text-faint)" }}
               aria-label="Fechar"
             >
               ✕
@@ -117,21 +118,20 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
           </div>
         </div>
 
-        <div className="flex gap-1 px-3 py-2 overflow-x-auto" style={{ borderBottom: "1px solid rgba(99, 102, 241, 0.06)" }}>
+        <div className="flex gap-1 px-3 py-2 overflow-x-auto" style={{ borderBottom: "1px solid var(--surface-border)" }}>
           {(Object.keys(FILTER_LABELS) as FilterType[]).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={`text-xs font-medium px-3 py-1.5 rounded-full whitespace-nowrap transition-all duration-150 min-h-[32px] ${
-                filter === f
-                  ? "text-white"
-                  : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                filter === f ? "" : "hover:opacity-80"
               }`}
               style={filter === f ? {
-                background: "linear-gradient(135deg, rgba(79,109,245,0.3), rgba(129,140,248,0.15))",
-                boxShadow: "0 0 12px rgba(79,109,245,0.2)",
-                border: "1px solid rgba(99,102,241,0.25)",
+                background: "linear-gradient(135deg, rgba(79,109,245,0.2), rgba(129,140,248,0.1))",
+                color: "#4f6df5",
+                border: "1px solid rgba(99,102,241,0.2)",
               } : {
+                color: "var(--text-muted)",
                 border: "1px solid transparent",
               }}
             >
@@ -143,44 +143,47 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <span className="text-sm text-slate-500">Carregando...</span>
+              <span className="text-sm" style={{ color: "var(--text-faint)" }}>Carregando...</span>
             </div>
           ) : notifications.length === 0 ? (
             <div className="text-center py-12">
               <span className="text-3xl block mb-2">🔕</span>
-              <p className="text-sm text-slate-500">Nenhuma notificação.</p>
+              <p className="text-sm" style={{ color: "var(--text-faint)" }}>Nenhuma notificação.</p>
             </div>
           ) : (
-            <div style={{ borderBottom: "1px solid rgba(99, 102, 241, 0.06)" }}>
+            <div style={{ borderBottom: "1px solid var(--surface-border)" }}>
               {notifications.map((n) => {
                 const config = TYPE_CONFIG[n.type] ?? TYPE_CONFIG.scheduled;
                 return (
                   <button
                     key={n.id}
                     onClick={() => !n.read && markRead(n.id)}
-                    className={`w-full text-left px-4 py-3 flex gap-3 hover:bg-white/[0.03] transition-colors min-h-[60px] ${
-                      !n.read ? "bg-primary/[0.04]" : ""
-                    }`}
+                    className={`w-full text-left px-4 py-3 flex gap-3 transition-colors min-h-[60px]`}
+                    style={{
+                      background: !n.read ? "var(--neon-blue)" : "transparent",
+                    }}
+                    onMouseEnter={(e) => { if (n.read) e.currentTarget.style.background = "var(--surface)"; }}
+                    onMouseLeave={(e) => { if (n.read) e.currentTarget.style.background = "transparent"; }}
                   >
-                    <span className="w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 mt-0.5" style={{ background: "rgba(79,109,245,0.1)" }}>
+                    <span className="w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 mt-0.5" style={{ background: "var(--neon-blue)" }}>
                       {config.icon}
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className={`text-sm font-medium ${!n.read ? "text-white" : "text-slate-300"} truncate`}>
+                        <p className="text-sm font-medium truncate" style={{ color: !n.read ? "var(--text-primary)" : "var(--text-secondary)" }}>
                           {n.title}
                         </p>
-                        <span className="text-[10px] text-slate-500 shrink-0 mt-0.5">
+                        <span className="text-[10px] shrink-0 mt-0.5" style={{ color: "var(--text-faint)" }}>
                           {timeAgo(n.created_at)}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{n.message}</p>
+                      <p className="text-xs mt-0.5 line-clamp-2" style={{ color: "var(--text-muted)" }}>{n.message}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${config.className}`}>
                           {FILTER_LABELS[n.type as FilterType] ?? n.type}
                         </span>
                         {n.channel_status === "sent" && (
-                          <span className="text-[10px] text-slate-500">✓ Enviado</span>
+                          <span className="text-[10px]" style={{ color: "var(--text-faint)" }}>✓ Enviado</span>
                         )}
                         {n.channel_status === "failed" && (
                           <span className="text-[10px] text-danger">Falha envio</span>
