@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, memo } from "react";
 import type { SessionData } from "@/lib/auth";
 
 interface NavItem {
@@ -32,7 +32,41 @@ const canAccessItem = (item: NavItem, session?: SessionData) => {
   return isSuperAdmin(session?.role);
 };
 
-export default function Sidebar({ session }: { session?: SessionData }) {
+const SidebarLink = memo(function SidebarLink({
+  href,
+  icon,
+  label,
+  active,
+  collapsed,
+  onClick,
+}: {
+  href: string;
+  icon: string;
+  label: string;
+  active: boolean;
+  collapsed: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <Link
+      href={href}
+      prefetch={true}
+      title={collapsed ? label : undefined}
+      onClick={onClick}
+      className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
+        active
+          ? "bg-accent text-white shadow-sm shadow-accent/20"
+          : "text-slate-400 hover:bg-sidebar-hover hover:text-white"
+      }`}
+      aria-current={active ? "page" : undefined}
+    >
+      <span className="w-5 text-center text-base shrink-0">{icon}</span>
+      {!collapsed && <span className="truncate">{label}</span>}
+    </Link>
+  );
+});
+
+function SidebarInner({ session }: { session?: SessionData }) {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
@@ -57,11 +91,11 @@ export default function Sidebar({ session }: { session?: SessionData }) {
     };
   }, [mobileOpen]);
 
-  async function handleLogout() {
+  const handleLogout = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/login");
     router.refresh();
-  }
+  }, [router]);
 
   return (
     <>
@@ -72,7 +106,7 @@ export default function Sidebar({ session }: { session?: SessionData }) {
         }`}
       >
         <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10">
-          <Link href="/dashboard" className="flex items-center gap-3 min-w-0">
+          <Link href="/dashboard" prefetch={true} className="flex items-center gap-3 min-w-0">
             <Image
               src="/icon.png"
               alt="SaúdeSync"
@@ -94,41 +128,30 @@ export default function Sidebar({ session }: { session?: SessionData }) {
             const active =
               pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             return (
-              <Link
+              <SidebarLink
                 key={item.href}
                 href={item.href}
-                title={collapsed ? item.label : undefined}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-                  active
-                    ? "bg-accent text-white shadow-sm shadow-accent/20"
-                    : "text-slate-400 hover:bg-sidebar-hover hover:text-white"
-                }`}
-                aria-current={active ? "page" : undefined}
-              >
-                <span className="w-5 text-center text-base shrink-0">{item.icon}</span>
-                {!collapsed && <span className="truncate">{item.label}</span>}
-              </Link>
+                icon={item.icon}
+                label={item.label}
+                active={active}
+                collapsed={collapsed}
+              />
             );
           })}
         </nav>
 
         <div className="p-2 border-t border-white/10 space-y-0.5">
-          <Link
+          <SidebarLink
             href="/perfil"
-            title={collapsed ? "Perfil" : undefined}
-            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-              pathname === "/perfil"
-                ? "bg-accent text-white shadow-sm shadow-accent/20"
-                : "text-slate-400 hover:bg-sidebar-hover hover:text-white"
-            }`}
-          >
-            <span className="w-5 text-center text-base shrink-0">⚙</span>
-            {!collapsed && <span className="truncate">Perfil</span>}
-          </Link>
+            icon="⚙"
+            label="Perfil"
+            active={pathname === "/perfil"}
+            collapsed={collapsed}
+          />
           <button
             onClick={handleLogout}
             title={collapsed ? "Sair" : undefined}
-            className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-sidebar-hover hover:text-white transition-all"
+            className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-sidebar-hover hover:text-white transition-all duration-150"
           >
             <span className="w-5 text-center text-base shrink-0">⎋</span>
             {!collapsed && <span className="truncate">Sair</span>}
@@ -163,7 +186,7 @@ export default function Sidebar({ session }: { session?: SessionData }) {
         aria-hidden={!mobileOpen}
       >
         <div className="flex items-center justify-between px-4 py-5 border-b border-white/10">
-          <Link href="/dashboard" className="flex items-center gap-3 min-w-0" onClick={closeMobile}>
+          <Link href="/dashboard" prefetch={true} className="flex items-center gap-3 min-w-0" onClick={closeMobile}>
             <Image
               src="/icon.png"
               alt="SaúdeSync"
@@ -190,38 +213,31 @@ export default function Sidebar({ session }: { session?: SessionData }) {
             const active =
               pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             return (
-              <Link
+              <SidebarLink
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all min-h-[48px] ${
-                  active
-                    ? "bg-accent text-white shadow-sm shadow-accent/20"
-                    : "text-slate-400 hover:bg-sidebar-hover hover:text-white"
-                }`}
-                aria-current={active ? "page" : undefined}
-              >
-                <span className="w-5 text-center text-base shrink-0">{item.icon}</span>
-                <span className="truncate">{item.label}</span>
-              </Link>
+                icon={item.icon}
+                label={item.label}
+                active={active}
+                collapsed={false}
+                onClick={closeMobile}
+              />
             );
           })}
         </nav>
 
         <div className="p-2 border-t border-white/10 space-y-0.5">
-          <Link
+          <SidebarLink
             href="/perfil"
-            className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all min-h-[48px] ${
-              pathname === "/perfil"
-                ? "bg-accent text-white shadow-sm shadow-accent/20"
-                : "text-slate-400 hover:bg-sidebar-hover hover:text-white"
-            }`}
-          >
-            <span className="w-5 text-center text-base shrink-0">⚙</span>
-            <span className="truncate">Perfil</span>
-          </Link>
+            icon="⚙"
+            label="Perfil"
+            active={pathname === "/perfil"}
+            collapsed={false}
+            onClick={closeMobile}
+          />
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-slate-400 hover:bg-sidebar-hover hover:text-white transition-all min-h-[48px]"
+            className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-slate-400 hover:bg-sidebar-hover hover:text-white transition-all duration-150 min-h-[48px]"
           >
             <span className="w-5 text-center text-base shrink-0">⎋</span>
             <span className="truncate">Sair</span>
@@ -229,11 +245,15 @@ export default function Sidebar({ session }: { session?: SessionData }) {
         </div>
       </aside>
 
-      {/* Expose openMobile via a button in the header - we use a callback pattern */}
+      {/* Expose openMobile via a button in the header */}
       <MobileMenuButton onClick={() => setMobileOpen(true)} />
     </>
   );
 }
+
+const Sidebar = memo(SidebarInner);
+
+export default Sidebar;
 
 function MobileMenuButton({ onClick }: { onClick: () => void }) {
   return (
