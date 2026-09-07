@@ -55,11 +55,24 @@ const SidebarLink = memo(function SidebarLink({
       onClick={onClick}
       className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
         active
-          ? "bg-accent text-white shadow-sm shadow-accent/20"
-          : "text-slate-400 hover:bg-sidebar-hover hover:text-white"
+          ? "text-white"
+          : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
       }`}
+      style={active ? {
+        background: "linear-gradient(135deg, rgba(79,109,245,0.15) 0%, rgba(129,140,248,0.08) 100%)",
+        boxShadow: "0 0 20px rgba(79,109,245,0.15), inset 0 1px 0 rgba(255,255,255,0.05)",
+        border: "1px solid rgba(99,102,241,0.2)",
+      } : {
+        border: "1px solid transparent",
+      }}
       aria-current={active ? "page" : undefined}
     >
+      {active && (
+        <span
+          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
+          style={{ background: "linear-gradient(180deg, #4f6df5, #818cf8)" }}
+        />
+      )}
       <span className="w-5 text-center text-base shrink-0">{icon}</span>
       {!collapsed && <span className="truncate">{label}</span>}
     </Link>
@@ -101,28 +114,30 @@ function SidebarInner({ session }: { session?: SessionData }) {
     <>
       {/* Desktop sidebar */}
       <aside
-        className={`hidden lg:flex shrink-0 bg-sidebar border-r border-white/10 flex-col transition-all duration-300 ${
+        className={`hidden lg:flex shrink-0 flex-col transition-all duration-300 border-r border-white/[0.06] ${
           collapsed ? "w-[72px]" : "w-60"
         }`}
+        style={{ background: "#0D1017" }}
       >
-        <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10">
+        {/* Logo */}
+        <div className="flex items-center gap-3 px-4 py-5 border-b border-white/[0.06]">
           <Link href="/dashboard" prefetch={true} className="flex items-center gap-3 min-w-0">
-            <Image
-              src="/icon.png"
-              alt="SaúdeSync"
-              width={32}
-              height={32}
-              className="rounded-lg shrink-0"
-            />
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0"
+              style={{ background: "linear-gradient(135deg, #4f6df5, #6366f1)" }}
+            >
+              S
+            </div>
             {!collapsed && (
               <div className="min-w-0">
                 <p className="font-semibold text-white leading-tight text-sm truncate">SaúdeSync</p>
-                <p className="text-[10px] text-slate-400 truncate">Recepção virtual IA</p>
+                <p className="text-[10px] text-slate-500 truncate">Recepção virtual IA</p>
               </div>
             )}
           </Link>
         </div>
 
+        {/* Navigation */}
         <nav className="flex-1 px-2 py-4 space-y-0.5" aria-label="Navegação lateral">
           {visibleItems.map((item) => {
             const active =
@@ -140,7 +155,8 @@ function SidebarInner({ session }: { session?: SessionData }) {
           })}
         </nav>
 
-        <div className="p-2 border-t border-white/10 space-y-0.5">
+        {/* Footer */}
+        <div className="p-2 border-t border-white/[0.06] space-y-0.5">
           <SidebarLink
             href="/perfil"
             icon="⚙"
@@ -151,16 +167,17 @@ function SidebarInner({ session }: { session?: SessionData }) {
           <button
             onClick={handleLogout}
             title={collapsed ? "Sair" : undefined}
-            className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 hover:bg-sidebar-hover hover:text-white transition-all duration-150"
+            className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all duration-150 border border-transparent"
           >
             <span className="w-5 text-center text-base shrink-0">⎋</span>
             {!collapsed && <span className="truncate">Sair</span>}
           </button>
         </div>
 
+        {/* Collapse toggle */}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="mx-2 mb-3 flex items-center justify-center gap-2 text-xs text-slate-500 hover:text-slate-300 py-1.5 rounded-lg hover:bg-white/5 transition-colors"
+          className="mx-2 mb-3 flex items-center justify-center gap-2 text-xs text-slate-500 hover:text-slate-300 py-1.5 rounded-lg hover:bg-white/[0.04] transition-colors"
           aria-label={collapsed ? "Expandir sidebar" : "Recolher sidebar"}
         >
           <span className={`transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`}>◀</span>
@@ -171,7 +188,7 @@ function SidebarInner({ session }: { session?: SessionData }) {
       {/* Mobile drawer overlay */}
       {mobileOpen && (
         <div
-          className="lg:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          className="lg:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
           onClick={closeMobile}
           aria-hidden="true"
         />
@@ -179,29 +196,29 @@ function SidebarInner({ session }: { session?: SessionData }) {
 
       {/* Mobile drawer */}
       <aside
-        className={`lg:hidden fixed inset-y-0 left-0 z-50 w-72 bg-sidebar flex flex-col transform transition-transform duration-300 ease-in-out ${
+        className={`lg:hidden fixed inset-y-0 left-0 z-50 w-72 flex flex-col transform transition-transform duration-300 ease-in-out border-r border-white/[0.06] ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
+        style={{ background: "#0D1017" }}
         aria-label="Navegação lateral"
         aria-hidden={!mobileOpen}
       >
-        <div className="flex items-center justify-between px-4 py-5 border-b border-white/10">
+        <div className="flex items-center justify-between px-4 py-5 border-b border-white/[0.06]">
           <Link href="/dashboard" prefetch={true} className="flex items-center gap-3 min-w-0" onClick={closeMobile}>
-            <Image
-              src="/icon.png"
-              alt="SaúdeSync"
-              width={32}
-              height={32}
-              className="rounded-lg shrink-0"
-            />
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold shrink-0"
+              style={{ background: "linear-gradient(135deg, #4f6df5, #6366f1)" }}
+            >
+              S
+            </div>
             <div className="min-w-0">
               <p className="font-semibold text-white leading-tight text-sm truncate">SaúdeSync</p>
-              <p className="text-[10px] text-slate-400 truncate">Recepção virtual IA</p>
+              <p className="text-[10px] text-slate-500 truncate">Recepção virtual IA</p>
             </div>
           </Link>
           <button
             onClick={closeMobile}
-            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors"
             aria-label="Fechar menu"
           >
             ✕
@@ -226,7 +243,7 @@ function SidebarInner({ session }: { session?: SessionData }) {
           })}
         </nav>
 
-        <div className="p-2 border-t border-white/10 space-y-0.5">
+        <div className="p-2 border-t border-white/[0.06] space-y-0.5">
           <SidebarLink
             href="/perfil"
             icon="⚙"
@@ -237,7 +254,7 @@ function SidebarInner({ session }: { session?: SessionData }) {
           />
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-slate-400 hover:bg-sidebar-hover hover:text-white transition-all duration-150 min-h-[48px]"
+            className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-slate-400 hover:text-white hover:bg-white/[0.04] transition-all duration-150 min-h-[48px] border border-transparent"
           >
             <span className="w-5 text-center text-base shrink-0">⎋</span>
             <span className="truncate">Sair</span>
@@ -245,7 +262,6 @@ function SidebarInner({ session }: { session?: SessionData }) {
         </div>
       </aside>
 
-      {/* Expose openMobile via a button in the header */}
       <MobileMenuButton onClick={() => setMobileOpen(true)} />
     </>
   );
@@ -259,7 +275,12 @@ function MobileMenuButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="lg:hidden fixed top-4 left-4 z-40 p-2.5 rounded-xl bg-sidebar text-white shadow-lg hover:bg-sidebar-hover transition-colors min-w-[48px] min-h-[48px] flex items-center justify-center"
+      className="lg:hidden fixed top-4 left-4 z-40 p-2.5 rounded-xl text-white shadow-lg transition-colors min-w-[48px] min-h-[48px] flex items-center justify-center"
+      style={{
+        background: "rgba(13, 16, 23, 0.9)",
+        border: "1px solid rgba(99, 102, 241, 0.2)",
+        backdropFilter: "blur(12px)",
+      }}
       aria-label="Abrir menu de navegação"
     >
       <span className="text-lg">☰</span>

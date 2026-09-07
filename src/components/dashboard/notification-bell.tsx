@@ -27,12 +27,18 @@ export default function NotificationBell({ onToggle }: NotificationBellProps) {
   return (
     <button
       onClick={onToggle}
-      className="relative p-2.5 rounded-xl hover:bg-slate-100 transition-colors text-slate-500 hover:text-slate-700 min-w-[44px] min-h-[44px] flex items-center justify-center"
+      className="relative p-2.5 rounded-xl hover:bg-white/[0.04] transition-colors text-slate-400 hover:text-white min-w-[44px] min-h-[44px] flex items-center justify-center"
       aria-label={`Notificações${unreadCount > 0 ? `, ${unreadCount} não lidas` : ""}`}
     >
       <span className="text-lg">🔔</span>
       {unreadCount > 0 && (
-        <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] flex items-center justify-center bg-danger text-white text-[10px] font-bold rounded-full px-1">
+        <span
+          className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] flex items-center justify-center text-white text-[10px] font-bold rounded-full px-1"
+          style={{
+            background: "linear-gradient(135deg, #ef4444, #dc2626)",
+            boxShadow: "0 0 8px rgba(239,68,68,0.5)",
+          }}
+        >
           {unreadCount > 99 ? "99+" : unreadCount}
         </span>
       )}

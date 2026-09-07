@@ -15,11 +15,11 @@ interface Notification {
 
 type FilterType = "all" | "scheduled" | "cancelled" | "rescheduled" | "reminder";
 
-const TYPE_CONFIG: Record<string, { icon: string; color: string; bg: string }> = {
-  scheduled: { icon: "🟢", color: "text-success", bg: "bg-success-light" },
-  cancelled: { icon: "🔴", color: "text-danger", bg: "bg-danger-light" },
-  rescheduled: { icon: "🟡", color: "text-warning", bg: "bg-warning-light" },
-  reminder: { icon: "🔵", color: "text-primary", bg: "bg-primary/10" },
+const TYPE_CONFIG: Record<string, { icon: string; className: string }> = {
+  scheduled: { icon: "🟢", className: "neon-badge-success" },
+  cancelled: { icon: "🔴", className: "neon-badge-danger" },
+  rescheduled: { icon: "🟡", className: "neon-badge-warning" },
+  reminder: { icon: "🔵", className: "neon-badge" },
 };
 
 const FILTER_LABELS: Record<FilterType, string> = {
@@ -89,19 +89,27 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} aria-hidden="true" />
-      <div className="fixed inset-x-0 top-0 sm:inset-auto sm:top-16 sm:right-6 sm:w-96 z-50 bg-white sm:rounded-2xl sm:border sm:border-slate-200 sm:shadow-xl max-h-[100dvh] sm:max-h-[70vh] flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-          <h3 className="font-semibold text-slate-900 text-sm">Notificações</h3>
+      <div
+        className="fixed inset-x-0 top-0 sm:inset-auto sm:top-16 sm:right-6 sm:w-96 z-50 sm:rounded-2xl max-h-[100dvh] sm:max-h-[70vh] flex flex-col"
+        style={{
+          background: "rgba(22, 25, 38, 0.98)",
+          border: "1px solid rgba(99, 102, 241, 0.12)",
+          backdropFilter: "blur(20px)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+        }}
+      >
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid rgba(99, 102, 241, 0.08)" }}>
+          <h3 className="font-semibold text-white text-sm">Notificações</h3>
           <div className="flex items-center gap-2">
             <button
               onClick={markAllRead}
-              className="text-xs text-primary hover:text-primary-dark font-medium min-h-[32px] px-2"
+              className="text-xs text-highlight hover:text-primary font-medium min-h-[32px] px-2"
             >
               Marcar todas lidas
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 min-w-[32px] min-h-[32px] flex items-center justify-center"
+              className="p-1.5 rounded-lg hover:bg-white/[0.06] text-slate-400 min-w-[32px] min-h-[32px] flex items-center justify-center"
               aria-label="Fechar"
             >
               ✕
@@ -109,16 +117,23 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
           </div>
         </div>
 
-        <div className="flex gap-1 px-3 py-2 border-b border-slate-100 overflow-x-auto">
+        <div className="flex gap-1 px-3 py-2 overflow-x-auto" style={{ borderBottom: "1px solid rgba(99, 102, 241, 0.06)" }}>
           {(Object.keys(FILTER_LABELS) as FilterType[]).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`text-xs font-medium px-3 py-1.5 rounded-full whitespace-nowrap transition-colors min-h-[32px] ${
+              className={`text-xs font-medium px-3 py-1.5 rounded-full whitespace-nowrap transition-all duration-150 min-h-[32px] ${
                 filter === f
-                  ? "bg-primary text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  ? "text-white"
+                  : "text-slate-400 hover:text-white hover:bg-white/[0.04]"
               }`}
+              style={filter === f ? {
+                background: "linear-gradient(135deg, rgba(79,109,245,0.3), rgba(129,140,248,0.15))",
+                boxShadow: "0 0 12px rgba(79,109,245,0.2)",
+                border: "1px solid rgba(99,102,241,0.25)",
+              } : {
+                border: "1px solid transparent",
+              }}
             >
               {FILTER_LABELS[f]}
             </button>
@@ -128,44 +143,44 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <span className="text-sm text-slate-400">Carregando...</span>
+              <span className="text-sm text-slate-500">Carregando...</span>
             </div>
           ) : notifications.length === 0 ? (
             <div className="text-center py-12">
               <span className="text-3xl block mb-2">🔕</span>
-              <p className="text-sm text-slate-400">Nenhuma notificação.</p>
+              <p className="text-sm text-slate-500">Nenhuma notificação.</p>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div style={{ borderBottom: "1px solid rgba(99, 102, 241, 0.06)" }}>
               {notifications.map((n) => {
                 const config = TYPE_CONFIG[n.type] ?? TYPE_CONFIG.scheduled;
                 return (
                   <button
                     key={n.id}
                     onClick={() => !n.read && markRead(n.id)}
-                    className={`w-full text-left px-4 py-3 flex gap-3 hover:bg-slate-50 transition-colors min-h-[60px] ${
-                      !n.read ? "bg-primary/5" : ""
+                    className={`w-full text-left px-4 py-3 flex gap-3 hover:bg-white/[0.03] transition-colors min-h-[60px] ${
+                      !n.read ? "bg-primary/[0.04]" : ""
                     }`}
                   >
-                    <span className={`w-8 h-8 rounded-full ${config.bg} flex items-center justify-center text-sm shrink-0 mt-0.5`}>
+                    <span className="w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 mt-0.5" style={{ background: "rgba(79,109,245,0.1)" }}>
                       {config.icon}
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className={`text-sm font-medium ${!n.read ? "text-slate-900" : "text-slate-700"} truncate`}>
+                        <p className={`text-sm font-medium ${!n.read ? "text-white" : "text-slate-300"} truncate`}>
                           {n.title}
                         </p>
-                        <span className="text-[10px] text-slate-400 shrink-0 mt-0.5">
+                        <span className="text-[10px] text-slate-500 shrink-0 mt-0.5">
                           {timeAgo(n.created_at)}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.message}</p>
+                      <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{n.message}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${config.bg} ${config.color}`}>
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${config.className}`}>
                           {FILTER_LABELS[n.type as FilterType] ?? n.type}
                         </span>
                         {n.channel_status === "sent" && (
-                          <span className="text-[10px] text-slate-400">✓ Enviado</span>
+                          <span className="text-[10px] text-slate-500">✓ Enviado</span>
                         )}
                         {n.channel_status === "failed" && (
                           <span className="text-[10px] text-danger">Falha envio</span>
@@ -173,7 +188,13 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
                       </div>
                     </div>
                     {!n.read && (
-                      <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-2" />
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0 mt-2"
+                        style={{
+                          background: "#4f6df5",
+                          boxShadow: "0 0 8px rgba(79,109,245,0.6)",
+                        }}
+                      />
                     )}
                   </button>
                 );
