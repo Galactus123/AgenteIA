@@ -50,7 +50,7 @@ function safeTime(at: string): string {
 function IconBox({ children, color }: { children: React.ReactNode; color: string }) {
   return (
     <div
-      className="p-2.5 rounded-xl"
+      className="p-3 rounded-xl transition-all duration-300 group-hover:scale-110 group-active:scale-95"
       style={{
         background: color,
         boxShadow: `0 0 12px ${color.replace(/[\d.]+\)$/, "0.4)")}`,
@@ -131,20 +131,22 @@ function DashboardContent() {
         {kpis.map((kpi) => (
           <div
             key={kpi.label}
-            className="p-4 sm:p-5 rounded-2xl transition-all duration-300"
+            className="group relative overflow-hidden rounded-2xl p-4 sm:p-5 select-none cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1 active:scale-[0.98] hover:shadow-[0_0_25px_rgba(99,102,241,0.3)] active:shadow-[0_0_30px_rgba(99,102,241,0.5)] hover:border-indigo-500/50 active:border-indigo-500/70"
             style={{
               background: "var(--card)",
               border: "1px solid var(--card-border)",
-              boxShadow: "0 0 15px rgba(99,102,241,0.15)",
             }}
           >
-            <div className="flex items-start justify-between">
+            <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity duration-300 pointer-events-none"
+              style={{ background: "radial-gradient(circle at 50% 0%, rgba(99,102,241,0.08) 0%, transparent 70%)" }}
+            />
+            <div className="relative flex items-start justify-between">
               <IconBox color={kpi.color}>
                 <span className={kpi.iconClassName}>{kpi.icon}</span>
               </IconBox>
             </div>
-            <p className="text-xl sm:text-2xl font-bold mt-3 dark:text-white text-slate-900">{kpi.value}</p>
-            <p className="text-xs sm:text-sm mt-1 dark:text-slate-400 text-slate-500">{kpi.label}</p>
+            <p className="relative text-xl sm:text-2xl font-bold mt-3 dark:text-white text-slate-900">{kpi.value}</p>
+            <p className="relative text-xs sm:text-sm mt-1 dark:text-slate-400 text-slate-500">{kpi.label}</p>
           </div>
         ))}
       </div>
@@ -152,7 +154,7 @@ function DashboardContent() {
       {/* Content Grid */}
       <div className="relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Agenda do dia */}
-        <div className="lg:col-span-2 rounded-2xl p-4 sm:p-6" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+        <div className="group lg:col-span-2 rounded-2xl p-4 sm:p-6 transition-all duration-300 hover:shadow-[0_0_20px_rgba(99,102,241,0.15)] active:shadow-[0_0_25px_rgba(99,102,241,0.25)] hover:border-indigo-500/30 active:border-indigo-500/50" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <IconBox color="rgba(79,109,245,0.12)">
@@ -180,10 +182,7 @@ function DashboardContent() {
               {stats.todayAppointments.map((a) => (
                 <div
                   key={a.id}
-                  className="flex items-center gap-3 p-3 rounded-xl transition-colors"
-                  style={{ background: "transparent" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  className="flex items-center gap-3 p-3 rounded-xl transition-all duration-200 hover:bg-slate-100 dark:hover:bg-[#1A1D2E] active:bg-slate-200 dark:active:bg-[#1E2235]"
                 >
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-semibold shrink-0"
@@ -213,7 +212,7 @@ function DashboardContent() {
         {/* Right column */}
         <div className="space-y-4 sm:space-y-6">
           {/* Solicitações */}
-          <div className="rounded-2xl p-4 sm:p-6" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+          <div className="group rounded-2xl p-4 sm:p-6 transition-all duration-300 hover:shadow-[0_0_20px_rgba(99,102,241,0.15)] active:shadow-[0_0_25px_rgba(99,102,241,0.25)] hover:border-indigo-500/30 active:border-indigo-500/50" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <IconBox color="rgba(245,158,11,0.12)">
@@ -259,7 +258,7 @@ function DashboardContent() {
           </div>
 
           {/* Médicos */}
-          <div className="rounded-2xl p-4 sm:p-6" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+          <div className="group rounded-2xl p-4 sm:p-6 transition-all duration-300 hover:shadow-[0_0_20px_rgba(99,102,241,0.15)] active:shadow-[0_0_25px_rgba(99,102,241,0.25)] hover:border-indigo-500/30 active:border-indigo-500/50" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <IconBox color="rgba(16,185,129,0.12)">
@@ -282,7 +281,7 @@ function DashboardContent() {
             ) : (
               <div className="space-y-2">
                 {stats.doctors.filter((d) => d.status === "active").slice(0, 5).map((doctor) => (
-                  <div key={doctor.id} className="flex items-center gap-3 p-2 rounded-xl" style={{ background: "transparent" }}>
+                  <div key={doctor.id} className="flex items-center gap-3 p-2 rounded-xl transition-all duration-200 hover:bg-slate-100 dark:hover:bg-[#1A1D2E] active:bg-slate-200 dark:active:bg-[#1E2235]">
                     <div
                       className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-semibold shrink-0"
                       style={{ background: "rgba(79,109,245,0.12)" }}
