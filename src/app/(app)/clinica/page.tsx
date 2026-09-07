@@ -66,15 +66,15 @@ export default function ClinicaPage() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Clínica</h1>
-        <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+        <h1 className="text-xl font-bold dark:text-white text-slate-900">Clínica</h1>
+        <p className="text-sm mt-1 dark:text-slate-400 text-slate-500">
           Dados cadastrais da clínica usados nas confirmações e lembretes.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="rounded-2xl p-5 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
         <div>
-          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Nome da clínica</label>
+          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Nome da clínica</label>
           <input
             type="text"
             value={form.name}
@@ -84,7 +84,7 @@ export default function ClinicaPage() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Endereço</label>
+          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Endereço</label>
           <input
             type="text"
             value={form.address}
@@ -94,7 +94,7 @@ export default function ClinicaPage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Telefone</label>
+            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Telefone</label>
             <input
               type="text"
               value={form.phone}
@@ -103,7 +103,7 @@ export default function ClinicaPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>WhatsApp</label>
+            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">WhatsApp</label>
             <input
               type="text"
               value={form.whatsapp}
@@ -113,7 +113,7 @@ export default function ClinicaPage() {
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Horário de funcionamento</label>
+          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Horário de funcionamento</label>
           <input
             type="text"
             value={form.opening_hours}
@@ -123,7 +123,7 @@ export default function ClinicaPage() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Localização</label>
+          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Localização</label>
           <input
             type="text"
             value={form.location}
@@ -132,7 +132,7 @@ export default function ClinicaPage() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Redes sociais (JSON)</label>
+          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Redes sociais (JSON)</label>
           <textarea
             value={form.social_media}
             onChange={(e) => setForm({ ...form, social_media: e.target.value })}

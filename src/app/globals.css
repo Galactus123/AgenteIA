@@ -262,13 +262,36 @@ body {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* ── Global Dark Theme Form Styles ────────────────────────────── */
+/* ── Global Form Styles (Light + Dark) ─────────────────────────── */
+input,
+textarea,
+select {
+  color: var(--text-primary);
+  border-color: var(--input-border);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 2px rgba(79, 109, 245, 0.15) !important;
+  outline: none !important;
+}
+
+label {
+  color: var(--text-secondary);
+}
+
+/* ── Dark-only form overrides ──────────────────────────────────── */
 .dark input,
 .dark textarea,
 .dark select {
   background: var(--input-bg) !important;
-  color: var(--text-primary) !important;
-  border-color: var(--input-border) !important;
 }
 
 .dark input::placeholder,
@@ -276,18 +299,24 @@ body {
   color: var(--text-faint) !important;
 }
 
-.dark input:focus,
-.dark textarea:focus,
-.dark select:focus {
-  border-color: var(--color-primary) !important;
-  box-shadow: 0 0 0 1px var(--color-primary) !important;
-  outline: none !important;
+/* ── Light-only form overrides ─────────────────────────────────── */
+:root:not(.dark) input,
+:root:not(.dark) textarea,
+:root:not(.dark) select {
+  background: #F8FAFC !important;
+  border-color: #E2E8F0 !important;
 }
 
-.dark label {
-  color: var(--text-secondary) !important;
+:root:not(.dark) input::placeholder,
+:root:not(.dark) textarea::placeholder {
+  color: #94A3B8 !important;
 }
 
+:root:not(.dark) label {
+  color: #334155 !important;
+}
+
+/* ── Dark card/table helpers ───────────────────────────────────── */
 .dark .dark-card {
   background: var(--card) !important;
   border: 1px solid var(--card-border) !important;

@@ -86,7 +86,7 @@ export default function PerfilPage() {
   return (
     <div className="space-y-6 max-w-xl">
       <div>
-        <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Perfil</h1>
+        <h1 className="text-xl font-bold dark:text-white text-slate-900">Perfil</h1>
         <p className="text-sm text-slate-500 mt-1">
           Gerencie suas credenciais de acesso.
         </p>
@@ -95,9 +95,9 @@ export default function PerfilPage() {
       {admin && (
         <div className="rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
           <p className="text-sm text-slate-500">Usuário</p>
-          <p className="font-medium" style={{ color: "var(--text-primary)" }}>{admin.username}</p>
+          <p className="font-medium dark:text-white text-slate-900">{admin.username}</p>
           <p className="text-sm text-slate-500 mt-2">Função</p>
-          <p className="font-medium capitalize" style={{ color: "var(--text-primary)" }}>
+          <p className="font-medium capitalize dark:text-white text-slate-900">
             {admin.role.replace("_", " ")}
           </p>
         </div>
@@ -109,10 +109,10 @@ export default function PerfilPage() {
         className="rounded-2xl p-5 space-y-4"
         style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
       >
-        <h2 className="font-semibold" style={{ color: "var(--text-primary)" }}>Alterar E-mail</h2>
+        <h2 className="font-semibold dark:text-white text-slate-900">Alterar E-mail</h2>
 
         <div>
-          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">
             Novo E-mail
           </label>
           <input
@@ -126,7 +126,7 @@ export default function PerfilPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">
             Senha Atual (confirmação)
           </label>
           <input
@@ -163,10 +163,10 @@ export default function PerfilPage() {
         className="rounded-2xl p-5 space-y-4"
         style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
       >
-        <h2 className="font-semibold" style={{ color: "var(--text-primary)" }}>Alterar Senha</h2>
+        <h2 className="font-semibold dark:text-white text-slate-900">Alterar Senha</h2>
 
         <div>
-          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">
             Senha Atual
           </label>
           <input
@@ -179,7 +179,7 @@ export default function PerfilPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">
             Nova Senha
           </label>
           <input
@@ -194,7 +194,7 @@ export default function PerfilPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">
             Confirmar Nova Senha
           </label>
           <input

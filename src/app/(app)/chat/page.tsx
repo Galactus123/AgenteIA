@@ -133,14 +133,14 @@ export default function ChatPage() {
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       <div>
-        <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Atendimento IA (simulador WhatsApp)</h1>
-        <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+        <h1 className="text-xl font-bold dark:text-white text-slate-900">Atendimento IA (simulador WhatsApp)</h1>
+        <p className="text-sm mt-1 dark:text-slate-400 text-slate-500">
           Simule a conversa de um paciente com a recepcionista virtual. Escolha um número para testar.
         </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-sm font-medium" style={{ color: "var(--text-secondary)" }}>WhatsApp do paciente:</label>
+        <label className="text-sm font-medium dark:text-slate-300 text-slate-600">WhatsApp do paciente:</label>
         <input
           type="text"
           value={phone}
@@ -247,8 +247,8 @@ export default function ChatPage() {
         </div>
       </div>
 
-      <div className="rounded-xl p-4 text-sm space-y-1" style={{ background: "var(--card)", border: "1px solid var(--card-border)", color: "var(--text-secondary)" }}>
-        <p className="font-medium" style={{ color: "var(--text-primary)" }}>Dicas para testar o fluxo do PRD:</p>
+      <div className="rounded-xl p-4 text-sm space-y-1 dark:text-slate-300 text-slate-600" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+        <p className="font-medium dark:text-white text-slate-900">Dicas para testar o fluxo do PRD:</p>
         <p>• Agendar: informe o problema e confirme o horário que a IA sugerir.</p>
         <p>• Remarcar: diga &quot;quero remarcar minha consulta&quot;.</p>
         <p>• Cancelar: diga &quot;quero cancelar minha consulta&quot;.</p>

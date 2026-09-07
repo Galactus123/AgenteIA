@@ -11,7 +11,7 @@ export default function ConsultasPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Consultas</h1>
+          <h1 className="text-xl font-bold dark:text-white text-slate-900">Consultas</h1>
         </div>
         <div className="rounded-2xl p-6" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
           <p className="text-sm text-red-600">Erro ao carregar consultas. Tente novamente mais tarde.</p>
@@ -23,15 +23,15 @@ export default function ConsultasPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Consultas</h1>
-        <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+        <h1 className="text-xl font-bold dark:text-white text-slate-900">Consultas</h1>
+        <p className="text-sm mt-1 dark:text-slate-400 text-slate-500">
           Todas as consultas marcadas, remarcadas e canceladas.
         </p>
       </div>
 
       <div className="rounded-2xl overflow-hidden" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
         {appointments.length === 0 ? (
-          <p className="p-6 text-sm" style={{ color: "var(--text-muted)" }}>
+          <p className="p-6 text-sm dark:text-slate-400 text-slate-500">
             Nenhuma consulta ainda. As consultas agendadas pela IA aparecerão aqui.
           </p>
         ) : (
@@ -51,12 +51,12 @@ export default function ConsultasPage() {
               <tbody>
                 {appointments.map((a) => (
                   <tr key={a.id} className="border-t" style={{ borderColor: "var(--surface-border)" }}>
-                    <td className="px-4 py-3 font-medium" style={{ color: "var(--text-primary)" }}>{a.patient_name}</td>
-                    <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{a.doctor_name}</td>
-                    <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{a.specialty_name}</td>
-                    <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{displayDateTime(a.starts_at)}</td>
-                    <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{formatPrice(a.price)}</td>
-                    <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>
+                    <td className="px-4 py-3 font-medium dark:text-white text-slate-900">{a.patient_name}</td>
+                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{a.doctor_name}</td>
+                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{a.specialty_name}</td>
+                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{displayDateTime(a.starts_at)}</td>
+                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{formatPrice(a.price)}</td>
+                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">
                       {a.source === "ia" ? "IA" : "Manual"}
                     </td>
                     <td className="px-4 py-3">

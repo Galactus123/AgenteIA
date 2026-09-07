@@ -91,28 +91,28 @@ function DashboardContent() {
       value: stats.scheduled,
       icon: <Calendar size={20} strokeWidth={1.75} />,
       color: "rgba(79,109,245,0.12)",
-      iconColor: "#818cf8",
+      iconClassName: "dark:text-indigo-400 text-indigo-600",
     },
     {
       label: "Médicos Ativos",
       value: stats.activeDoctors,
       icon: <Stethoscope size={20} strokeWidth={1.75} />,
       color: "rgba(16,185,129,0.12)",
-      iconColor: "#34d399",
+      iconClassName: "dark:text-emerald-400 text-emerald-600",
     },
     {
       label: "Atendimentos IA",
       value: stats.totalConversations,
       icon: <MessageSquare size={20} strokeWidth={1.75} />,
       color: "rgba(99,102,241,0.12)",
-      iconColor: "#a5b4fc",
+      iconClassName: "dark:text-indigo-300 text-indigo-500",
     },
     {
       label: "Pacientes",
       value: stats.totalPatients,
       icon: <Users size={20} strokeWidth={1.75} />,
       color: "rgba(168,85,247,0.12)",
-      iconColor: "#c4b5fd",
+      iconClassName: "dark:text-violet-300 text-violet-500",
     },
   ];
 
@@ -122,8 +122,8 @@ function DashboardContent() {
       <div className="glow-blob glow-blob-purple w-[250px] h-[250px] top-1/2 -left-40 animate-glow-pulse" style={{ animationDelay: "1.5s" }} />
 
       <div className="relative z-10">
-        <h1 className="text-lg sm:text-xl font-bold" style={{ color: "var(--text-primary)" }}>Dashboard</h1>
-        <p className="text-xs sm:text-sm mt-1" style={{ color: "var(--text-muted)" }}>Visão geral da clínica e do atendimento com IA.</p>
+        <h1 className="text-lg sm:text-xl font-bold dark:text-white text-slate-900">Dashboard</h1>
+        <p className="text-xs sm:text-sm mt-1 dark:text-slate-400 text-slate-500">Visão geral da clínica e do atendimento com IA.</p>
       </div>
 
       {/* KPI Cards */}
@@ -140,11 +140,11 @@ function DashboardContent() {
           >
             <div className="flex items-start justify-between">
               <IconBox color={kpi.color}>
-                <span style={{ color: kpi.iconColor }}>{kpi.icon}</span>
+                <span className={kpi.iconClassName}>{kpi.icon}</span>
               </IconBox>
             </div>
-            <p className="text-xl sm:text-2xl font-bold mt-3" style={{ color: "var(--text-primary)" }}>{kpi.value}</p>
-            <p className="text-xs sm:text-sm mt-1" style={{ color: "var(--text-muted)" }}>{kpi.label}</p>
+            <p className="text-xl sm:text-2xl font-bold mt-3 dark:text-white text-slate-900">{kpi.value}</p>
+            <p className="text-xs sm:text-sm mt-1 dark:text-slate-400 text-slate-500">{kpi.label}</p>
           </div>
         ))}
       </div>
@@ -156,24 +156,24 @@ function DashboardContent() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <IconBox color="rgba(79,109,245,0.12)">
-                <Calendar size={18} strokeWidth={1.75} style={{ color: "#818cf8" }} />
+                <Calendar size={18} strokeWidth={1.75} className="dark:text-indigo-400 text-indigo-600" />
               </IconBox>
               <div>
-                <h2 className="font-semibold text-base" style={{ color: "var(--text-primary)" }}>Agenda do dia</h2>
-                <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{dateLabel}</p>
+                <h2 className="font-semibold text-base dark:text-white text-slate-900">Agenda do dia</h2>
+                <p className="text-xs mt-0.5 dark:text-slate-400 text-slate-500">{dateLabel}</p>
               </div>
             </div>
-            <a href="/consultas" className="flex items-center gap-1 text-xs font-medium transition-colors min-h-[44px]" style={{ color: "var(--color-highlight)" }}>
+            <a href="/consultas" className="flex items-center gap-1 text-xs font-medium transition-colors min-h-[44px] dark:text-indigo-400 text-indigo-600">
               Ver todas <ChevronRight size={14} />
             </a>
           </div>
 
           {stats.todayAppointments.length === 0 ? (
             <div className="text-center py-8">
-              <div className="inline-flex p-3 rounded-xl mb-3" style={{ background: "rgba(99,102,241,0.08)" }}>
-                <FileText size={24} strokeWidth={1.75} style={{ color: "var(--text-faint)" }} />
-              </div>
-              <p className="text-sm" style={{ color: "var(--text-faint)" }}>Nenhuma consulta agendada para hoje.</p>
+                <div className="inline-flex p-3 rounded-xl mb-3" style={{ background: "rgba(99,102,241,0.08)" }}>
+                  <FileText size={24} strokeWidth={1.75} className="dark:text-slate-500 text-slate-400" />
+                </div>
+                <p className="text-sm dark:text-slate-500 text-slate-400">Nenhuma consulta agendada para hoje.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -187,13 +187,13 @@ function DashboardContent() {
                 >
                   <div
                     className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-semibold shrink-0"
-                    style={{ background: "rgba(79,109,245,0.12)", color: "#818cf8" }}
+                    style={{ background: "rgba(79,109,245,0.12)" }}
                   >
-                    <Clock size={16} strokeWidth={1.75} />
+                    <Clock size={16} strokeWidth={1.75} className="dark:text-indigo-400 text-indigo-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{a.patient_name}</p>
-                    <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
+                    <p className="text-sm font-medium truncate dark:text-white text-slate-900">{a.patient_name}</p>
+                    <p className="text-xs truncate dark:text-slate-400 text-slate-500">
                       {safeTime(a.starts_at)} · {a.doctor_name} · {a.specialty_name}
                     </p>
                   </div>
@@ -217,9 +217,9 @@ function DashboardContent() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <IconBox color="rgba(245,158,11,0.12)">
-                  <Activity size={18} strokeWidth={1.75} style={{ color: "#fbbf24" }} />
+                  <Activity size={18} strokeWidth={1.75} className="dark:text-amber-400 text-amber-600" />
                 </IconBox>
-                <h2 className="font-semibold text-base" style={{ color: "var(--text-primary)" }}>Solicitações</h2>
+                <h2 className="font-semibold text-base dark:text-white text-slate-900">Solicitações</h2>
               </div>
               <span className="neon-badge-warning text-xs font-medium px-2 py-0.5 rounded-full">
                 {stats.pendingRequests.length}
@@ -229,9 +229,9 @@ function DashboardContent() {
             {stats.pendingRequests.length === 0 ? (
               <div className="text-center py-6">
                 <div className="inline-flex p-3 rounded-xl mb-3" style={{ background: "rgba(16,185,129,0.08)" }}>
-                  <CheckCircle2 size={24} strokeWidth={1.75} style={{ color: "#34d399" }} />
+                  <CheckCircle2 size={24} strokeWidth={1.75} className="dark:text-emerald-400 text-emerald-600" />
                 </div>
-                <p className="text-sm" style={{ color: "var(--text-faint)" }}>Nenhuma solicitação pendente.</p>
+                <p className="text-sm dark:text-slate-500 text-slate-400">Nenhuma solicitação pendente.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -243,8 +243,8 @@ function DashboardContent() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{req.patient_name}</p>
-                        <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                        <p className="text-sm font-medium truncate dark:text-white text-slate-900">{req.patient_name}</p>
+                        <p className="text-xs mt-0.5 dark:text-slate-400 text-slate-500">
                           {req.specialty_name} · {req.preferred_date} {req.preferred_time}
                         </p>
                       </div>
@@ -263,11 +263,11 @@ function DashboardContent() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <IconBox color="rgba(16,185,129,0.12)">
-                  <Stethoscope size={18} strokeWidth={1.75} style={{ color: "#34d399" }} />
+                  <Stethoscope size={18} strokeWidth={1.75} className="dark:text-emerald-400 text-emerald-600" />
                 </IconBox>
-                <h2 className="font-semibold text-base" style={{ color: "var(--text-primary)" }}>Médicos</h2>
+                <h2 className="font-semibold text-base dark:text-white text-slate-900">Médicos</h2>
               </div>
-              <a href="/medicos" className="flex items-center gap-1 text-xs font-medium transition-colors min-h-[44px]" style={{ color: "var(--color-highlight)" }}>
+              <a href="/medicos" className="flex items-center gap-1 text-xs font-medium transition-colors min-h-[44px] dark:text-indigo-400 text-indigo-600">
                 Ver todos <ChevronRight size={14} />
               </a>
             </div>
@@ -275,9 +275,9 @@ function DashboardContent() {
             {stats.doctors.length === 0 ? (
               <div className="text-center py-6">
                 <div className="inline-flex p-3 rounded-xl mb-3" style={{ background: "rgba(99,102,241,0.08)" }}>
-                  <Stethoscope size={24} strokeWidth={1.75} style={{ color: "var(--text-faint)" }} />
+                  <Stethoscope size={24} strokeWidth={1.75} className="dark:text-slate-500 text-slate-400" />
                 </div>
-                <p className="text-sm" style={{ color: "var(--text-faint)" }}>Nenhum médico encontrado.</p>
+                <p className="text-sm dark:text-slate-500 text-slate-400">Nenhum médico encontrado.</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -285,13 +285,13 @@ function DashboardContent() {
                   <div key={doctor.id} className="flex items-center gap-3 p-2 rounded-xl" style={{ background: "transparent" }}>
                     <div
                       className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-semibold shrink-0"
-                      style={{ background: "rgba(79,109,245,0.12)", color: "#818cf8" }}
+                      style={{ background: "rgba(79,109,245,0.12)" }}
                     >
-                      {doctor.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                      <span className="dark:text-indigo-400 text-indigo-600">{doctor.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{doctor.name}</p>
-                      <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>{doctor.specialty_name}</p>
+                      <p className="text-sm font-medium truncate dark:text-white text-slate-900">{doctor.name}</p>
+                      <p className="text-xs truncate dark:text-slate-400 text-slate-500">{doctor.specialty_name}</p>
                     </div>
                   </div>
                 ))}

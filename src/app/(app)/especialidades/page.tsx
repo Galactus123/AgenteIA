@@ -81,23 +81,23 @@ export default function EspecialidadesPage() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Especialidades</h1>
-        <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+        <h1 className="text-xl font-bold dark:text-white text-slate-900">Especialidades</h1>
+        <p className="text-sm mt-1 dark:text-slate-400 text-slate-500">
           Cadastro de especialidades e palavras-chave usadas pela IA para sugerir o atendimento.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="rounded-2xl p-5 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold" style={{ color: "var(--text-primary)" }}>{editing ? "Editar especialidade" : "Nova especialidade"}</h2>
+          <h2 className="font-semibold dark:text-white text-slate-900">{editing ? "Editar especialidade" : "Nova especialidade"}</h2>
           {editing && (
-            <button type="button" onClick={resetForm} className="text-sm" style={{ color: "var(--text-muted)" }}>
+            <button type="button" onClick={resetForm} className="text-sm dark:text-slate-400 text-slate-500">
               Cancelar edição
             </button>
           )}
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Nome</label>
+          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Nome</label>
           <input
             type="text"
             value={form.name}
@@ -107,7 +107,7 @@ export default function EspecialidadesPage() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Descrição</label>
+          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Descrição</label>
           <textarea
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -116,7 +116,7 @@ export default function EspecialidadesPage() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">
             Palavras-chave (separadas por vírgula)
           </label>
           <input
@@ -139,7 +139,7 @@ export default function EspecialidadesPage() {
 
       <div className="rounded-2xl overflow-hidden" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
         {items.length === 0 ? (
-          <p className="p-6 text-sm" style={{ color: "var(--text-muted)" }}>Nenhuma especialidade cadastrada.</p>
+          <p className="p-6 text-sm dark:text-slate-400 text-slate-500">Nenhuma especialidade cadastrada.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -154,18 +154,18 @@ export default function EspecialidadesPage() {
                 {items.map((s) => (
                   <tr key={s.id} className="border-t" style={{ borderColor: "var(--surface-border)" }}>
                     <td className="px-4 py-3">
-                      <p className="font-medium" style={{ color: "var(--text-primary)" }}>{s.name}</p>
-                      <p className="text-xs line-clamp-1" style={{ color: "var(--text-muted)" }}>{s.description}</p>
+                      <p className="font-medium dark:text-white text-slate-900">{s.name}</p>
+                      <p className="text-xs line-clamp-1 dark:text-slate-400 text-slate-500">{s.description}</p>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         {s.keywords.slice(0, 5).map((k, i) => (
-                          <span key={i} className="rounded-full px-2 py-0.5 text-xs" style={{ background: "rgba(99,102,241,0.1)", color: "var(--text-secondary)" }}>
+                          <span key={i} className="rounded-full px-2 py-0.5 text-xs dark:text-slate-300 text-slate-600" style={{ background: "rgba(99,102,241,0.1)" }}>
                             {k}
                           </span>
                         ))}
                         {s.keywords.length > 5 && (
-                          <span className="text-xs" style={{ color: "var(--text-muted)" }}>+{s.keywords.length - 5}</span>
+                          <span className="text-xs dark:text-slate-400 text-slate-500">+{s.keywords.length - 5}</span>
                         )}
                       </div>
                     </td>

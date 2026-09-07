@@ -87,18 +87,18 @@ export default function PacientesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Pacientes</h1>
-        <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
+        <h1 className="text-xl font-bold dark:text-white text-slate-900">Pacientes</h1>
+        <p className="text-sm mt-1 dark:text-slate-400 text-slate-500">
           Cadastro e gestão de pacientes da clínica.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="rounded-2xl p-5 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
-        <h2 className="font-semibold" style={{ color: "var(--text-primary)" }}>Novo paciente</h2>
+        <h2 className="font-semibold dark:text-white text-slate-900">Novo paciente</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Nome *</label>
+            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Nome *</label>
             <input
               type="text"
               value={form.nome}
@@ -108,7 +108,7 @@ export default function PacientesPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Telefone *</label>
+            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Telefone *</label>
             <input
               type="tel"
               value={form.telefone}
@@ -119,7 +119,7 @@ export default function PacientesPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>E-mail</label>
+            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">E-mail</label>
             <input
               type="email"
               value={form.email ?? ""}
@@ -128,7 +128,7 @@ export default function PacientesPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Data de nascimento</label>
+            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Data de nascimento</label>
             <input
               type="date"
               value={form.data_nascimento ?? ""}
@@ -137,7 +137,7 @@ export default function PacientesPage() {
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Endereço</label>
+            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Endereço</label>
             <input
               type="text"
               value={form.endereco ?? ""}
@@ -146,7 +146,7 @@ export default function PacientesPage() {
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-1" style={{ color: "var(--text-secondary)" }}>Observações</label>
+            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Observações</label>
             <textarea
               value={form.observacoes ?? ""}
               onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
@@ -176,8 +176,8 @@ export default function PacientesPage() {
           </div>
         ) : patients.length === 0 ? (
           <div className="p-6 text-center">
-            <p className="text-sm" style={{ color: "var(--text-faint)" }}>Nenhum paciente cadastrado.</p>
-            <p className="text-xs mt-1" style={{ color: "var(--text-faint)" }}>Use o formulário acima para cadastrar o primeiro paciente.</p>
+            <p className="text-sm dark:text-slate-500 text-slate-400">Nenhum paciente cadastrado.</p>
+            <p className="text-xs mt-1 dark:text-slate-500 text-slate-400">Use o formulário acima para cadastrar o primeiro paciente.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -194,15 +194,15 @@ export default function PacientesPage() {
               <tbody>
                 {patients.map((p) => (
                   <tr key={p.id} className="border-t" style={{ borderColor: "var(--surface-border)" }}>
-                    <td className="px-4 py-3 font-medium" style={{ color: "var(--text-primary)" }}>{p.nome}</td>
-                    <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{p.telefone}</td>
-                    <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{p.email || "—"}</td>
-                    <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>
+                    <td className="px-4 py-3 font-medium dark:text-white text-slate-900">{p.nome}</td>
+                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{p.telefone}</td>
+                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{p.email || "—"}</td>
+                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">
                       {p.data_nascimento
                         ? new Date(p.data_nascimento).toLocaleDateString("pt-BR")
                         : "—"}
                     </td>
-                    <td className="px-4 py-3" style={{ color: "var(--text-secondary)" }}>{p.endereco || "—"}</td>
+                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{p.endereco || "—"}</td>
                   </tr>
                 ))}
               </tbody>

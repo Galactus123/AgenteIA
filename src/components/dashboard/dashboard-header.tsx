@@ -27,7 +27,7 @@ export default function DashboardHeader({ userName = "Admin", clinicName = "Saú
     >
       <div className="flex items-center gap-3 flex-1 min-w-0 pl-10 lg:pl-0">
         <div className="relative flex-1 max-w-md">
-          <Search size={16} strokeWidth={1.75} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-faint)" }} />
+          <Search size={16} strokeWidth={1.75} className="absolute left-3 top-1/2 -translate-y-1/2 dark:text-slate-500 text-slate-400" />
           <input
             type="text"
             placeholder="Buscar..."
@@ -61,8 +61,8 @@ export default function DashboardHeader({ userName = "Admin", clinicName = "Saú
             {userName.charAt(0).toUpperCase()}
           </div>
           <div className="text-left hidden sm:block">
-            <p className="text-sm font-medium leading-tight" style={{ color: "var(--text-primary)" }}>{userName}</p>
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>{clinicName}</p>
+            <p className="text-sm font-medium leading-tight dark:text-white text-slate-900" style={{ color: "var(--text-primary)" }}>{userName}</p>
+            <p className="text-xs dark:text-slate-400 text-slate-500" style={{ color: "var(--text-muted)" }}>{clinicName}</p>
           </div>
         </Link>
       </div>

@@ -131,7 +131,7 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
             >
               <Bell size={16} strokeWidth={1.75} style={{ color: "#818cf8" }} />
             </div>
-            <h3 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>Notificações</h3>
+            <h3 className="font-semibold text-sm dark:text-white text-slate-900">Notificações</h3>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -144,8 +144,7 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:opacity-80 min-w-[32px] min-h-[32px] flex items-center justify-center"
-              style={{ color: "var(--text-faint)" }}
+              className="p-1.5 rounded-lg hover:opacity-80 min-w-[32px] min-h-[32px] flex items-center justify-center dark:text-slate-500 text-slate-400"
               aria-label="Fechar"
             >
               <X size={16} />
@@ -159,14 +158,13 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
               key={f}
               onClick={() => setFilter(f)}
               className={`text-xs font-medium px-3 py-1.5 rounded-full whitespace-nowrap transition-all duration-150 min-h-[32px] ${
-                filter === f ? "" : "hover:opacity-80"
+                filter === f ? "" : "hover:opacity-80 dark:text-slate-400 text-slate-500"
               }`}
               style={filter === f ? {
                 background: "linear-gradient(135deg, rgba(79,109,245,0.2), rgba(129,140,248,0.1))",
                 color: "#4f6df5",
                 border: "1px solid rgba(99,102,241,0.2)",
               } : {
-                color: "var(--text-muted)",
                 border: "1px solid transparent",
               }}
             >
@@ -178,14 +176,14 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <span className="text-sm" style={{ color: "var(--text-faint)" }}>Carregando...</span>
+              <span className="text-sm dark:text-slate-500 text-slate-400">Carregando...</span>
             </div>
           ) : notifications.length === 0 ? (
             <div className="text-center py-12">
               <div className="inline-flex p-3 rounded-xl mb-3" style={{ background: "rgba(99,102,241,0.08)" }}>
-                <BellOff size={24} strokeWidth={1.75} style={{ color: "var(--text-faint)" }} />
+                <BellOff size={24} strokeWidth={1.75} className="dark:text-slate-500 text-slate-400" />
               </div>
-              <p className="text-sm" style={{ color: "var(--text-faint)" }}>Nenhuma notificação.</p>
+              <p className="text-sm dark:text-slate-500 text-slate-400">Nenhuma notificação.</p>
             </div>
           ) : (
             <div style={{ borderBottom: "1px solid var(--surface-border)" }}>
@@ -210,20 +208,20 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm font-medium truncate" style={{ color: !n.read ? "var(--text-primary)" : "var(--text-secondary)" }}>
+                        <p className={`text-sm font-medium truncate ${!n.read ? "dark:text-white text-slate-900" : "dark:text-slate-300 text-slate-600"}`}>
                           {n.title}
                         </p>
-                        <span className="text-[10px] shrink-0 mt-0.5" style={{ color: "var(--text-faint)" }}>
+                        <span className="text-[10px] shrink-0 mt-0.5 dark:text-slate-500 text-slate-400">
                           {timeAgo(n.created_at)}
                         </span>
                       </div>
-                      <p className="text-xs mt-0.5 line-clamp-2" style={{ color: "var(--text-muted)" }}>{n.message}</p>
+                      <p className="text-xs mt-0.5 line-clamp-2 dark:text-slate-400 text-slate-500">{n.message}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${config.className}`}>
                           {FILTER_LABELS[n.type as FilterType] ?? n.type}
                         </span>
                         {n.channel_status === "sent" && (
-                          <span className="text-[10px] flex items-center gap-1" style={{ color: "var(--text-faint)" }}>
+                          <span className="text-[10px] flex items-center gap-1 dark:text-slate-500 text-slate-400">
                             <CheckCircle2 size={10} strokeWidth={2} /> Enviado
                           </span>
                         )}
