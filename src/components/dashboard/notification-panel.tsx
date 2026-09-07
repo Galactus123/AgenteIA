@@ -1,6 +1,15 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import {
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Bell,
+  BellOff,
+  X,
+  CheckCheck,
+} from "lucide-react";
 
 interface Notification {
   id: number;
@@ -15,11 +24,27 @@ interface Notification {
 
 type FilterType = "all" | "scheduled" | "cancelled" | "rescheduled" | "reminder";
 
-const TYPE_CONFIG: Record<string, { icon: string; className: string }> = {
-  scheduled: { icon: "🟢", className: "neon-badge-success" },
-  cancelled: { icon: "🔴", className: "neon-badge-danger" },
-  rescheduled: { icon: "🟡", className: "neon-badge-warning" },
-  reminder: { icon: "🔵", className: "neon-badge" },
+const TYPE_CONFIG: Record<string, { icon: React.ReactNode; className: string; iconColor: string }> = {
+  scheduled: {
+    icon: <CheckCircle2 size={14} strokeWidth={1.75} />,
+    className: "neon-badge-success",
+    iconColor: "#34d399",
+  },
+  cancelled: {
+    icon: <XCircle size={14} strokeWidth={1.75} />,
+    className: "neon-badge-danger",
+    iconColor: "#f87171",
+  },
+  rescheduled: {
+    icon: <Clock size={14} strokeWidth={1.75} />,
+    className: "neon-badge-warning",
+    iconColor: "#fbbf24",
+  },
+  reminder: {
+    icon: <Bell size={14} strokeWidth={1.75} />,
+    className: "neon-badge",
+    iconColor: "#818cf8",
+  },
 };
 
 const FILTER_LABELS: Record<FilterType, string> = {
@@ -99,12 +124,22 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
         }}
       >
         <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: "1px solid var(--surface-border)" }}>
-          <h3 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>Notificações</h3>
+          <div className="flex items-center gap-2.5">
+            <div
+              className="p-1.5 rounded-lg"
+              style={{ background: "rgba(79,109,245,0.12)" }}
+            >
+              <Bell size={16} strokeWidth={1.75} style={{ color: "#818cf8" }} />
+            </div>
+            <h3 className="font-semibold text-sm" style={{ color: "var(--text-primary)" }}>Notificações</h3>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={markAllRead}
-              className="text-xs text-highlight hover:text-primary font-medium min-h-[32px] px-2"
+              className="flex items-center gap-1.5 text-xs font-medium min-h-[32px] px-2 rounded-lg hover:opacity-80"
+              style={{ color: "var(--color-highlight)" }}
             >
+              <CheckCheck size={14} strokeWidth={1.75} />
               Marcar todas lidas
             </button>
             <button
@@ -113,7 +148,7 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
               style={{ color: "var(--text-faint)" }}
               aria-label="Fechar"
             >
-              ✕
+              <X size={16} />
             </button>
           </div>
         </div>
@@ -147,7 +182,9 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
             </div>
           ) : notifications.length === 0 ? (
             <div className="text-center py-12">
-              <span className="text-3xl block mb-2">🔕</span>
+              <div className="inline-flex p-3 rounded-xl mb-3" style={{ background: "rgba(99,102,241,0.08)" }}>
+                <BellOff size={24} strokeWidth={1.75} style={{ color: "var(--text-faint)" }} />
+              </div>
               <p className="text-sm" style={{ color: "var(--text-faint)" }}>Nenhuma notificação.</p>
             </div>
           ) : (
@@ -165,9 +202,12 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
                     onMouseEnter={(e) => { if (n.read) e.currentTarget.style.background = "var(--surface)"; }}
                     onMouseLeave={(e) => { if (n.read) e.currentTarget.style.background = "transparent"; }}
                   >
-                    <span className="w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 mt-0.5" style={{ background: "var(--neon-blue)" }}>
-                      {config.icon}
-                    </span>
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
+                      style={{ background: `rgba(${config.iconColor === "#34d399" ? "52,211,153" : config.iconColor === "#f87171" ? "248,113,113" : config.iconColor === "#fbbf24" ? "251,191,36" : "129,140,248"},0.12)` }}
+                    >
+                      <span style={{ color: config.iconColor }}>{config.icon}</span>
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-sm font-medium truncate" style={{ color: !n.read ? "var(--text-primary)" : "var(--text-secondary)" }}>
@@ -183,10 +223,14 @@ export default function NotificationPanel({ onClose }: NotificationPanelProps) {
                           {FILTER_LABELS[n.type as FilterType] ?? n.type}
                         </span>
                         {n.channel_status === "sent" && (
-                          <span className="text-[10px]" style={{ color: "var(--text-faint)" }}>✓ Enviado</span>
+                          <span className="text-[10px] flex items-center gap-1" style={{ color: "var(--text-faint)" }}>
+                            <CheckCircle2 size={10} strokeWidth={2} /> Enviado
+                          </span>
                         )}
                         {n.channel_status === "failed" && (
-                          <span className="text-[10px] text-danger">Falha envio</span>
+                          <span className="text-[10px] flex items-center gap-1 text-danger">
+                            <XCircle size={10} strokeWidth={2} /> Falha envio
+                          </span>
                         )}
                       </div>
                     </div>

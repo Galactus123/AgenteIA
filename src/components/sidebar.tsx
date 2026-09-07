@@ -1,27 +1,40 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, memo } from "react";
 import { useTheme } from "next-themes";
 import type { SessionData } from "@/lib/auth";
+import {
+  LayoutDashboard,
+  Calendar,
+  MessageSquare,
+  Users,
+  Stethoscope,
+  Tag,
+  Building2,
+  Settings,
+  LogOut,
+  Menu,
+  X,
+  ChevronLeft,
+} from "lucide-react";
 
 interface NavItem {
   href: string;
   label: string;
-  icon: string;
+  icon: React.ReactNode;
   superAdminOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: "▦" },
-  { href: "/consultas", label: "Consultas", icon: "🗓" },
-  { href: "/chat", label: "Atendimento IA", icon: "💬", superAdminOnly: true },
-  { href: "/pacientes", label: "Pacientes", icon: "👥" },
-  { href: "/medicos", label: "Médicos", icon: "🩺" },
-  { href: "/especialidades", label: "Especialidades", icon: "🏷" },
-  { href: "/clinica", label: "Clínica", icon: "🏥" },
+  { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} strokeWidth={1.75} /> },
+  { href: "/consultas", label: "Consultas", icon: <Calendar size={18} strokeWidth={1.75} /> },
+  { href: "/chat", label: "Atendimento IA", icon: <MessageSquare size={18} strokeWidth={1.75} />, superAdminOnly: true },
+  { href: "/pacientes", label: "Pacientes", icon: <Users size={18} strokeWidth={1.75} /> },
+  { href: "/medicos", label: "Médicos", icon: <Stethoscope size={18} strokeWidth={1.75} /> },
+  { href: "/especialidades", label: "Especialidades", icon: <Tag size={18} strokeWidth={1.75} /> },
+  { href: "/clinica", label: "Clínica", icon: <Building2 size={18} strokeWidth={1.75} /> },
 ];
 
 const isSuperAdmin = (role?: string) =>
@@ -43,7 +56,7 @@ const SidebarLink = memo(function SidebarLink({
   isDark,
 }: {
   href: string;
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   active: boolean;
   collapsed: boolean;
@@ -78,7 +91,15 @@ const SidebarLink = memo(function SidebarLink({
           style={{ background: "linear-gradient(180deg, #4f6df5, #818cf8)" }}
         />
       )}
-      <span className="w-5 text-center text-base shrink-0">{icon}</span>
+      <span
+        className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-150"
+        style={active ? {
+          background: isDark ? "rgba(79,109,245,0.18)" : "rgba(79,109,245,0.12)",
+          boxShadow: isDark ? "0 0 10px rgba(79,109,245,0.25)" : "none",
+        } : {}}
+      >
+        {icon}
+      </span>
       {!collapsed && <span className="truncate">{label}</span>}
     </Link>
   );
@@ -173,7 +194,7 @@ function SidebarInner({ session }: { session?: SessionData }) {
         <div className="p-2 space-y-0.5" style={{ borderTop: `1px solid ${sidebarBorder}` }}>
           <SidebarLink
             href="/perfil"
-            icon="⚙"
+            icon={<Settings size={18} strokeWidth={1.75} />}
             label="Perfil"
             active={pathname === "/perfil"}
             collapsed={collapsed}
@@ -185,7 +206,9 @@ function SidebarInner({ session }: { session?: SessionData }) {
             className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 hover:opacity-80 border border-transparent"
             style={{ color: "var(--text-muted)" }}
           >
-            <span className="w-5 text-center text-base shrink-0">⎋</span>
+            <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0">
+              <LogOut size={18} strokeWidth={1.75} />
+            </span>
             {!collapsed && <span className="truncate">Sair</span>}
           </button>
         </div>
@@ -197,7 +220,7 @@ function SidebarInner({ session }: { session?: SessionData }) {
           style={{ color: "var(--text-faint)" }}
           aria-label={collapsed ? "Expandir sidebar" : "Recolher sidebar"}
         >
-          <span className={`transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`}>◀</span>
+          <ChevronLeft size={14} className={`transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`} />
           {!collapsed && <span>Recolher</span>}
         </button>
       </aside>
@@ -239,7 +262,7 @@ function SidebarInner({ session }: { session?: SessionData }) {
             style={{ color: "var(--text-muted)" }}
             aria-label="Fechar menu"
           >
-            ✕
+            <X size={18} />
           </button>
         </div>
 
@@ -265,7 +288,7 @@ function SidebarInner({ session }: { session?: SessionData }) {
         <div className="p-2 space-y-0.5" style={{ borderTop: `1px solid ${sidebarBorder}` }}>
           <SidebarLink
             href="/perfil"
-            icon="⚙"
+            icon={<Settings size={18} strokeWidth={1.75} />}
             label="Perfil"
             active={pathname === "/perfil"}
             collapsed={false}
@@ -277,7 +300,9 @@ function SidebarInner({ session }: { session?: SessionData }) {
             className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-all duration-150 min-h-[48px] hover:opacity-80 border border-transparent"
             style={{ color: "var(--text-muted)" }}
           >
-            <span className="w-5 text-center text-base shrink-0">⎋</span>
+            <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0">
+              <LogOut size={18} strokeWidth={1.75} />
+            </span>
             <span className="truncate">Sair</span>
           </button>
         </div>
@@ -307,7 +332,7 @@ function MobileMenuButton({ onClick, isDark, mounted }: { onClick: () => void; i
       }}
       aria-label="Abrir menu de navegação"
     >
-      <span className="text-lg">☰</span>
+      <Menu size={18} strokeWidth={1.75} />
     </button>
   );
 }

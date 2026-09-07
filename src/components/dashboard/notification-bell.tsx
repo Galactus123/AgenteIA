@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { Bell } from "lucide-react";
 
 interface NotificationBellProps {
   onToggle: () => void;
@@ -28,10 +29,13 @@ export default function NotificationBell({ onToggle }: NotificationBellProps) {
     <button
       onClick={onToggle}
       className="relative p-2.5 rounded-xl hover:opacity-80 transition-opacity min-w-[44px] min-h-[44px] flex items-center justify-center"
-      style={{ color: "var(--text-muted)" }}
+      style={{
+        color: "var(--text-muted)",
+        background: unreadCount > 0 ? "rgba(79,109,245,0.08)" : "transparent",
+      }}
       aria-label={`Notificações${unreadCount > 0 ? `, ${unreadCount} não lidas` : ""}`}
     >
-      <span className="text-lg">🔔</span>
+      <Bell size={20} strokeWidth={1.75} />
       {unreadCount > 0 && (
         <span
           className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] flex items-center justify-center text-white text-[10px] font-bold rounded-full px-1"

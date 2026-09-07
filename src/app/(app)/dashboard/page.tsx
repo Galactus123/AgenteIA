@@ -2,6 +2,17 @@ import { Suspense } from "react";
 import { getStats } from "@/lib/services/stats";
 import { displayDate } from "@/lib/datetime";
 import { DashboardSkeleton } from "@/components/skeleton";
+import {
+  Calendar,
+  Stethoscope,
+  MessageSquare,
+  Users,
+  Clock,
+  FileText,
+  CheckCircle2,
+  ChevronRight,
+  Activity,
+} from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +47,20 @@ function safeTime(at: string): string {
   }
 }
 
+function IconBox({ children, color }: { children: React.ReactNode; color: string }) {
+  return (
+    <div
+      className="p-2.5 rounded-xl"
+      style={{
+        background: color,
+        boxShadow: `0 0 12px ${color.replace(/[\d.]+\)$/, "0.4)")}`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 function DashboardContent() {
   let stats = DEFAULT_STATS;
 
@@ -60,6 +85,37 @@ function DashboardContent() {
 
   const dateLabel = safeDateLabel();
 
+  const kpis = [
+    {
+      label: "Consultas Hoje",
+      value: stats.scheduled,
+      icon: <Calendar size={20} strokeWidth={1.75} />,
+      color: "rgba(79,109,245,0.12)",
+      iconColor: "#818cf8",
+    },
+    {
+      label: "Médicos Ativos",
+      value: stats.activeDoctors,
+      icon: <Stethoscope size={20} strokeWidth={1.75} />,
+      color: "rgba(16,185,129,0.12)",
+      iconColor: "#34d399",
+    },
+    {
+      label: "Atendimentos IA",
+      value: stats.totalConversations,
+      icon: <MessageSquare size={20} strokeWidth={1.75} />,
+      color: "rgba(99,102,241,0.12)",
+      iconColor: "#a5b4fc",
+    },
+    {
+      label: "Pacientes",
+      value: stats.totalPatients,
+      icon: <Users size={20} strokeWidth={1.75} />,
+      color: "rgba(168,85,247,0.12)",
+      iconColor: "#c4b5fd",
+    },
+  ];
+
   return (
     <div className="relative space-y-4 sm:space-y-6">
       <div className="glow-blob glow-blob-primary w-[300px] h-[300px] -top-32 -right-32 animate-glow-pulse" />
@@ -72,12 +128,7 @@ function DashboardContent() {
 
       {/* KPI Cards */}
       <div className="relative z-10 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {[
-          { label: "Consultas Hoje", value: stats.scheduled, icon: "🗓", glow: "rgba(79,109,245,0.15)" },
-          { label: "Médicos Ativos", value: stats.activeDoctors, icon: "🩺", glow: "rgba(16,185,129,0.15)" },
-          { label: "Atendimentos IA", value: stats.totalConversations, icon: "💬", glow: "rgba(129,140,248,0.15)" },
-          { label: "Pacientes", value: stats.totalPatients, icon: "👥", glow: "rgba(168,85,247,0.15)" },
-        ].map((kpi) => (
+        {kpis.map((kpi) => (
           <div
             key={kpi.label}
             className="p-4 sm:p-5 rounded-2xl transition-all duration-300"
@@ -88,12 +139,9 @@ function DashboardContent() {
             }}
           >
             <div className="flex items-start justify-between">
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
-                style={{ background: kpi.glow }}
-              >
-                {kpi.icon}
-              </div>
+              <IconBox color={kpi.color}>
+                <span style={{ color: kpi.iconColor }}>{kpi.icon}</span>
+              </IconBox>
             </div>
             <p className="text-xl sm:text-2xl font-bold mt-3" style={{ color: "var(--text-primary)" }}>{kpi.value}</p>
             <p className="text-xs sm:text-sm mt-1" style={{ color: "var(--text-muted)" }}>{kpi.label}</p>
@@ -106,18 +154,25 @@ function DashboardContent() {
         {/* Agenda do dia */}
         <div className="lg:col-span-2 rounded-2xl p-4 sm:p-6" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
           <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="font-semibold text-base" style={{ color: "var(--text-primary)" }}>Agenda do dia</h2>
-              <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{dateLabel}</p>
+            <div className="flex items-center gap-3">
+              <IconBox color="rgba(79,109,245,0.12)">
+                <Calendar size={18} strokeWidth={1.75} style={{ color: "#818cf8" }} />
+              </IconBox>
+              <div>
+                <h2 className="font-semibold text-base" style={{ color: "var(--text-primary)" }}>Agenda do dia</h2>
+                <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>{dateLabel}</p>
+              </div>
             </div>
-            <a href="/consultas" className="text-xs font-medium transition-colors min-h-[44px] flex items-center" style={{ color: "var(--color-highlight)" }}>
-              Ver todas →
+            <a href="/consultas" className="flex items-center gap-1 text-xs font-medium transition-colors min-h-[44px]" style={{ color: "var(--color-highlight)" }}>
+              Ver todas <ChevronRight size={14} />
             </a>
           </div>
 
           {stats.todayAppointments.length === 0 ? (
             <div className="text-center py-8">
-              <span className="text-3xl block mb-2">📋</span>
+              <div className="inline-flex p-3 rounded-xl mb-3" style={{ background: "rgba(99,102,241,0.08)" }}>
+                <FileText size={24} strokeWidth={1.75} style={{ color: "var(--text-faint)" }} />
+              </div>
               <p className="text-sm" style={{ color: "var(--text-faint)" }}>Nenhuma consulta agendada para hoje.</p>
             </div>
           ) : (
@@ -131,15 +186,15 @@ function DashboardContent() {
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold shrink-0"
-                    style={{ background: "var(--neon-blue)", color: "var(--color-primary)" }}
+                    className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-semibold shrink-0"
+                    style={{ background: "rgba(79,109,245,0.12)", color: "#818cf8" }}
                   >
-                    {safeTime(a.starts_at)}
+                    <Clock size={16} strokeWidth={1.75} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{a.patient_name}</p>
                     <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
-                      {a.doctor_name} · {a.specialty_name}
+                      {safeTime(a.starts_at)} · {a.doctor_name} · {a.specialty_name}
                     </p>
                   </div>
                   <span
@@ -160,7 +215,12 @@ function DashboardContent() {
           {/* Solicitações */}
           <div className="rounded-2xl p-4 sm:p-6" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-base" style={{ color: "var(--text-primary)" }}>Solicitações</h2>
+              <div className="flex items-center gap-3">
+                <IconBox color="rgba(245,158,11,0.12)">
+                  <Activity size={18} strokeWidth={1.75} style={{ color: "#fbbf24" }} />
+                </IconBox>
+                <h2 className="font-semibold text-base" style={{ color: "var(--text-primary)" }}>Solicitações</h2>
+              </div>
               <span className="neon-badge-warning text-xs font-medium px-2 py-0.5 rounded-full">
                 {stats.pendingRequests.length}
               </span>
@@ -168,7 +228,9 @@ function DashboardContent() {
 
             {stats.pendingRequests.length === 0 ? (
               <div className="text-center py-6">
-                <span className="text-3xl block mb-2">✅</span>
+                <div className="inline-flex p-3 rounded-xl mb-3" style={{ background: "rgba(16,185,129,0.08)" }}>
+                  <CheckCircle2 size={24} strokeWidth={1.75} style={{ color: "#34d399" }} />
+                </div>
                 <p className="text-sm" style={{ color: "var(--text-faint)" }}>Nenhuma solicitação pendente.</p>
               </div>
             ) : (
@@ -199,15 +261,22 @@ function DashboardContent() {
           {/* Médicos */}
           <div className="rounded-2xl p-4 sm:p-6" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-base" style={{ color: "var(--text-primary)" }}>Médicos</h2>
-              <a href="/medicos" className="text-xs font-medium transition-colors min-h-[44px] flex items-center" style={{ color: "var(--color-highlight)" }}>
-                Ver todos →
+              <div className="flex items-center gap-3">
+                <IconBox color="rgba(16,185,129,0.12)">
+                  <Stethoscope size={18} strokeWidth={1.75} style={{ color: "#34d399" }} />
+                </IconBox>
+                <h2 className="font-semibold text-base" style={{ color: "var(--text-primary)" }}>Médicos</h2>
+              </div>
+              <a href="/medicos" className="flex items-center gap-1 text-xs font-medium transition-colors min-h-[44px]" style={{ color: "var(--color-highlight)" }}>
+                Ver todos <ChevronRight size={14} />
               </a>
             </div>
 
             {stats.doctors.length === 0 ? (
               <div className="text-center py-6">
-                <span className="text-3xl block mb-2">🩺</span>
+                <div className="inline-flex p-3 rounded-xl mb-3" style={{ background: "rgba(99,102,241,0.08)" }}>
+                  <Stethoscope size={24} strokeWidth={1.75} style={{ color: "var(--text-faint)" }} />
+                </div>
                 <p className="text-sm" style={{ color: "var(--text-faint)" }}>Nenhum médico encontrado.</p>
               </div>
             ) : (
@@ -215,8 +284,8 @@ function DashboardContent() {
                 {stats.doctors.filter((d) => d.status === "active").slice(0, 5).map((doctor) => (
                   <div key={doctor.id} className="flex items-center gap-3 p-2 rounded-xl" style={{ background: "transparent" }}>
                     <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0"
-                      style={{ background: "var(--neon-blue)", color: "var(--color-primary)" }}
+                      className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-semibold shrink-0"
+                      style={{ background: "rgba(79,109,245,0.12)", color: "#818cf8" }}
                     >
                       {doctor.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
                     </div>

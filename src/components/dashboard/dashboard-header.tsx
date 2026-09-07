@@ -5,6 +5,7 @@ import Link from "next/link";
 import NotificationBell from "@/components/dashboard/notification-bell";
 import NotificationPanel from "@/components/dashboard/notification-panel";
 import ThemeToggle from "@/components/theme-toggle";
+import { Search } from "lucide-react";
 
 interface DashboardHeaderProps {
   userName?: string;
@@ -26,7 +27,7 @@ export default function DashboardHeader({ userName = "Admin", clinicName = "Saú
     >
       <div className="flex items-center gap-3 flex-1 min-w-0 pl-10 lg:pl-0">
         <div className="relative flex-1 max-w-md">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--text-faint)" }}>🔍</span>
+          <Search size={16} strokeWidth={1.75} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-faint)" }} />
           <input
             type="text"
             placeholder="Buscar..."
