@@ -11,12 +11,18 @@ export interface SessionData {
 
 const SESSION_COOKIE = "saudesync_session";
 
-// Em producao, SESSION_SECRET e obrigatorio. Se nao estiver definido,
-// a aplicacao recusa iniciar para evitar sessoes forjaveis.
-// Em dev local, gera uma chave aleatoria segura por processo.
-function resolveSessionSecret(): string {
+// Lazy resolution: resolve SESSION_SECRET only when first needed,
+// never at module scope (prevents crashing serverless functions on import).
+let _sessionSecret: string | null = null;
+
+function getSessionSecret(): string {
+  if (_sessionSecret) return _sessionSecret;
+
   const secret = process.env.SESSION_SECRET;
-  if (secret) return secret;
+  if (secret) {
+    _sessionSecret = secret;
+    return _sessionSecret;
+  }
 
   if (process.env.VERCEL || process.env.NODE_ENV === "production") {
     throw new Error(
@@ -26,10 +32,10 @@ function resolveSessionSecret(): string {
 
   // Dev local: chave aleatoria segura (muda a cada reinicio — sessoes invalidadas)
   console.warn("[AUTH] SESSION_SECRET nao definido — usando chave aleatoria temporaria (dev apenas)");
-  return randomBytes(32).toString("hex");
+  _sessionSecret = randomBytes(32).toString("hex");
+  return _sessionSecret;
 }
 
-const SESSION_SECRET = resolveSessionSecret();
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 
 function base64UrlEncode(input: string): string {
@@ -41,7 +47,7 @@ function base64UrlDecode(input: string): string {
 }
 
 function sign(payload: string): string {
-  return createHmac("sha256", SESSION_SECRET).update(payload).digest("base64url");
+  return createHmac("sha256", getSessionSecret()).update(payload).digest("base64url");
 }
 
 export function verifyPassword(identifier: string, password: string): boolean {
