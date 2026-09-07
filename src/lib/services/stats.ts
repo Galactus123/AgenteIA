@@ -9,6 +9,7 @@ export interface DashboardStats {
   botMessages: number;
   conversionRate: number;
   activeDoctors: number;
+  totalPatients: number;
   todayAppointments: { id: number; patient_name: string; doctor_name: string; specialty_name: string; starts_at: string; status: string }[];
   pendingRequests: { id: number; patient_name: string; patient_phone: string; specialty_name: string; preferred_date: string; preferred_time: string; reason: string; source: string; created_at: string }[];
   doctors: { id: number; name: string; specialty_name: string; status: string; schedule: { weekday: number; start_time: string; end_time: string }[] }[];
@@ -42,6 +43,7 @@ export function getStats(): DashboardStats {
   const totalConversations = safeCount("SELECT COUNT(*) AS c FROM conversations");
   const botMessages = safeCount("SELECT COUNT(*) AS c FROM messages WHERE sender = 'bot'");
   const activeDoctors = safeCount("SELECT COUNT(*) AS c FROM doctors WHERE status = 'active'");
+  const totalPatients = safeCount("SELECT COUNT(DISTINCT patient_name) AS c FROM appointments");
   const conversions = safeCount("SELECT COUNT(*) AS c FROM appointments WHERE source = 'ia' AND status = 'scheduled'");
 
   const conversionRate = totalConversations > 0
@@ -113,6 +115,7 @@ export function getStats(): DashboardStats {
     botMessages,
     conversionRate,
     activeDoctors,
+    totalPatients,
     todayAppointments,
     pendingRequests,
     doctors,
