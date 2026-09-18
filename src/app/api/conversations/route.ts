@@ -10,7 +10,7 @@ import {
 } from "@/lib/services/conversations";
 
 export async function GET(request: NextRequest) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   const phone = request.nextUrl.searchParams.get("phone");
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   const body = await request.json().catch(() => null);

@@ -4,7 +4,7 @@ import { getConversationMessages } from "@/lib/agent/agent";
 import { requireAuth } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
   const phone = request.nextUrl.searchParams.get("phone");
   if (!phone) return NextResponse.json({ error: "Número obrigatório." }, { status: 400 });

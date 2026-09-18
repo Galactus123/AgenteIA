@@ -1,21 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authCookie, getAuthFromCookies } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { createServerClient } from "@supabase/ssr";
 
 export async function GET(request: NextRequest) {
-  const session = getAuthFromCookies(request.cookies.get(authCookie)?.value);
-  if (!session) {
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll() {},
+      },
+    }
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
     return NextResponse.json({ authenticated: false }, { status: 200 });
   }
-  const admin = db
-    .prepare("SELECT id, username, role, email FROM admins WHERE id = ?")
-    .get(session.adminId) as
-    | { id: number; username: string; role: string; email: string }
-    | undefined;
+
+  // Buscar dados do admin_profiles
+  const { data: adminProfile } = await supabase
+    .from("admin_profiles")
+    .select("role, legacy_username, legacy_admin_id")
+    .eq("user_id", user.id)
+    .single();
+
   return NextResponse.json({
     authenticated: true,
-    admin: admin
-      ? { id: admin.id, username: admin.username, role: admin.role, email: admin.email }
-      : null,
+    user: {
+      id: user.id,
+      email: user.email,
+      role: adminProfile?.role ?? "admin",
+      username: adminProfile?.legacy_username ?? user.email,
+    },
   });
 }

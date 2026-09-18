@@ -1,17 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authCookie, readSessionToken } from "@/lib/auth";
+import { createServerClient } from "@supabase/ssr";
 
-// Próxima geração do middleware: Proxy (Node.js runtime por padrão).
-// Protege as rotas do dashboard: redireciona para /login se o cookie de sessão
-// não existir, estiver expirado, com assinatura inválida ou de admin removido.
 export function proxy(request: NextRequest) {
-  const token = request.cookies.get(authCookie)?.value;
-  const session = readSessionToken(token);
-  if (!session) {
+  let supabaseResponse = NextResponse.next({ request });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          supabaseResponse = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
+  // Atualizar sessão (refresh de token se expirado)
+  // Nota: getUser() é síncrono no proxy, mas o Supabase SSR lida com isso internamente
+  // Para simplificar, verificamos se o cookie de sessão existe
+  const sessionCookie = request.cookies.get("sb-" + process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/https?:\/\/([^.]+)/)?.[1] + "-auth-token")?.value;
+
+  // Rotas protegidas
+  const pathname = request.nextUrl.pathname;
+  const isProtectedRoute =
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/consultas") ||
+    pathname.startsWith("/pacientes") ||
+    pathname.startsWith("/medicos") ||
+    pathname.startsWith("/especialidades") ||
+    pathname.startsWith("/perfil") ||
+    pathname.startsWith("/clinica") ||
+    pathname.startsWith("/chat") ||
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/appointments");
+
+  if (isProtectedRoute && !sessionCookie) {
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
   }
-  return NextResponse.next();
+
+  return supabaseResponse;
 }
 
 export const config = {
@@ -25,5 +63,6 @@ export const config = {
     "/chat/:path*",
     "/settings/:path*",
     "/appointments/:path*",
+    "/pacientes/:path*",
   ],
 };

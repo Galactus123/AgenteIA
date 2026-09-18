@@ -3,13 +3,13 @@ import { requireAuth } from "@/lib/api-auth";
 import { getClinic, updateClinic } from "@/lib/services/clinics";
 
 export async function GET(request: NextRequest) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
   return NextResponse.json(getClinic());
 }
 
 export async function PUT(request: NextRequest) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Corpo inválido." }, { status: 400 });

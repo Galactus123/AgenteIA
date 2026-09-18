@@ -3,13 +3,13 @@ import { requireAuth } from "@/lib/api-auth";
 import { listSpecialties, createSpecialty } from "@/lib/services/specialties";
 
 export async function GET(request: NextRequest) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
   return NextResponse.json(listSpecialties());
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
   const body = await request.json().catch(() => null);
   if (!body?.name) return NextResponse.json({ error: "Nome é obrigatório." }, { status: 400 });

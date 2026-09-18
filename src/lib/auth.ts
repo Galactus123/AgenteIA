@@ -7,6 +7,8 @@ export type AdminRole = "admin" | "super_admin" | "saas_admin";
 export interface SessionData {
   adminId: number;
   role: AdminRole;
+  userId?: string;
+  username?: string;
 }
 
 const SESSION_COOKIE = "saudesync_session";

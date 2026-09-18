@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const FALLBACK_PHONE = "+258 84 111 2222";
 
 export async function POST(request: NextRequest) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   let body: { mensagem?: unknown; phone?: unknown };

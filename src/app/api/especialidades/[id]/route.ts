@@ -5,7 +5,7 @@ import { updateSpecialty, deleteSpecialty, getSpecialty } from "@/lib/services/s
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PUT(request: NextRequest, ctx: RouteContext) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
   const { id } = await ctx.params;
   const body = await request.json().catch(() => null);
@@ -24,7 +24,7 @@ export async function PUT(request: NextRequest, ctx: RouteContext) {
 }
 
 export async function DELETE(request: NextRequest, ctx: RouteContext) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
   const { id } = await ctx.params;
   const existing = getSpecialty(Number(id));

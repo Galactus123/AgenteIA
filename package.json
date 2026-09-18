@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.112.4",
     "@vercel/functions": "^3.9.3",
     "bcryptjs": "^3.0.3",

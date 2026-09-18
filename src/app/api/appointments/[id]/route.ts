@@ -15,7 +15,7 @@ export async function GET(
   request: NextRequest,
   ctx: RouteContext
 ) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   const { id } = await ctx.params;
@@ -33,7 +33,7 @@ export async function PATCH(
   request: NextRequest,
   ctx: RouteContext
 ) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   const { id } = await ctx.params;
@@ -92,7 +92,7 @@ export async function PUT(
   request: NextRequest,
   ctx: RouteContext
 ) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   const { id } = await ctx.params;
@@ -132,7 +132,7 @@ export async function DELETE(
   request: NextRequest,
   ctx: RouteContext
 ) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   const { id } = await ctx.params;

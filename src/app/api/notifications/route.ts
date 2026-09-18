@@ -8,7 +8,7 @@ import {
 import type { NotificationType } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   const searchParams = request.nextUrl.searchParams;
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   const body = await request.json().catch(() => null);

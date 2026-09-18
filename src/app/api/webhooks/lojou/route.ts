@@ -5,6 +5,12 @@ import { db } from "@/lib/db";
 import { nowStr } from "@/lib/datetime";
 import { isKomunikaConfigured, sendKomunikaMessage } from "@/lib/services/komunika";
 import { isValidPayloadSize } from "@/lib/agent/security";
+import { getPlanByPriceId, type PlanId } from "@/lib/plans";
+import {
+  createSubscription,
+  updateSubscription,
+  getActiveSubscription,
+} from "@/lib/services/plan-limits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +53,12 @@ interface LojouWebhookPayload {
   // Campos diretos no root
   order_id?: string;
   id?: string;
+  // Campos de assinatura (quando aplicável)
+  subscription_id?: string;
+  customer_id?: string;
+  price_id?: string;
+  current_period_start?: string;
+  current_period_end?: string;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -168,9 +180,39 @@ export async function POST(request: NextRequest) {
       "order.completed",
       "sale.approved",
       "payment.approved",
+      "subscription.created",
+      "subscription.active",
+      "subscription.renewed",
+      "invoice.paid",
     ]);
 
-    if (!APPROVED_EVENTS.has(eventName)) {
+    // Eventos de assinatura
+    const SUBSCRIPTION_EVENTS = new Set([
+      "subscription.created",
+      "subscription.active",
+      "subscription.renewed",
+      "invoice.paid",
+    ]);
+
+    // Eventos de cancelamento
+    const CANCELLATION_EVENTS = new Set([
+      "subscription.canceled",
+      "subscription.cancelled",
+      "subscription.expired",
+    ]);
+
+    // Eventos de pagamento atrasado
+    const PAST_DUE_EVENTS = new Set([
+      "subscription.past_due",
+      "subscription.payment_failed",
+      "invoice.payment_failed",
+    ]);
+
+    const isSubscriptionEvent = SUBSCRIPTION_EVENTS.has(eventName);
+    const isCancellationEvent = CANCELLATION_EVENTS.has(eventName);
+    const isPastDueEvent = PAST_DUE_EVENTS.has(eventName);
+
+    if (!APPROVED_EVENTS.has(eventName) && !isCancellationEvent && !isPastDueEvent) {
       console.log("[lojou-webhook] Evento ignorado:", eventName);
       return NextResponse.json({ received: true, ignored: true });
     }
@@ -262,9 +304,105 @@ export async function POST(request: NextRequest) {
       // Notificação é opcional — não falha o webhook
     }
 
+    // 9. Processar eventos de assinatura
+    if (isSubscriptionEvent || isCancellationEvent || isPastDueEvent) {
+      await handleSubscriptionEvent({
+        eventName,
+        orderId,
+        productId,
+        email,
+        userId,
+        body,
+      });
+    }
+
     return NextResponse.json({ success: true, user_id: userId, created: true });
   } catch (error) {
     console.error("[lojou-webhook] Erro fatal:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+// ── Handler de eventos de assinatura ──────────────────────────────────────
+
+async function handleSubscriptionEvent(params: {
+  eventName: string;
+  orderId: string;
+  productId: string;
+  email: string;
+  userId: number;
+  body: LojouWebhookPayload;
+}): Promise<void> {
+  const { eventName, orderId, productId, email, userId, body } = params;
+
+  try {
+    // Resolver plano pelo product_id/price_id
+    const priceId = body.price_id ?? productId;
+    const plan = getPlanByPriceId(priceId);
+
+    if (!plan) {
+      console.log("[lojou-webhook] Plano não resolvido para price_id:", priceId);
+      return;
+    }
+
+    // Buscar a clínica do utilizador (via admin_id)
+    const admin = db.prepare("SELECT id FROM admins WHERE email = ? OR id = ?").get(email, userId) as { id: number } | undefined;
+    if (!admin) {
+      console.log("[lojou-webhook] Admin não encontrado para assinatura:", email);
+      return;
+    }
+
+    const clinicRow = db.prepare("SELECT clinic_id FROM clinic_members WHERE admin_id = ? AND active = 1 LIMIT 1").get(admin.id) as { clinic_id: number } | undefined;
+    const clinicId = clinicRow?.clinic_id ?? 1;
+
+    // Verificar idempotência
+    const existingSub = getActiveSubscription(clinicId);
+    if (existingSub && existingSub.status === "active" && existingSub.plan_id === plan.id) {
+      console.log("[lojou-webhook] Assinatura já ativa para este plano, ignorando.");
+      return;
+    }
+
+    const now = nowStr();
+    const periodStart = body.current_period_start ?? now;
+    const periodEnd = body.current_period_end ?? now;
+    const subscriptionId = body.subscription_id ?? orderId;
+
+    if (existingSub) {
+      // Atualizar assinatura existente
+      updateSubscription(existingSub.id, {
+        status: "active",
+        plan_id: plan.id,
+        lojou_subscription_id: subscriptionId,
+        current_period_start: periodStart,
+        current_period_end: periodEnd,
+        cancel_at_period_end: 0,
+      });
+      console.log(`[lojou-webhook] Assinatura atualizada: clinic=${clinicId}, plan=${plan.id}`);
+    } else {
+      // Criar nova assinatura
+      createSubscription({
+        clinic_id: clinicId,
+        plan_id: plan.id,
+        lojou_customer_id: String(userId),
+        lojou_subscription_id: subscriptionId,
+        current_period_start: periodStart,
+        current_period_end: periodEnd,
+      });
+      console.log(`[lojou-webhook] Assinatura criada: clinic=${clinicId}, plan=${plan.id}`);
+    }
+
+    // Notificar
+    try {
+      const { createNotification } = await import("@/lib/services/notifications");
+      createNotification({
+        type: "scheduled",
+        title: `Assinatura ${eventName.includes("renewed") ? "renovada" : "ativada"}`,
+        message: `Plano ${plan.name} ${eventName.includes("renewed") ? "renovado" : "ativado"} para a clínica.`,
+      });
+    } catch {
+      // Notificação é opcional
+    }
+  } catch (err) {
+    console.error("[lojou-webhook] Erro ao processar assinatura:", err);
   }
 }

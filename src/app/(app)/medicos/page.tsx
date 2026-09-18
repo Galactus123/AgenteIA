@@ -10,23 +10,22 @@ interface ScheduleRow {
   end_time: string;
 }
 
-interface Doctor {
-  id: number;
-  nome: string;
+interface Professional {
+  id: string;
+  name: string;
   email: string;
-  especialidade_id: number;
-  especialidade_nome: string;
-  duracao_consulta: number;
-  valor_consulta: number;
+  specialty_id: number | null;
+  specialty_name: string;
+  consultation_duration: number;
+  price: number;
   status: string;
-  telefone: string;
-  dias_atendimento: string[];
+  phone: string;
+  schedule: string[];
 }
 
 interface Specialty {
   id: number;
-  name?: string;
-  nome?: string;
+  name: string;
   [key: string]: unknown;
 }
 
@@ -40,59 +39,59 @@ const EMPTY_SCHEDULE: ScheduleRow[] = Array.from({ length: 7 }, (_, weekday) => 
 }));
 
 const EMPTY_FORM = {
-  nome: "",
+  name: "",
   email: "",
-  especialidade_id: "",
-  telefone: "",
-  duracao_consulta: 30,
-  valor_consulta: 0,
-  status: "Ativo",
+  specialty_id: "",
+  phone: "",
+  consultation_duration: 30,
+  price: 0,
+  status: "active",
 };
 
 export default function MedicosPage() {
-  const [doctors, setDoctors] = useState<Doctor[]>([]);
-  const [especialidades, setEspecialidades] = useState<Specialty[]>([]);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [specialties, setSpecialties] = useState<Specialty[]>([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [schedule, setSchedule] = useState<ScheduleRow[]>(EMPTY_SCHEDULE);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
 
   useEffect(() => {
-    async function carregarEspecialidades() {
-      const { data, error } = await supabase.from("especialidades").select("*");
+    async function loadSpecialties() {
+      const { data, error } = await supabase.from("specialties").select("*");
       if (error) console.error("Erro ao buscar especialidades:", error);
       else {
         console.log("Especialidades carregadas:", data);
-        setEspecialidades(data || []);
+        setSpecialties(data || []);
       }
     }
-    carregarEspecialidades();
+    loadSpecialties();
   }, []);
 
   const load = useCallback(async () => {
     setFetching(true);
 
     const { data, error } = await supabase
-      .from("medicos")
-      .select("*, especialidades(nome)")
+      .from("professionals")
+      .select("*")
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      setDoctors(
+      setProfessionals(
         data.map((d: Record<string, unknown>) => ({
-          id: d.id as number,
-          nome: d.nome as string,
+          id: d.id as string,
+          name: d.name as string,
           email: (d.email as string) ?? "",
-          especialidade_id: d.especialidade_id as number,
-          especialidade_nome: (d.especialidade as string) ?? "",
-          duracao_consulta: (d.duracao_consulta as number) ?? 30,
-          valor_consulta: (d.valor_consulta as number) ?? 0,
-          status: (d.status as string) ?? "Ativo",
-          telefone: (d.telefone as string) ?? "",
-          dias_atendimento: (d.dias_atendimento as string[]) ?? [],
+          specialty_id: d.specialty_id as number | null,
+          specialty_name: (d.specialty_name as string) ?? "",
+          consultation_duration: (d.consultation_duration as number) ?? 30,
+          price: (d.price as number) ?? 0,
+          status: (d.status as string) ?? "active",
+          phone: (d.phone as string) ?? "",
+          schedule: (d.schedule as string[]) ?? [],
         }))
       );
     }
@@ -104,20 +103,20 @@ export default function MedicosPage() {
     load();
   }, [load]);
 
-  function startEdit(d: Doctor) {
+  function startEdit(d: Professional) {
     setEditingId(d.id);
     setForm({
-      nome: d.nome,
+      name: d.name,
       email: d.email || "",
-      especialidade_id: String(d.especialidade_id || ""),
-      telefone: d.telefone,
-      duracao_consulta: d.duracao_consulta,
-      valor_consulta: d.valor_consulta,
+      specialty_id: String(d.specialty_id || ""),
+      phone: d.phone,
+      consultation_duration: d.consultation_duration,
+      price: d.price,
       status: d.status,
     });
     const rows = EMPTY_SCHEDULE.map((row) => ({
       ...row,
-      enabled: d.dias_atendimento.includes(DAY_LABELS[row.weekday]),
+      enabled: d.schedule.includes(DAY_LABELS[row.weekday]),
     }));
     setSchedule(rows);
     setError("");
@@ -142,26 +141,24 @@ export default function MedicosPage() {
     setError("");
     setSuccess("");
 
-    const diasAtendimento = schedule
+    const selectedDays = schedule
       .filter((r) => r.enabled)
       .map((r) => DAY_LABELS[r.weekday]);
 
-    const especialidadeSelecionada = especialidades.find(
-      (e) => e.id === Number(form.especialidade_id)
+    const selectedSpecialty = specialties.find(
+      (s) => s.id === Number(form.specialty_id)
     );
 
     const payload = {
-      nome: form.nome,
-      email: form.email || null,
-      telefone: form.telefone || null,
-      especialidade_id: form.especialidade_id ? Number(form.especialidade_id) : null,
-      especialidade: especialidadeSelecionada
-        ? String(especialidadeSelecionada.nome ?? especialidadeSelecionada.name ?? "")
-        : "",
-      duracao_consulta: Number(form.duracao_consulta || 30),
-      valor_consulta: Number(form.valor_consulta || 0),
-      status: form.status || "Ativo",
-      dias_atendimento: diasAtendimento,
+      name: form.name,
+      email: form.email || "",
+      phone: form.phone || "",
+      specialty_id: form.specialty_id ? Number(form.specialty_id) : null,
+      specialty_name: selectedSpecialty ? String(selectedSpecialty.name ?? "") : "",
+      consultation_duration: Number(form.consultation_duration || 30),
+      price: Number(form.price || 0),
+      status: form.status || "active",
+      schedule: selectedDays,
     };
 
     try {
@@ -169,60 +166,60 @@ export default function MedicosPage() {
 
       if (editingId) {
         result = await supabase
-          .from("medicos")
+          .from("professionals")
           .update(payload)
           .eq("id", editingId)
           .select()
           .single();
       } else {
         result = await supabase
-          .from("medicos")
+          .from("professionals")
           .insert([payload])
           .select()
           .single();
       }
 
       if (result.error) {
-        console.error("Erro ao salvar médico:", result.error);
-        setError(result.error.message ?? "Erro ao salvar médico.");
+        console.error("Erro ao salvar profissional:", result.error);
+        setError(result.error.message ?? "Erro ao salvar profissional.");
       } else {
         resetForm();
-        setSuccess(editingId ? "Médico atualizado com sucesso!" : "Médico cadastrado com sucesso!");
+        setSuccess(editingId ? "Profissional atualizado com sucesso!" : "Profissional cadastrado com sucesso!");
         await load();
         setTimeout(() => setSuccess(""), 3000);
       }
     } catch (err) {
-      console.error("Erro ao enviar formulário de médico:", err);
-      setError("Erro de conexão ao salvar médico.");
+      console.error("Erro ao enviar formulário de profissional:", err);
+      setError("Erro de conexão ao salvar profissional.");
     }
 
     setLoading(false);
   }
 
-  async function handleDelete(id: number) {
-    if (!confirm("Excluir este médico?")) return;
-    const { error: delError } = await supabase.from("medicos").delete().eq("id", id);
+  async function handleDelete(id: string) {
+    if (!confirm("Excluir este profissional?")) return;
+    const { error: delError } = await supabase.from("professionals").delete().eq("id", id);
     if (!delError) load();
   }
 
-  async function toggleStatus(d: Doctor) {
-    const newStatus = d.status === "Ativo" ? "Inativo" : "Ativo";
-    await supabase.from("medicos").update({ status: newStatus }).eq("id", d.id);
+  async function toggleStatus(d: Professional) {
+    const newStatus = d.status === "active" ? "inactive" : "active";
+    await supabase.from("professionals").update({ status: newStatus }).eq("id", d.id);
     load();
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold dark:text-white text-slate-900">Médicos</h1>
+        <h1 className="text-xl font-bold dark:text-white text-slate-900">Profissionais</h1>
         <p className="text-sm mt-1 dark:text-slate-400 text-slate-500">
-          Cadastro de médicos, especialidades, valores e horários de atendimento.
+          Cadastro de profissionais, especialidades, valores e horários de atendimento.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="rounded-2xl p-5 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold dark:text-white text-slate-900">{editingId ? "Editar médico" : "Novo médico"}</h2>
+          <h2 className="font-semibold dark:text-white text-slate-900">{editingId ? "Editar profissional" : "Novo profissional"}</h2>
           {editingId && (
             <button type="button" onClick={resetForm} className="text-sm hover:underline dark:text-slate-400 text-slate-500">
               Cancelar edição
@@ -235,8 +232,8 @@ export default function MedicosPage() {
             <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Nome</label>
             <input
               type="text"
-              value={form.nome}
-              onChange={(e) => setForm({ ...form, nome: e.target.value })}
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
               className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             />
@@ -247,7 +244,7 @@ export default function MedicosPage() {
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="medico@exemplo.com"
+              placeholder="profissional@exemplo.com"
               className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             />
@@ -255,15 +252,15 @@ export default function MedicosPage() {
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Especialidade</label>
             <select
-              value={form.especialidade_id || ""}
-              onChange={(e) => setForm({ ...form, especialidade_id: e.target.value })}
+              value={form.specialty_id || ""}
+              onChange={(e) => setForm({ ...form, specialty_id: e.target.value })}
               className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             >
               <option value="">Selecione...</option>
-              {especialidades.map((esp) => (
+              {specialties.map((esp) => (
                 <option key={esp.id} value={esp.id}>
-                  {String(esp.nome ?? esp.name ?? "")}
+                  {esp.name}
                 </option>
               ))}
             </select>
@@ -276,8 +273,8 @@ export default function MedicosPage() {
               type="number"
               min={10}
               step={5}
-              value={form.duracao_consulta}
-              onChange={(e) => setForm({ ...form, duracao_consulta: Number(e.target.value) })}
+              value={form.consultation_duration}
+              onChange={(e) => setForm({ ...form, consultation_duration: Number(e.target.value) })}
               className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             />
@@ -288,8 +285,8 @@ export default function MedicosPage() {
               type="number"
               min={0}
               step={10}
-              value={form.valor_consulta}
-              onChange={(e) => setForm({ ...form, valor_consulta: Number(e.target.value) })}
+              value={form.price}
+              onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
               className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             />
@@ -301,8 +298,8 @@ export default function MedicosPage() {
               onChange={(e) => setForm({ ...form, status: e.target.value })}
               className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
             >
-              <option value="Ativo">Ativo</option>
-              <option value="Inativo">Inativo</option>
+              <option value="active">Ativo</option>
+              <option value="inactive">Inativo</option>
             </select>
           </div>
           <div>
@@ -311,8 +308,8 @@ export default function MedicosPage() {
             </label>
             <input
               type="tel"
-              value={form.telefone}
-              onChange={(e) => setForm({ ...form, telefone: e.target.value })}
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
               placeholder="+258 8X XXX XXXX"
               className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
             />
@@ -373,8 +370,8 @@ export default function MedicosPage() {
             <div className="h-4 bg-slate-100 rounded animate-pulse w-1/2" />
             <div className="h-4 bg-slate-100 rounded animate-pulse w-2/5" />
           </div>
-        ) : doctors.length === 0 ? (
-          <p className="p-6 text-sm dark:text-slate-500 text-slate-400">Nenhum médico cadastrado.</p>
+        ) : professionals.length === 0 ? (
+          <p className="p-6 text-sm dark:text-slate-500 text-slate-400">Nenhum profissional cadastrado.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -390,25 +387,25 @@ export default function MedicosPage() {
                 </tr>
               </thead>
               <tbody>
-                {doctors.map((d) => (
+                {professionals.map((d) => (
                   <tr key={d.id} style={{ borderTop: "1px solid var(--surface-border)" }}>
-                    <td className="px-4 py-3 font-medium dark:text-white text-slate-900">{d.nome}</td>
-                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{d.especialidade_nome}</td>
-                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{d.telefone || "—"}</td>
-                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{d.duracao_consulta} min</td>
+                    <td className="px-4 py-3 font-medium dark:text-white text-slate-900">{d.name}</td>
+                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{d.specialty_name}</td>
+                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{d.phone || "—"}</td>
+                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{d.consultation_duration} min</td>
                     <td className="px-4 py-3 dark:text-slate-300 text-slate-600">
-                      {d.valor_consulta.toLocaleString("pt-BR", { style: "currency", currency: "MZN" })}
+                      {d.price.toLocaleString("pt-BR", { style: "currency", currency: "MZN" })}
                     </td>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => toggleStatus(d)}
                         className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          d.status === "Ativo"
+                          d.status === "active"
                             ? "bg-emerald-50 text-emerald-700"
                             : "bg-slate-100"
                         }`}
                       >
-                        {d.status}
+                        {d.status === "active" ? "Ativo" : "Inativo"}
                       </button>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">

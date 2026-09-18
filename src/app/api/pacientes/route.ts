@@ -3,17 +3,17 @@ import { requireAuth } from "@/lib/api-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export async function GET(request: NextRequest) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   const { searchParams } = new URL(request.url);
-  const telefone = searchParams.get("telefone");
+  const phone = searchParams.get("phone") || searchParams.get("telefone");
 
-  if (telefone) {
+  if (phone) {
     const { data, error } = await supabaseAdmin
-      .from("pacientes")
+      .from("patients")
       .select("*")
-      .eq("telefone", telefone)
+      .eq("phone", phone)
       .single();
 
     if (error) {
@@ -24,9 +24,9 @@ export async function GET(request: NextRequest) {
   }
 
   const { data, error } = await supabaseAdmin
-    .from("pacientes")
+    .from("patients")
     .select("*")
-    .order("nome", { ascending: true });
+    .order("name", { ascending: true });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -36,11 +36,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   const body = await request.json().catch(() => null);
-  if (!body?.nome || !body?.telefone) {
+  if (!body?.name || !body?.phone) {
     return NextResponse.json(
       { error: "Nome e telefone são obrigatórios." },
       { status: 400 }
@@ -48,14 +48,15 @@ export async function POST(request: NextRequest) {
   }
 
   const { data, error } = await supabaseAdmin
-    .from("pacientes")
+    .from("patients")
     .insert({
-      nome: String(body.nome),
-      telefone: String(body.telefone),
-      email: body.email ? String(body.email) : null,
-      data_nascimento: body.data_nascimento ? String(body.data_nascimento) : null,
-      endereco: body.endereco ? String(body.endereco) : null,
-      observacoes: body.observacoes ? String(body.observacoes) : null,
+      name: String(body.name),
+      phone: String(body.phone),
+      email: body.email ? String(body.email) : "",
+      cpf: body.cpf ? String(body.cpf) : "",
+      date_of_birth: body.date_of_birth || null,
+      address: body.address ? String(body.address) : "",
+      notes: body.notes ? String(body.notes) : "",
     })
     .select()
     .single();

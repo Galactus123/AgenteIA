@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const isProd = process.env.NODE_ENV === "production";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["172.31.237.171", "localhost:3000"],
   async headers() {
     return [
       // ── Webhooks: CORS restritivo ────────────────────────────────────

@@ -28,7 +28,7 @@ export default function AuthPage() {
   }, []);
 
   // ── Sign In state ──────────────────────────────────────────────────
-  const [loginUser, setLoginUser] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
   const [loginPass, setLoginPass] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
@@ -49,7 +49,7 @@ export default function AuthPage() {
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: loginUser, password: loginPass }),
+      body: JSON.stringify({ email: loginEmail, password: loginPass }),
     });
     const data = await res.json().catch(() => null);
     if (res.ok) {
@@ -189,10 +189,10 @@ export default function AuthPage() {
                       </svg>
                     </div>
                     <input
-                      type="text"
-                      value={loginUser}
-                      onChange={(e) => setLoginUser(e.target.value)}
-                      placeholder="Usuário ou e-mail"
+                      type="email"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      placeholder="E-mail"
                       className="w-full rounded-xl dark:border-[rgba(99,102,241,0.15)] border-slate-200 dark:bg-[rgba(255,255,255,0.04)] bg-slate-50 pl-10 pr-4 text-sm dark:text-white text-slate-900 dark:placeholder:text-slate-500 placeholder:text-slate-400 placeholder:font-normal focus:border-[#4f6df5] focus:ring-2 focus:ring-[#4f6df5]/20 focus:outline-none transition-all"
                       style={{ fontWeight: 400, fontSize: "16px", height: "48px" }}
                       required
@@ -444,10 +444,10 @@ export default function AuthPage() {
                     </svg>
                   </div>
                   <input
-                    type="text"
-                    value={loginUser}
-                    onChange={(e) => setLoginUser(e.target.value)}
-                    placeholder="Usuário ou e-mail"
+                    type="email"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="E-mail"
                     className="w-full rounded-xl dark:border-[rgba(99,102,241,0.15)] border-slate-200 dark:bg-[rgba(255,255,255,0.04)] bg-slate-50 pl-10 pr-4 py-3 text-sm dark:text-white text-slate-900 dark:placeholder:text-slate-500 placeholder:text-slate-400 placeholder:font-normal focus:border-[#4f6df5] focus:ring-2 focus:ring-[#4f6df5]/20 focus:outline-none transition-all"
                     style={{ fontWeight: 400 }}
                     required

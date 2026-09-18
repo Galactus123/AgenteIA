@@ -6,13 +6,13 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   const { id } = await params;
 
   const { data, error } = await supabaseAdmin
-    .from("pacientes")
+    .from("patients")
     .select("*")
     .eq("id", id)
     .single();

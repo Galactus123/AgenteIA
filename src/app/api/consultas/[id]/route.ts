@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 
-const STATUS_PERMITIDOS = ["agendada", "realizada", "cancelada"];
+const STATUS_PERMITIDOS = ["scheduled", "completed", "cancelled"];
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   const { id } = await params;
@@ -22,13 +22,13 @@ export async function PATCH(
   }
 
   const { data, error } = await supabaseAdmin
-    .from("consultas")
+    .from("appointments")
     .update({ status: body.status })
     .eq("id", id)
     .select(`
       *,
-      paciente:pacientes(id, nome, telefone),
-      profissional:profissionais(id, nome, especialidade)
+      patient:patients(id, name, phone),
+      professional:professionals(id, name, specialty_name)
     `)
     .single();
 

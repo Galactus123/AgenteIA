@@ -15,11 +15,11 @@ export async function POST(request: NextRequest) {
     if (!internalAuthError) {
       // autenticou via INTERNAL_API_TOKEN — segue
     } else {
-      const sessionAuthError = requireAuth(request);
+      const sessionAuthError = await requireAuth(request);
       if (sessionAuthError) return sessionAuthError;
     }
   } else {
-    const sessionAuthError = requireAuth(request);
+    const sessionAuthError = await requireAuth(request);
     if (sessionAuthError) return sessionAuthError;
   }
   if (!isKomunikaConfigured()) {

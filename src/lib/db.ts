@@ -84,14 +84,16 @@ export function migrate() {
       username TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'admin',
-      email TEXT DEFAULT ''
+      email TEXT DEFAULT '',
+      clinic_id INTEGER REFERENCES clinics(id) DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS specialties (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,
       description TEXT DEFAULT '',
-      keywords TEXT DEFAULT '[]'
+      keywords TEXT DEFAULT '[]',
+      clinic_id INTEGER REFERENCES clinics(id) DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS doctors (
@@ -101,7 +103,8 @@ export function migrate() {
       consultation_duration INTEGER NOT NULL DEFAULT 30,
       price REAL NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'active',
-      phone TEXT DEFAULT ''
+      phone TEXT DEFAULT '',
+      clinic_id INTEGER REFERENCES clinics(id) DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS doctor_schedule (
@@ -128,7 +131,8 @@ export function migrate() {
       conversation_id INTEGER REFERENCES conversations(id),
       cancelled_at TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      clinic_id INTEGER REFERENCES clinics(id) DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS conversations (
@@ -137,7 +141,8 @@ export function migrate() {
       patient_name TEXT DEFAULT '',
       status TEXT NOT NULL DEFAULT 'open',
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      clinic_id INTEGER REFERENCES clinics(id) DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -152,7 +157,8 @@ export function migrate() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       appointment_id INTEGER NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
       type TEXT NOT NULL,
-      sent_at TEXT NOT NULL
+      sent_at TEXT NOT NULL,
+      clinic_id INTEGER REFERENCES clinics(id) DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS notifications (
@@ -164,7 +170,8 @@ export function migrate() {
       doctor_id INTEGER REFERENCES doctors(id) ON DELETE SET NULL,
       read INTEGER NOT NULL DEFAULT 0,
       channel_status TEXT NOT NULL DEFAULT 'pending',
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      clinic_id INTEGER REFERENCES clinics(id) DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS users (
@@ -176,7 +183,53 @@ export function migrate() {
       lojou_order_id TEXT DEFAULT '',
       product_id TEXT DEFAULT '',
       status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL,
+      clinic_id INTEGER REFERENCES clinics(id) DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clinic_id INTEGER NOT NULL REFERENCES clinics(id),
+      plan_id TEXT NOT NULL DEFAULT 'start',
+      status TEXT NOT NULL DEFAULT 'none',
+      lojou_customer_id TEXT DEFAULT '',
+      lojou_subscription_id TEXT DEFAULT '',
+      current_period_start TEXT NOT NULL,
+      current_period_end TEXT NOT NULL,
+      cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS clinic_members (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clinic_id INTEGER NOT NULL REFERENCES clinics(id),
+      user_id INTEGER,
+      admin_id INTEGER REFERENCES admins(id),
+      role TEXT NOT NULL DEFAULT 'admin',
+      professional_id INTEGER,
+      active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS clinic_units (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clinic_id INTEGER NOT NULL REFERENCES clinics(id),
+      name TEXT NOT NULL,
+      address TEXT DEFAULT '',
+      phone TEXT DEFAULT '',
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS usage (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clinic_id INTEGER NOT NULL REFERENCES clinics(id),
+      period TEXT NOT NULL,
+      whatsapp_conversations INTEGER NOT NULL DEFAULT 0,
+      ai_interactions INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
     );
   `);
 

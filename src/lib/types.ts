@@ -150,3 +150,48 @@ export interface User {
   status: "active" | "inactive";
   created_at: string;
 }
+
+export interface SubscriptionRecord {
+  id: number;
+  clinic_id: number;
+  plan_id: string;
+  status: string;
+  lojou_customer_id: string;
+  lojou_subscription_id: string;
+  current_period_start: string;
+  current_period_end: string;
+  cancel_at_period_end: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClinicMember {
+  id: number;
+  clinic_id: number;
+  user_id: number | null;
+  admin_id: number | null;
+  role: string;
+  professional_id: number | null;
+  active: number;
+  created_at: string;
+}
+
+export interface ClinicUnit {
+  id: number;
+  clinic_id: number;
+  name: string;
+  address: string;
+  phone: string;
+  active: number;
+  created_at: string;
+}
+
+export interface ClinicUsage {
+  id: number;
+  clinic_id: number;
+  period: string;
+  whatsapp_conversations: number;
+  ai_interactions: number;
+  created_at: string;
+  updated_at: string;
+}

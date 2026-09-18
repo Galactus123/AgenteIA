@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 // Compra explícita de um pacote excedente de 50.000 tokens (gestor/admin da clínica).
 export async function POST(request: NextRequest) {
-  const authError = requireAuth(request);
+  const authError = await requireAuth(request);
   if (authError) return authError;
 
   try {

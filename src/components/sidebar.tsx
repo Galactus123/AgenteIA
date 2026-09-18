@@ -19,6 +19,7 @@ import {
   X,
   ChevronLeft,
   Activity,
+  CreditCard,
 } from "lucide-react";
 
 interface NavItem {
@@ -195,6 +196,14 @@ function SidebarInner({ session }: { session?: SessionData }) {
         {/* Footer */}
         <div className="p-2 space-y-0.5" style={{ borderTop: `1px solid ${sidebarBorder}` }}>
           <SidebarLink
+            href="/configuracoes/assinatura"
+            icon={<CreditCard size={18} strokeWidth={1.75} />}
+            label="Assinatura"
+            active={pathname === "/configuracoes/assinatura"}
+            collapsed={collapsed}
+            isDark={isDark}
+          />
+          <SidebarLink
             href="/perfil"
             icon={<Settings size={18} strokeWidth={1.75} />}
             label="Perfil"
@@ -289,6 +298,15 @@ function SidebarInner({ session }: { session?: SessionData }) {
         </nav>
 
         <div className="p-2 space-y-0.5" style={{ borderTop: `1px solid ${sidebarBorder}` }}>
+          <SidebarLink
+            href="/configuracoes/assinatura"
+            icon={<CreditCard size={18} strokeWidth={1.75} />}
+            label="Assinatura"
+            active={pathname === "/configuracoes/assinatura"}
+            collapsed={false}
+            onClick={closeMobile}
+            isDark={isDark}
+          />
           <SidebarLink
             href="/perfil"
             icon={<Settings size={18} strokeWidth={1.75} />}
