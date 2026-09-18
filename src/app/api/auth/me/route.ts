@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 
 export async function GET(request: NextRequest) {
   const supabase = createServerClient(
@@ -23,8 +24,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ authenticated: false }, { status: 200 });
   }
 
-  // Buscar dados do admin_profiles
-  const { data: adminProfile } = await supabase
+  // Buscar dados do admin_profiles com service_role (bypassa RLS)
+  const serviceClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+
+  const { data: adminProfile } = await serviceClient
     .from("admin_profiles")
     .select("role, legacy_username, legacy_admin_id")
     .eq("user_id", user.id)

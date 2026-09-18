@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 
 export async function PUT(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -23,6 +24,12 @@ export async function PUT(request: NextRequest) {
         },
       },
     }
+  );
+
+  const serviceClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
   const {
@@ -53,20 +60,25 @@ export async function PUT(request: NextRequest) {
     );
   }
 
-  // Verificar senha atual via Supabase
-  const { error: verifyError } = await supabase.auth.signInWithPassword({
+  // Verificar senha atual via service_role
+  const { error: verifyError } = await serviceClient.auth.signInWithPassword({
     email: user.email!,
     password: currentPassword,
   });
 
   if (verifyError) {
+    console.error("[auth/email] verify error:", JSON.stringify(verifyError, null, 2));
     return NextResponse.json({ error: "Senha atual incorreta." }, { status: 403 });
   }
 
   // Atualizar e-mail via Supabase Auth
-  const { error: updateError } = await supabase.auth.updateUser({ email });
+  const { error: updateError } = await serviceClient.auth.admin.updateUserById(
+    user.id,
+    { email }
+  );
 
   if (updateError) {
+    console.error("[auth/email] update error:", JSON.stringify(updateError, null, 2));
     return NextResponse.json({ error: updateError.message }, { status: 400 });
   }
 
