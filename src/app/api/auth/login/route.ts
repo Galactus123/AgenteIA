@@ -1,100 +1,95 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyPassword, createSessionToken, authCookie, getAdminByIdentifier } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { hashSync } from "bcryptjs";
-
-const DEFAULT_ADMIN_USERNAME = "admin";
-const DEFAULT_ADMIN_PASSWORD = "admin123";
-
-function ensureAdminUser() {
-  const existing = db.prepare("SELECT id FROM admins WHERE username = ?").get(DEFAULT_ADMIN_USERNAME);
-  if (existing) return;
-  db.prepare("INSERT INTO admins (username, password_hash, role, email) VALUES (?, ?, ?, ?)").run(
-    DEFAULT_ADMIN_USERNAME,
-    hashSync(DEFAULT_ADMIN_PASSWORD, 10),
-    "super_admin",
-    "admin@saudesync.mz"
-  );
-}
-
-// ── Rate Limiting ──────────────────────────────────────────────────────
-// Limite: 5 tentativas por 15 minutos por IP.
-// Armazenado em memoria (reseta a cada reinicio do processo — aceitavel para SaaS inicial).
-const loginAttempts = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_MAX = 5;
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutos
-
-function checkRateLimit(ip: string): { allowed: boolean; retryAfterMs?: number } {
-  const now = Date.now();
-  const record = loginAttempts.get(ip);
-
-  if (!record || now > record.resetAt) {
-    loginAttempts.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return { allowed: true };
-  }
-
-  if (record.count >= RATE_LIMIT_MAX) {
-    const retryAfterMs = record.resetAt - now;
-    return { allowed: false, retryAfterMs };
-  }
-
-  record.count++;
-  return { allowed: true };
-}
-
-function isDefaultPassword(password: string): boolean {
-  return password === DEFAULT_ADMIN_PASSWORD;
-}
+import { createServerClient } from "@supabase/ssr";
 
 export async function POST(request: NextRequest) {
-  // ── Rate limit ──────────────────────────────────────────────────────
-  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    ?? request.headers.get("x-real-ip")
-    ?? "unknown";
+  let supabaseResponse = NextResponse.next({ request });
 
-  const rateCheck = checkRateLimit(ip);
-  if (!rateCheck.allowed) {
-    const retryAfterSec = Math.ceil((rateCheck.retryAfterMs ?? 0) / 1000);
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          supabaseResponse = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
+  const body = await request.json().catch(() => null);
+  const email = String(body?.email ?? "").trim().toLowerCase();
+  const password = String(body?.password ?? "");
+
+  if (!email || !password) {
+    return NextResponse.json({ error: "Email e senha são obrigatórios." }, { status: 400 });
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    console.error("[auth/login] Supabase signInWithPassword error:", {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+    });
     return NextResponse.json(
-      { error: `Multiplas tentativas falharam. Tente novamente em ${retryAfterSec}s.` },
-      { status: 429 }
+      { error: error.message, code: error.code, status: error.status },
+      { status: 401 }
     );
   }
 
-  // ── Validar body ────────────────────────────────────────────────────
-  const body = await request.json().catch(() => null);
-  const username = String(body?.username ?? "");
-  const password = String(body?.password ?? "");
-  if (!username || !password) {
-    return NextResponse.json({ error: "Informe usuario e senha." }, { status: 400 });
+  console.log("[auth/login] signInWithPassword OK, user:", data.user.id, data.user.email);
+
+  // Buscar dados do admin_profiles
+  let adminProfile = null;
+  try {
+    const { data: profile, error: profileError } = await supabase
+      .from("admin_profiles")
+      .select("role, legacy_username")
+      .eq("user_id", data.user.id)
+      .single();
+
+    if (profileError) {
+      console.error("[auth/login] admin_profiles query error:", {
+        message: profileError.message,
+        code: profileError.code,
+        details: profileError.details,
+        hint: profileError.hint,
+      });
+    } else {
+      adminProfile = profile;
+      console.log("[auth/login] admin_profile found:", profile);
+    }
+  } catch (e) {
+    console.error("[auth/login] admin_profiles unexpected error:", e);
   }
 
-  ensureAdminUser();
-
-  if (!verifyPassword(username, password)) {
-    return NextResponse.json({ error: "Credenciais invalidas." }, { status: 401 });
-  }
-
-  const admin = getAdminByIdentifier(username);
-  if (!admin) {
-    return NextResponse.json({ error: "Credenciais invalidas." }, { status: 401 });
-  }
-
-  // ── Verificar se e senha padrao (forcar troca) ─────────────────────
-  const adminRow = db
-    .prepare("SELECT password_hash FROM admins WHERE id = ?")
-    .get(admin.id) as { password_hash: string } | undefined;
-
-  const mustChangePassword = adminRow ? isDefaultPassword(password) : false;
-
-  const token = createSessionToken(admin.id, admin.role);
-  const response = NextResponse.json({ ok: true, mustChangePassword });
-  response.cookies.set(authCookie, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+  const response = NextResponse.json({
+    ok: true,
+    user: {
+      id: data.user.id,
+      email: data.user.email,
+      role: adminProfile?.role ?? "admin",
+      username: adminProfile?.legacy_username ?? data.user.email,
+    },
   });
+
+  // Copy session cookies from supabaseResponse to our response
+  supabaseResponse.cookies.getAll().forEach((cookie) => {
+    response.cookies.set(cookie.name, cookie.value, cookie);
+  });
+
   return response;
 }

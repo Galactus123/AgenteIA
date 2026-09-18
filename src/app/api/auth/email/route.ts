@@ -1,10 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authCookie, getAuthFromCookies, verifyPassword } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { createServerClient } from "@supabase/ssr";
 
 export async function PUT(request: NextRequest) {
-  const session = getAuthFromCookies(request.cookies.get(authCookie)?.value);
-  if (!session) {
+  let supabaseResponse = NextResponse.next({ request });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          supabaseResponse = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
 
@@ -28,15 +53,27 @@ export async function PUT(request: NextRequest) {
     );
   }
 
-  const admin = db
-    .prepare("SELECT username FROM admins WHERE id = ?")
-    .get(session.adminId) as { username: string } | undefined;
+  // Verificar senha atual via Supabase
+  const { error: verifyError } = await supabase.auth.signInWithPassword({
+    email: user.email!,
+    password: currentPassword,
+  });
 
-  if (!admin || !verifyPassword(admin.username, currentPassword)) {
+  if (verifyError) {
     return NextResponse.json({ error: "Senha atual incorreta." }, { status: 403 });
   }
 
-  db.prepare("UPDATE admins SET email = ? WHERE id = ?").run(email, session.adminId);
+  // Atualizar e-mail via Supabase Auth
+  const { error: updateError } = await supabase.auth.updateUser({ email });
 
-  return NextResponse.json({ ok: true, email });
+  if (updateError) {
+    return NextResponse.json({ error: updateError.message }, { status: 400 });
+  }
+
+  const response = NextResponse.json({ ok: true, email });
+  supabaseResponse.cookies.getAll().forEach((cookie) => {
+    response.cookies.set(cookie.name, cookie.value, cookie);
+  });
+
+  return response;
 }

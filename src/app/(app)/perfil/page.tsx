@@ -28,9 +28,9 @@ export default function PerfilPage() {
   const loadProfile = useCallback(async () => {
     const res = await fetch("/api/auth/me");
     const data = await res.json();
-    if (data.authenticated && data.admin) {
-      setAdmin(data.admin);
-      setEmail(data.admin.email ?? "");
+    if (data.authenticated && data.user) {
+      setAdmin(data.user);
+      setEmail(data.user.email ?? "");
     }
   }, []);
 
