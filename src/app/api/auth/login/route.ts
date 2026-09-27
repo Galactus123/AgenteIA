@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
   );
 
-  // Client com service_role para auth e queries que bypassam RLS
+  // Client com service_role para queries que bypassam RLS
   const serviceClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -44,17 +44,22 @@ export async function POST(request: NextRequest) {
 
   console.log("[auth/login] Tentando signInWithPassword para:", email);
 
-  const { data, error } = await serviceClient.auth.signInWithPassword({
+  // Usar o client com anon key + cookies para signInWithPassword (service_role causa "Database error querying schema")
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
   if (error) {
-    console.error("ERRO COMPLETO SUPABASE LOGIN:", JSON.stringify(error, null, 2));
+    console.error("[auth/login] signInWithPassword error:", JSON.stringify(error, null, 2));
     return NextResponse.json(
       { error: error.message, code: error.code, status: error.status },
       { status: 401 }
     );
+  }
+
+  if (!data.user) {
+    return NextResponse.json({ error: "Usuário não encontrado." }, { status: 401 });
   }
 
   console.log("[auth/login] signInWithPassword OK, user:", data.user.id, data.user.email);
@@ -96,9 +101,6 @@ export async function POST(request: NextRequest) {
   } catch (e) {
     console.error("[auth/login] clinic_members unexpected error:", e);
   }
-
-  // Fazer signIn no client com cookies para manter a sessão no browser
-  await supabase.auth.signInWithPassword({ email, password });
 
   const response = NextResponse.json({
     ok: true,
