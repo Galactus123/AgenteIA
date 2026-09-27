@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
   }
 
   console.log("[auth/login] Tentando signInWithPassword para:", email);
+  console.log("DEBUG LOGIN ERROR: STEP 1 - email:", email);
 
   // Usar o client com anon key + cookies para signInWithPassword (service_role causa "Database error querying schema")
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -50,8 +51,11 @@ export async function POST(request: NextRequest) {
     password,
   });
 
+  console.log("DEBUG LOGIN ERROR: STEP 2 - signIn result:", JSON.stringify({ hasData: !!data, hasError: !!error, errorMessage: error?.message, errorCode: error?.code, userId: data?.user?.id }));
+
   if (error) {
     console.error("[auth/login] signInWithPassword error:", JSON.stringify(error, null, 2));
+    console.error("DEBUG LOGIN ERROR: STEP 2 FAILED:", JSON.stringify(error, null, 2));
     return NextResponse.json(
       { error: error.message, code: error.code, status: error.status },
       { status: 401 }
@@ -59,6 +63,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (!data.user) {
+    console.error("DEBUG LOGIN ERROR: STEP 2 FAILED - no user in data");
     return NextResponse.json({ error: "Usuário não encontrado." }, { status: 401 });
   }
 
@@ -67,6 +72,7 @@ export async function POST(request: NextRequest) {
   // Buscar dados do admin_profiles com service_role (bypassa RLS)
   let adminProfile = null;
   try {
+    console.log("DEBUG LOGIN ERROR: STEP 3 - querying admin_profiles for user_id:", data.user.id);
     const { data: profile, error: profileError } = await serviceClient
       .from("admin_profiles")
       .select("role, legacy_username")
@@ -75,17 +81,21 @@ export async function POST(request: NextRequest) {
 
     if (profileError) {
       console.error("[auth/login] admin_profiles query error:", JSON.stringify(profileError, null, 2));
+      console.error("DEBUG LOGIN ERROR: STEP 3 FAILED:", JSON.stringify(profileError, null, 2));
     } else {
       adminProfile = profile;
       console.log("[auth/login] admin_profile found:", profile);
+      console.log("DEBUG LOGIN ERROR: STEP 3 OK:", JSON.stringify(profile));
     }
   } catch (e) {
     console.error("[auth/login] admin_profiles unexpected error:", e);
+    console.error("DEBUG LOGIN ERROR: STEP 3 EXCEPTION:", JSON.stringify(e));
   }
 
   // Buscar clínicas do usuário com service_role
   let clinicIds: string[] = [];
   try {
+    console.log("DEBUG LOGIN ERROR: STEP 4 - querying clinic_members for user_id:", data.user.id);
     const { data: clinics, error: clinicError } = await serviceClient
       .from("clinic_members")
       .select("clinic_id")
@@ -94,13 +104,18 @@ export async function POST(request: NextRequest) {
 
     if (clinicError) {
       console.error("[auth/login] clinic_members query error:", JSON.stringify(clinicError, null, 2));
+      console.error("DEBUG LOGIN ERROR: STEP 4 FAILED:", JSON.stringify(clinicError, null, 2));
     } else if (clinics) {
       clinicIds = clinics.map((c) => String(c.clinic_id));
       console.log("[auth/login] clinic_ids:", clinicIds);
+      console.log("DEBUG LOGIN ERROR: STEP 4 OK:", JSON.stringify(clinicIds));
     }
   } catch (e) {
     console.error("[auth/login] clinic_members unexpected error:", e);
+    console.error("DEBUG LOGIN ERROR: STEP 4 EXCEPTION:", JSON.stringify(e));
   }
+
+  console.log("DEBUG LOGIN ERROR: STEP 5 - returning response with user:", data.user.id, "adminProfile:", adminProfile, "clinicIds:", clinicIds);
 
   const response = NextResponse.json({
     ok: true,
