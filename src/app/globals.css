@@ -1,12 +1,42 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════════════
-   THEME: DARK (default)
+   THEME: LIGHT (default)
    ═══════════════════════════════════════════════════════════════════ */
 :root {
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+  --card-border: rgba(99, 102, 241, 0.1);
+  --card-hover-border: rgba(99, 102, 241, 0.2);
+  --surface: #F1F5F9;
+  --surface-hover: #E2E8F0;
+  --surface-border: rgba(0, 0, 0, 0.06);
+  --input-bg: #F8FAFC;
+  --input-border: #E2E8F0;
+  --muted-foreground: #475569;
+  --text-primary: #0F172A;
+  --text-secondary: #334155;
+  --text-muted: #475569;
+  --text-faint: #94A3B8;
+  --neon-blue: rgba(59, 130, 246, 0.15);
+  --neon-purple: rgba(139, 92, 246, 0.1);
+  --neon-glow: 0 0 0 transparent;
+  --neon-glow-strong: 0 4px 20px rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.04);
+  --scrollbar-thumb: #CBD5E1;
+  --scrollbar-thumb-hover: #94A3B8;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   THEME: DARK
+   ═══════════════════════════════════════════════════════════════════ */
+.dark {
   --background: #0B0D14;
   --foreground: #E2E8F0;
   --card: #161926;
+  --card-foreground: #E2E8F0;
   --card-border: rgba(99, 102, 241, 0.12);
   --card-hover-border: rgba(99, 102, 241, 0.25);
   --surface: #1A1D2E;
@@ -14,6 +44,7 @@
   --surface-border: rgba(99, 102, 241, 0.08);
   --input-bg: rgba(255,255,255,0.04);
   --input-border: rgba(99, 102, 241, 0.1);
+  --muted-foreground: #94A3B8;
   --text-primary: #FFFFFF;
   --text-secondary: #CBD5E1;
   --text-muted: #94A3B8;
@@ -25,38 +56,6 @@
   --shadow-card: none;
   --scrollbar-thumb: rgba(99, 102, 241, 0.2);
   --scrollbar-thumb-hover: rgba(99, 102, 241, 0.35);
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   THEME: LIGHT
-   ═══════════════════════════════════════════════════════════════════ */
-.dark {
-  --background: #0B0D14;
-  --foreground: #E2E8F0;
-}
-
-:root:not(.dark) {
-  --background: #F8FAFC;
-  --foreground: #1E293B;
-  --card: #FFFFFF;
-  --card-border: rgba(99, 102, 241, 0.1);
-  --card-hover-border: rgba(99, 102, 241, 0.2);
-  --surface: #F1F5F9;
-  --surface-hover: #E2E8F0;
-  --surface-border: rgba(0, 0, 0, 0.06);
-  --input-bg: #F8FAFC;
-  --input-border: #E2E8F0;
-  --text-primary: #0F172A;
-  --text-secondary: #334155;
-  --text-muted: #64748B;
-  --text-faint: #94A3B8;
-  --neon-blue: rgba(59, 130, 246, 0.15);
-  --neon-purple: rgba(139, 92, 246, 0.1);
-  --neon-glow: 0 0 0 transparent;
-  --neon-glow-strong: 0 4px 20px rgba(0, 0, 0, 0.05);
-  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.05);
-  --scrollbar-thumb: #CBD5E1;
-  --scrollbar-thumb-hover: #94A3B8;
 }
 
 @theme inline {
@@ -87,8 +86,8 @@ html {
 }
 
 html:not(.dark) {
-  --color-sidebar: #F1F5F9;
-  --color-sidebar-hover: #E2E8F0;
+  --color-sidebar: #FFFFFF;
+  --color-sidebar-hover: #F1F5F9;
   --color-column-header: #334155;
 }
 
@@ -152,11 +151,11 @@ body {
 }
 
 :root:not(.dark) .glow-blob-primary {
-  background: rgba(79, 109, 245, 0.05);
+  background: rgba(79, 109, 245, 0.04);
 }
 
 :root:not(.dark) .glow-blob-purple {
-  background: rgba(129, 140, 248, 0.04);
+  background: rgba(129, 140, 248, 0.03);
 }
 
 /* ── Neon card ──────────────────────────────────────────────────── */
@@ -303,7 +302,7 @@ label {
 :root:not(.dark) input,
 :root:not(.dark) textarea,
 :root:not(.dark) select {
-  background: #F8FAFC !important;
+  background: #FFFFFF !important;
   border-color: #E2E8F0 !important;
 }
 
@@ -313,7 +312,7 @@ label {
 }
 
 :root:not(.dark) label {
-  color: #334155 !important;
+  color: #475569 !important;
 }
 
 /* ── Dark card/table helpers ───────────────────────────────────── */
