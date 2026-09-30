@@ -1,80 +1,139 @@
-import { db } from "@/lib/db";
+import { supabaseAdmin } from "@/lib/supabase";
 import type { Conversation, Message } from "@/lib/types";
 import { nowStr } from "@/lib/datetime";
 
-export function getOrCreateConversation(phone: string): Conversation {
+function fail(action: string, message: string): never {
+  throw new Error(`[${action}] ${message}`);
+}
+
+export async function getOrCreateConversation(phone: string): Promise<Conversation> {
   const normalized = phone.replace(/\D/g, "");
   const now = nowStr();
 
-  // Bloqueia a tabela para evitar race condition na criação concorrente
-  db.exec("BEGIN IMMEDIATE");
-  try {
-    const existing = db
-      .prepare("SELECT * FROM conversations WHERE phone = ?")
-      .get(normalized) as Conversation | undefined;
-    if (existing) {
-      db.exec("COMMIT");
-      return existing;
-    }
-    const result = db
-      .prepare(
-        "INSERT INTO conversations (phone, patient_name, status, created_at, updated_at) VALUES (?, '', 'open', ?, ?)"
-      )
-      .run(normalized, now, now);
-    const conversation = db
-      .prepare("SELECT * FROM conversations WHERE id = ?")
-      .get(Number(result.lastInsertRowid)) as unknown as Conversation;
-    db.exec("COMMIT");
-    return conversation;
-  } catch (err) {
-    db.exec("ROLLBACK");
-    // Se outro processo criou a conversa simultaneamente, busca a existente
-    const fallback = db
-      .prepare("SELECT * FROM conversations WHERE phone = ?")
-      .get(normalized) as Conversation | undefined;
-    if (fallback) return fallback;
-    throw err;
+  const { data: existing, error: readError } = await supabaseAdmin
+    .from("conversations")
+    .select("*")
+    .eq("phone", normalized)
+    .maybeSingle();
+
+  if (readError) fail("conversations", readError.message);
+  if (existing) return existing as unknown as Conversation;
+
+  const { data: created, error: insertError } = await supabaseAdmin
+    .from("conversations")
+    .insert({
+      phone: normalized,
+      patient_name: "",
+      status: "open",
+      created_at: now,
+      updated_at: now,
+    })
+    .select("*")
+    .single();
+
+  if (!insertError && created) return created as unknown as Conversation;
+
+  // 23505 = outra requisicao criou a mesma conversa entre o SELECT e o INSERT.
+  if (insertError?.code === "23505") {
+    const { data: concurrent } = await supabaseAdmin
+      .from("conversations")
+      .select("*")
+      .eq("phone", normalized)
+      .maybeSingle();
+    if (concurrent) return concurrent as unknown as Conversation;
   }
+
+  fail("conversations", insertError?.message ?? "nao foi possivel criar a conversa");
 }
 
-export function getConversation(id: number): Conversation | null {
-  const row = db.prepare("SELECT * FROM conversations WHERE id = ?").get(id);
-  return row ? (row as unknown as Conversation) : null;
+export async function getConversation(id: number): Promise<Conversation | null> {
+  const { data, error } = await supabaseAdmin
+    .from("conversations")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) fail("conversations", error.message);
+  return (data as unknown as Conversation | null) ?? null;
 }
 
-export function getConversationByPhone(phone: string): Conversation | null {
+export async function getConversationByPhone(phone: string): Promise<Conversation | null> {
   const normalized = phone.replace(/\D/g, "");
-  const row = db.prepare("SELECT * FROM conversations WHERE phone = ?").get(normalized);
-  return row ? (row as unknown as Conversation) : null;
+  const { data, error } = await supabaseAdmin
+    .from("conversations")
+    .select("*")
+    .eq("phone", normalized)
+    .maybeSingle();
+
+  if (error) fail("conversations", error.message);
+  return (data as unknown as Conversation | null) ?? null;
 }
 
-export function updateConversation(id: number, data: { patient_name?: string; status?: string }): void {
-  const existing = getConversation(id);
+export async function updateConversation(
+  id: number,
+  data: { patient_name?: string; status?: string }
+): Promise<void> {
+  const existing = await getConversation(id);
   if (!existing) return;
-  db.prepare("UPDATE conversations SET patient_name = ?, status = ?, updated_at = ? WHERE id = ?").run(
-    data.patient_name ?? existing.patient_name,
-    data.status ?? existing.status,
-    nowStr(),
-    id
-  );
+
+  const { error } = await supabaseAdmin
+    .from("conversations")
+    .update({
+      patient_name: data.patient_name ?? existing.patient_name,
+      status: data.status ?? existing.status,
+      updated_at: nowStr(),
+    })
+    .eq("id", id);
+
+  if (error) fail("conversations", error.message);
 }
 
-export function addMessage(conversationId: number, sender: Message["sender"], content: string): Message {
-  const result = db
-    .prepare("INSERT INTO messages (conversation_id, sender, content, created_at) VALUES (?, ?, ?, ?)")
-    .run(conversationId, sender, content, nowStr());
-  db.prepare("UPDATE conversations SET updated_at = ? WHERE id = ?").run(nowStr(), conversationId);
-  return db
-    .prepare("SELECT * FROM messages WHERE id = ?")
-    .get(Number(result.lastInsertRowid)) as unknown as Message;
+export async function addMessage(
+  conversationId: number,
+  sender: Message["sender"],
+  content: string
+): Promise<Message> {
+  const { data: message, error } = await supabaseAdmin
+    .from("messages")
+    .insert({
+      conversation_id: conversationId,
+      sender,
+      content,
+      created_at: nowStr(),
+    })
+    .select("*")
+    .single();
+
+  if (error) fail("messages", error.message);
+
+  const { error: touchError } = await supabaseAdmin
+    .from("conversations")
+    .update({ updated_at: nowStr() })
+    .eq("id", conversationId);
+
+  if (touchError) fail("conversations", touchError.message);
+
+  return message as unknown as Message;
 }
 
-export function getMessages(conversationId: number): Message[] {
-  return db
-    .prepare("SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC")
-    .all(conversationId) as unknown as Message[];
+export async function getMessages(conversationId: number): Promise<Message[]> {
+  const { data, error } = await supabaseAdmin
+    .from("messages")
+    .select("*")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true });
+
+  if (error) fail("messages", error.message);
+  return (data ?? []) as unknown as Message[];
 }
 
-export function listConversations(): Conversation[] {
-  return db.prepare("SELECT * FROM conversations ORDER BY updated_at DESC").all() as unknown as Conversation[];
+export async function listConversations(): Promise<Conversation[]> {
+  const { data, error } = await supabaseAdmin
+    .from("conversations")
+    .select("*")
+    .order("updated_at", { ascending: false });
+
+  if (error) fail("conversations", error.message);
+  return (data ?? []) as unknown as Conversation[];
 }

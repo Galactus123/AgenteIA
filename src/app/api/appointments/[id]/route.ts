@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api-auth";
+import { supabaseAdmin } from "@/lib/supabase";
 import {
   getAppointment,
   getAppointmentView,
@@ -19,7 +20,7 @@ export async function GET(
   if (authError) return authError;
 
   const { id } = await ctx.params;
-  const appointment = getAppointmentView(Number(id));
+  const appointment = await getAppointmentView(Number(id));
   if (!appointment) {
     return NextResponse.json(
       { error: "Consulta não encontrada." },
@@ -37,7 +38,7 @@ export async function PATCH(
   if (authError) return authError;
 
   const { id } = await ctx.params;
-  const appointment = getAppointment(Number(id));
+  const appointment = await getAppointment(Number(id));
   if (!appointment) {
     return NextResponse.json(
       { error: "Consulta não encontrada." },
@@ -61,21 +62,31 @@ export async function PATCH(
       if (!check.ok) {
         return NextResponse.json({ error: check.reason }, { status: 400 });
       }
-      cancelAppointment(Number(id));
+      await cancelAppointment(Number(id));
       return NextResponse.json({
         ok: true,
-        appointment: getAppointmentView(Number(id)),
+        appointment: await getAppointmentView(Number(id)),
       });
     }
 
     if (status === "completed") {
-      const db = (await import("@/lib/db")).db;
-      db.prepare(
-        "UPDATE appointments SET status = 'completed', updated_at = ? WHERE id = ?"
-      ).run(new Date().toISOString().slice(0, 16).replace("T", " "), Number(id));
+      const { error } = await supabaseAdmin
+        .from("appointments")
+        .update({
+          status: "completed",
+          updated_at: new Date().toISOString().slice(0, 16).replace("T", " "),
+        })
+        .eq("id", Number(id));
+
+      if (error) {
+        return NextResponse.json(
+          { error: `Falha ao actualizar o estado: ${error.message}` },
+          { status: 500 }
+        );
+      }
       return NextResponse.json({
         ok: true,
-        appointment: getAppointmentView(Number(id)),
+        appointment: await getAppointmentView(Number(id)),
       });
     }
 
@@ -96,7 +107,7 @@ export async function PUT(
   if (authError) return authError;
 
   const { id } = await ctx.params;
-  const appointment = getAppointment(Number(id));
+  const appointment = await getAppointment(Number(id));
   if (!appointment) {
     return NextResponse.json(
       { error: "Consulta não encontrada." },
@@ -118,7 +129,7 @@ export async function PUT(
   }
 
   try {
-    const updated = rescheduleAppointment(Number(id), String(body.new_starts_at));
+    const updated = await rescheduleAppointment(Number(id), String(body.new_starts_at));
     return NextResponse.json({ ok: true, appointment: updated });
   } catch (err) {
     return NextResponse.json(
@@ -136,7 +147,7 @@ export async function DELETE(
   if (authError) return authError;
 
   const { id } = await ctx.params;
-  const appointment = getAppointment(Number(id));
+  const appointment = await getAppointment(Number(id));
   if (!appointment) {
     return NextResponse.json(
       { error: "Consulta não encontrada." },
@@ -149,6 +160,6 @@ export async function DELETE(
     return NextResponse.json({ error: check.reason }, { status: 400 });
   }
 
-  cancelAppointment(Number(id));
-  return NextResponse.json({ ok: true, appointment: getAppointmentView(Number(id)) });
+  await cancelAppointment(Number(id));
+  return NextResponse.json({ ok: true, appointment: await getAppointmentView(Number(id)) });
 }

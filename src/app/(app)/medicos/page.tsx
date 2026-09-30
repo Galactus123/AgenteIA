@@ -10,6 +10,12 @@ interface ScheduleRow {
   end_time: string;
 }
 
+interface ScheduleEntry {
+  weekday: number;
+  start_time: string;
+  end_time: string;
+}
+
 interface Professional {
   id: string;
   name: string;
@@ -20,7 +26,7 @@ interface Professional {
   price: number;
   status: string;
   phone: string;
-  schedule: string[];
+  schedule: ScheduleEntry[];
 }
 
 interface Specialty {
@@ -30,6 +36,41 @@ interface Specialty {
 }
 
 const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+const DAY_BY_LABEL: Record<string, number> = {
+  dom: 0,
+  seg: 1,
+  ter: 2,
+  qua: 3,
+  qui: 4,
+  sex: 5,
+  sab: 6,
+  sáb: 6,
+};
+
+function normalizeSchedule(raw: unknown): ScheduleEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item): ScheduleEntry | null => {
+      if (typeof item === "string") {
+        // Compatibilidade com o formato antigo (rótulos de dia).
+        const weekday = DAY_BY_LABEL[item.trim().toLowerCase().slice(0, 3)];
+        if (weekday === undefined) return null;
+        return { weekday, start_time: "08:00", end_time: "17:00" };
+      }
+      if (!item || typeof item !== "object") return null;
+      const o = item as Record<string, unknown>;
+      const weekday = Number(o.weekday);
+      if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) return null;
+      return {
+        weekday,
+        start_time: typeof o.start_time === "string" && o.start_time ? o.start_time : "08:00",
+        end_time: typeof o.end_time === "string" && o.end_time ? o.end_time : "17:00",
+      };
+    })
+    .filter((row): row is ScheduleEntry => row !== null)
+    .sort((a, b) => a.weekday - b.weekday || a.start_time.localeCompare(b.start_time));
+}
 
 const EMPTY_SCHEDULE: ScheduleRow[] = Array.from({ length: 7 }, (_, weekday) => ({
   weekday,
@@ -91,7 +132,7 @@ export default function MedicosPage() {
           price: (d.price as number) ?? 0,
           status: (d.status as string) ?? "active",
           phone: (d.phone as string) ?? "",
-          schedule: (d.schedule as string[]) ?? [],
+          schedule: normalizeSchedule(d.schedule),
         }))
       );
     }
@@ -100,7 +141,9 @@ export default function MedicosPage() {
   }, []);
 
   useEffect(() => {
-    load();
+    void (async () => {
+      await load();
+    })();
   }, [load]);
 
   function startEdit(d: Professional) {
@@ -114,10 +157,16 @@ export default function MedicosPage() {
       price: d.price,
       status: d.status,
     });
-    const rows = EMPTY_SCHEDULE.map((row) => ({
-      ...row,
-      enabled: d.schedule.includes(DAY_LABELS[row.weekday]),
-    }));
+    const byWeekday = new Map(d.schedule.map((entry) => [entry.weekday, entry]));
+    const rows = EMPTY_SCHEDULE.map((row) => {
+      const entry = byWeekday.get(row.weekday);
+      return {
+        ...row,
+        enabled: entry !== undefined,
+        start_time: entry?.start_time ?? row.start_time,
+        end_time: entry?.end_time ?? row.end_time,
+      };
+    });
     setSchedule(rows);
     setError("");
     setSuccess("");
@@ -143,7 +192,11 @@ export default function MedicosPage() {
 
     const selectedDays = schedule
       .filter((r) => r.enabled)
-      .map((r) => DAY_LABELS[r.weekday]);
+      .map((r) => ({
+        weekday: r.weekday,
+        start_time: r.start_time,
+        end_time: r.end_time,
+      }));
 
     const selectedSpecialty = specialties.find(
       (s) => s.id === Number(form.specialty_id)

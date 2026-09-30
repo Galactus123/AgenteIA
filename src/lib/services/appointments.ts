@@ -1,9 +1,9 @@
-import { db } from "@/lib/db";
+import { supabaseAdmin } from "@/lib/supabase";
 import type { Appointment, AppointmentView, AvailableSlot } from "@/lib/types";
 import {
+  addDays,
   addMinutes,
   dateFromStr,
-  formatDate,
   formatDateTime,
   nowStr,
   parseDatetime,
@@ -15,234 +15,365 @@ import {
   notifyDoctorCancelled,
   notifyDoctorRescheduled,
 } from "@/lib/services/notifications";
+import { getDefaultClinicId } from "@/lib/services/clinics";
+import { normalizeSchedule } from "@/lib/services/doctors";
 
 const CANCEL_WINDOW_HOURS = 4;
 const MAX_RESCHEDULES = 1;
 
-export function listAppointments(): AppointmentView[] {
-  const rows = db
-    .prepare(
-      `SELECT a.*, s.name AS specialty_name, d.name AS doctor_name, c.name AS clinic_name,
-              c.address AS clinic_address, d.consultation_duration, d.price
-       FROM appointments a
-       JOIN specialties s ON s.id = a.specialty_id
-       JOIN doctors d ON d.id = a.doctor_id
-       JOIN clinics c ON c.id = (SELECT id FROM clinics LIMIT 1)
-       ORDER BY a.starts_at DESC`
-    )
-    .all();
-  return rows as unknown as AppointmentView[];
+// Embedding via FK: specialties(name), professionals(...), clinics(name, address).
+const VIEW_SELECT =
+  "*, specialties(name), professionals(name, consultation_duration, price), clinics(name, address)";
+
+interface AppointmentRow extends Record<string, unknown> {
+  specialties: { name?: string } | null;
+  professionals: { name?: string; consultation_duration?: number; price?: number } | null;
+  clinics: { name?: string; address?: string } | null;
 }
 
-export function listAppointmentsFiltered(opts: {
+function toView(row: AppointmentRow): AppointmentView {
+  const base: Record<string, unknown> = { ...row };
+  delete base.specialties;
+  delete base.professionals;
+  delete base.clinics;
+  delete base.doctor_id;
+
+  return {
+    ...(base as unknown as AppointmentView),
+    specialty_name: row.specialties?.name ?? "",
+    doctor_name: row.professionals?.name ?? "",
+    clinic_name: row.clinics?.name ?? "",
+    clinic_address: row.clinics?.address ?? "",
+    consultation_duration: row.professionals?.consultation_duration ?? 0,
+    price: Number(row.professionals?.price ?? 0),
+  };
+}
+
+function fail(message: string): never {
+  throw new Error(message);
+}
+
+async function resolveViews(response: {
+  data: unknown;
+  error: { message: string } | null;
+}): Promise<AppointmentView[]> {
+  if (response.error) fail(`[appointments] Falha ao consultar consultas: ${response.error.message}`);
+  return ((response.data ?? []) as unknown as AppointmentRow[]).map(toView);
+}
+
+export async function listAppointments(): Promise<AppointmentView[]> {
+  const query = supabaseAdmin
+    .from("appointments")
+    .select(VIEW_SELECT)
+    .order("starts_at", { ascending: false });
+  return resolveViews(await query);
+}
+
+export async function listAppointmentsFiltered(opts: {
   date?: string;
   status?: string;
-}): AppointmentView[] {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
+}): Promise<AppointmentView[]> {
+  let query = supabaseAdmin.from("appointments").select(VIEW_SELECT);
 
   if (opts.date) {
-    conditions.push("a.starts_at >= ? AND a.starts_at < ?");
-    params.push(`${opts.date} 00:00`, `${opts.date} 23:59`);
+    query = query
+      .gte("starts_at", `${opts.date} 00:00`)
+      .lt("starts_at", `${addDays(opts.date, 1)} 00:00`);
   }
-  if (opts.status) {
-    conditions.push("a.status = ?");
-    params.push(opts.status);
-  }
+  if (opts.status) query = query.eq("status", opts.status);
 
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-
-  const rows = db
-    .prepare(
-      `SELECT a.*, s.name AS specialty_name, d.name AS doctor_name, c.name AS clinic_name,
-              c.address AS clinic_address, d.consultation_duration, d.price
-       FROM appointments a
-       JOIN specialties s ON s.id = a.specialty_id
-       JOIN doctors d ON d.id = a.doctor_id
-       JOIN clinics c ON c.id = (SELECT id FROM clinics LIMIT 1)
-       ${where}
-       ORDER BY a.starts_at DESC`
-    )
-    .all(...(params as string[]));
-  return rows as unknown as AppointmentView[];
+  return resolveViews(await query.order("starts_at", { ascending: false }));
 }
 
-export function getAppointment(id: number): Appointment | null {
-  const row = db.prepare("SELECT * FROM appointments WHERE id = ?").get(id);
-  return row ? (row as unknown as Appointment) : null;
+export async function listAppointmentsByDate(dateStr: string): Promise<AppointmentView[]> {
+  const query = supabaseAdmin
+    .from("appointments")
+    .select(VIEW_SELECT)
+    .gte("starts_at", `${dateStr} 00:00`)
+    .lt("starts_at", `${addDays(dateStr, 1)} 00:00`)
+    .order("starts_at", { ascending: true });
+
+  return resolveViews(await query);
 }
 
-export function getAppointmentView(id: number): AppointmentView | null {
-  const row = db
-    .prepare(
-      `SELECT a.*, s.name AS specialty_name, d.name AS doctor_name, c.name AS clinic_name,
-              c.address AS clinic_address, d.consultation_duration, d.price
-       FROM appointments a
-       JOIN specialties s ON s.id = a.specialty_id
-       JOIN doctors d ON d.id = a.doctor_id
-       JOIN clinics c ON c.id = (SELECT id FROM clinics LIMIT 1)
-       WHERE a.id = ?`
-    )
-    .get(id);
-  return row ? (row as unknown as AppointmentView) : null;
+export async function upcomingAppointments(): Promise<AppointmentView[]> {
+  const query = supabaseAdmin
+    .from("appointments")
+    .select(VIEW_SELECT)
+    .eq("status", "scheduled")
+    .gte("starts_at", `${todayStr()} 00:00`)
+    .order("starts_at", { ascending: true });
+
+  return resolveViews(await query);
 }
 
-export function getAppointmentByConversation(conversationId: number): AppointmentView | null {
-  const row = db
-    .prepare(
-      `SELECT a.*, s.name AS specialty_name, d.name AS doctor_name, c.name AS clinic_name,
-              c.address AS clinic_address, d.consultation_duration, d.price
-       FROM appointments a
-       JOIN specialties s ON s.id = a.specialty_id
-       JOIN doctors d ON d.id = a.doctor_id
-       JOIN clinics c ON c.id = (SELECT id FROM clinics LIMIT 1)
-       WHERE a.conversation_id = ? AND a.status = 'scheduled'
-       ORDER BY a.starts_at DESC LIMIT 1`
-    )
-    .get(conversationId);
-  return row ? (row as unknown as AppointmentView) : null;
+export async function getAppointment(id: number): Promise<Appointment | null> {
+  const { data, error } = await supabaseAdmin
+    .from("appointments")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) fail(`[appointments] Falha ao consultar a consulta: ${error.message}`);
+  return (data as unknown as Appointment | null) ?? null;
 }
 
-export function findUpcomingAppointmentByPhone(phone: string): AppointmentView | null {
-  const row = db
-    .prepare(
-      `SELECT a.*, s.name AS specialty_name, d.name AS doctor_name, c.name AS clinic_name,
-              c.address AS clinic_address, d.consultation_duration, d.price
-       FROM appointments a
-       JOIN specialties s ON s.id = a.specialty_id
-       JOIN doctors d ON d.id = a.doctor_id
-       JOIN clinics c ON c.id = (SELECT id FROM clinics LIMIT 1)
-       WHERE a.patient_phone = ? AND a.status = 'scheduled'
-       ORDER BY a.starts_at ASC LIMIT 1`
-    )
-    .get(phone);
-  return row ? (row as unknown as AppointmentView) : null;
+export async function getAppointmentView(id: number): Promise<AppointmentView | null> {
+  const query = supabaseAdmin
+    .from("appointments")
+    .select(VIEW_SELECT)
+    .eq("id", id)
+    .limit(1);
+  const views = await resolveViews(await query);
+  return views[0] ?? null;
 }
 
-function doctorHasAvailability(doctorId: number, startsAt: Date, durationMinutes: number): boolean {
-  const end = addMinutes(startsAt, durationMinutes);
+export async function getAppointmentByConversation(
+  conversationId: number
+): Promise<AppointmentView | null> {
+  const query = supabaseAdmin
+    .from("appointments")
+    .select(VIEW_SELECT)
+    .eq("conversation_id", conversationId)
+    .eq("status", "scheduled")
+    .order("starts_at", { ascending: false })
+    .limit(1);
+  const views = await resolveViews(await query);
+  return views[0] ?? null;
+}
+
+export async function findUpcomingAppointmentByPhone(phone: string): Promise<AppointmentView | null> {
+  const query = supabaseAdmin
+    .from("appointments")
+    .select(VIEW_SELECT)
+    .eq("patient_phone", phone)
+    .eq("status", "scheduled")
+    .order("starts_at", { ascending: true })
+    .limit(1);
+  const views = await resolveViews(await query);
+  return views[0] ?? null;
+}
+
+async function getProfessionalDuration(professionalId: string): Promise<number | null> {
+  const { data, error } = await supabaseAdmin
+    .from("professionals")
+    .select("consultation_duration")
+    .eq("id", professionalId)
+    .maybeSingle();
+
+  if (error) fail(`[appointments] Falha ao consultar o profissional: ${error.message}`);
+  return data ? ((data as { consultation_duration?: number }).consultation_duration ?? 30) : null;
+}
+
+async function hasConflict(
+  professionalId: string,
+  startsAt: Date,
+  durationMinutes: number,
+  excludeId?: number
+): Promise<boolean> {
+  const endStr = formatDateTime(addMinutes(startsAt, durationMinutes));
   const startStr = formatDateTime(startsAt);
-  const endStr = formatDateTime(end);
-  const conflict = db
-    .prepare(
-      `SELECT id FROM appointments
-       WHERE doctor_id = ? AND status = 'scheduled' AND starts_at < ? AND ends_at > ?`
-    )
-    .get(doctorId, endStr, startStr);
-  return !conflict;
+
+  let query = supabaseAdmin
+    .from("appointments")
+    .select("id")
+    .eq("professional_id", professionalId)
+    .eq("status", "scheduled")
+    .lt("starts_at", endStr)
+    .gt("ends_at", startStr);
+
+  if (excludeId !== undefined) query = query.neq("id", excludeId);
+
+  const { data, error } = await query.limit(1);
+  if (error) fail(`[appointments] Falha ao verificar disponibilidade: ${error.message}`);
+  return (data?.length ?? 0) > 0;
 }
 
-export function isSlotAvailable(doctorId: number, startsAtStr: string): boolean {
-  const doctor = db
-    .prepare("SELECT consultation_duration FROM doctors WHERE id = ?")
-    .get(doctorId) as { consultation_duration: number } | undefined;
-  if (!doctor) return false;
-  const startsAt = parseDatetime(startsAtStr);
-  return doctorHasAvailability(doctorId, startsAt, doctor.consultation_duration);
+export async function isSlotAvailable(professionalId: string, startsAtStr: string): Promise<boolean> {
+  const duration = await getProfessionalDuration(professionalId);
+  if (duration === null) return false;
+  return !(await hasConflict(professionalId, parseDatetime(startsAtStr), duration));
 }
 
-export function getAvailableSlots(specialtyId: number, dateStr: string): AvailableSlot[] {
+interface BusyWindow {
+  professional_id: string | null;
+  start: number;
+  end: number;
+}
+
+export async function getAvailableSlots(
+  specialtyId: number,
+  dateStr: string
+): Promise<AvailableSlot[]> {
   const weekday = weekdayOf(dateStr);
   const dayStart = dateFromStr(dateStr);
+  const nextDayStr = addDays(dateStr, 1);
   const now = new Date();
   const minStart = addMinutes(now, 2 * 60);
 
-  const doctors = db
-    .prepare("SELECT id, name, consultation_duration, price FROM doctors WHERE specialty_id = ? AND status = 'active'")
-    .all(specialtyId) as { id: number; name: string; consultation_duration: number; price: number }[];
+  const [{ data: professionals, error: profError }, { data: specialty, error: specError }, busy] =
+    await Promise.all([
+      supabaseAdmin
+        .from("professionals")
+        .select("id, name, consultation_duration, price, schedule")
+        .eq("specialty_id", specialtyId)
+        .eq("status", "active")
+        .order("name", { ascending: true }),
+      supabaseAdmin.from("specialties").select("name").eq("id", specialtyId).maybeSingle(),
+      loadBusyWindows(dateStr, nextDayStr),
+    ]);
 
+  if (profError) fail(`[appointments] Falha ao consultar profissionais: ${profError.message}`);
+  if (specError) fail(`[appointments] Falha ao consultar a especialidade: ${specError.message}`);
+
+  const specialtyName = (specialty as { name?: string } | null)?.name ?? "";
   const slots: AvailableSlot[] = [];
-  for (const doctor of doctors) {
-    const schedules = db
-      .prepare("SELECT * FROM doctor_schedule WHERE doctor_id = ? AND weekday = ? ORDER BY start_time")
-      .all(doctor.id, weekday) as { start_time: string; end_time: string }[];
-    for (const sched of schedules) {
-      const [sh, sm] = sched.start_time.split(":").map(Number);
-      const [eh, em] = sched.end_time.split(":").map(Number);
-      const start = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), sh, sm);
-      const end = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), eh, em);
+
+  for (const professional of (professionals ?? []) as Record<string, unknown>[]) {
+    const duration = Number(professional.consultation_duration ?? 30);
+    const professionalId = professional.id as string;
+    const ownBusy = busy.filter((w) => w.professional_id === professionalId);
+    const schedule = normalizeSchedule(professional.schedule);
+
+    for (const entry of schedule) {
+      if (entry.weekday !== weekday) continue;
+
+      const [sh, sm] = entry.start_time.split(":").map(Number);
+      const [eh, em] = entry.end_time.split(":").map(Number);
+      if (!Number.isFinite(sh) || !Number.isFinite(eh)) continue;
+
+      const start = new Date(
+        dayStart.getFullYear(),
+        dayStart.getMonth(),
+        dayStart.getDate(),
+        sh,
+        sm || 0
+      );
+      const end = new Date(
+        dayStart.getFullYear(),
+        dayStart.getMonth(),
+        dayStart.getDate(),
+        eh,
+        em || 0
+      );
+
       let cursor = start;
-      while (addMinutes(cursor, doctor.consultation_duration).getTime() <= end.getTime()) {
+      while (addMinutes(cursor, duration).getTime() <= end.getTime()) {
         const slotStart = new Date(cursor);
-        const slotEnd = addMinutes(slotStart, doctor.consultation_duration);
-        if (
-          slotStart.getTime() >= minStart.getTime() &&
-          doctorHasAvailability(doctor.id, slotStart, doctor.consultation_duration)
-        ) {
+        const slotEnd = addMinutes(slotStart, duration);
+        const free = !ownBusy.some((w) => w.start < slotEnd.getTime() && w.end > slotStart.getTime());
+
+        if (slotStart.getTime() >= minStart.getTime() && free) {
           slots.push({
-            doctor_id: doctor.id,
-            doctor_name: doctor.name,
+            professional_id: professionalId,
+            doctor_name: professional.name as string,
             specialty_id: specialtyId,
-            specialty_name: "",
+            specialty_name: specialtyName,
             starts_at: formatDateTime(slotStart),
             ends_at: formatDateTime(slotEnd),
-            price: doctor.price,
+            price: Number(professional.price ?? 0),
           });
         }
         cursor = addMinutes(cursor, 30);
       }
     }
   }
+
   return slots.sort((a, b) => a.starts_at.localeCompare(b.starts_at));
 }
 
-export function getSpecialtyNames(): Record<number, string> {
-  const rows = db.prepare("SELECT id, name FROM specialties").all() as { id: number; name: string }[];
+// Carrega de uma so vez todas as janelas ocupadas do dia (evita N+1 por slot).
+async function loadBusyWindows(fromDate: string, toDate: string): Promise<BusyWindow[]> {
+  const { data, error } = await supabaseAdmin
+    .from("appointments")
+    .select("professional_id, starts_at, ends_at")
+    .eq("status", "scheduled")
+    .lt("starts_at", `${toDate} 00:00`)
+    .gt("ends_at", `${fromDate} 00:00`);
+
+  if (error) fail(`[appointments] Falha ao consultar a agenda: ${error.message}`);
+
+  return ((data ?? []) as { professional_id: string | null; starts_at: string; ends_at: string }[])
+    .map((row) => ({
+      professional_id: row.professional_id,
+      start: parseDatetime(row.starts_at).getTime(),
+      end: parseDatetime(row.ends_at).getTime(),
+    }))
+    .filter((w) => Number.isFinite(w.start) && Number.isFinite(w.end));
+}
+
+export async function getSpecialtyNames(): Promise<Record<number, string>> {
+  const { data, error } = await supabaseAdmin.from("specialties").select("id, name");
+  if (error) fail(`[appointments] Falha ao consultar especialidades: ${error.message}`);
+
   const map: Record<number, string> = {};
-  for (const r of rows) map[r.id] = r.name;
+  for (const row of (data ?? []) as { id: number; name: string }[]) map[row.id] = row.name;
   return map;
 }
 
-export function createAppointment(data: {
+export async function createAppointment(data: {
   patient_name: string;
   patient_phone: string;
   specialty_id: number;
-  doctor_id: number;
+  professional_id: string;
   starts_at: string;
   reason?: string;
   source?: string;
   conversation_id?: number | null;
-}): AppointmentView {
-  const doctor = db
-    .prepare("SELECT consultation_duration FROM doctors WHERE id = ?")
-    .get(data.doctor_id) as { consultation_duration: number };
+}): Promise<AppointmentView> {
+  const duration = await getProfessionalDuration(data.professional_id);
+  if (duration === null) fail("Profissional não encontrado.");
+
   const startsAt = parseDatetime(data.starts_at);
-  const endsAt = addMinutes(startsAt, doctor.consultation_duration);
-  const result = db
-    .prepare(
-      `INSERT INTO appointments
-        (patient_name, patient_phone, specialty_id, doctor_id, starts_at, ends_at, status, reason, source, conversation_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'scheduled', ?, ?, ?, ?, ?)`
-    )
-    .run(
-      data.patient_name,
-      data.patient_phone,
-      data.specialty_id,
-      data.doctor_id,
-      data.starts_at,
-      formatDateTime(endsAt),
-      data.reason ?? "",
-      data.source ?? "ia",
-      data.conversation_id ?? null,
-      nowStr(),
-      nowStr()
-    );
-  const view = getAppointmentView(Number(result.lastInsertRowid))!;
-  triggerNewAppointmentNotification(view);
+  const endsAt = addMinutes(startsAt, duration);
+  const clinicId = await getDefaultClinicId();
+  const now = nowStr();
+
+  const { data: row, error } = await supabaseAdmin
+    .from("appointments")
+    .insert({
+      patient_name: data.patient_name,
+      patient_phone: data.patient_phone,
+      specialty_id: data.specialty_id,
+      professional_id: data.professional_id,
+      starts_at: data.starts_at,
+      ends_at: formatDateTime(endsAt),
+      status: "scheduled",
+      reason: data.reason ?? "",
+      source: data.source ?? "ia",
+      conversation_id: data.conversation_id ?? null,
+      clinic_id: clinicId,
+      created_at: now,
+      updated_at: now,
+    })
+    .select("id")
+    .single();
+
+  if (error) fail(`[appointments] Falha ao criar a consulta: ${error.message}`);
+
+  const view = await getAppointmentView((row as { id: number }).id);
+  if (!view) fail("Consulta criada mas não encontrada.");
+
+  await triggerNewAppointmentNotification(view);
   return view;
 }
 
-function getDoctorPhone(doctorId: number): string {
-  const row = db.prepare("SELECT phone FROM doctors WHERE id = ?").get(doctorId) as { phone: string } | undefined;
-  return row?.phone ?? "";
+async function getDoctorPhone(professionalId: string | null): Promise<string> {
+  if (!professionalId) return "";
+  const { data } = await supabaseAdmin
+    .from("professionals")
+    .select("phone")
+    .eq("id", professionalId)
+    .maybeSingle();
+  return (data as { phone?: string } | null)?.phone ?? "";
 }
 
-function triggerNewAppointmentNotification(appointment: AppointmentView): void {
+async function triggerNewAppointmentNotification(appointment: AppointmentView): Promise<void> {
   try {
-    const phone = getDoctorPhone(appointment.doctor_id);
+    const phone = await getDoctorPhone(appointment.professional_id);
     if (phone) {
-      notifyDoctorNewAppointment(
-        appointment.doctor_id,
+      await notifyDoctorNewAppointment(
+        appointment.professional_id,
         appointment.doctor_name,
         phone,
         appointment.patient_name,
@@ -251,8 +382,8 @@ function triggerNewAppointmentNotification(appointment: AppointmentView): void {
         appointment.id
       );
     }
-  } catch {
-    // fire-and-forget
+  } catch (err) {
+    console.error("[appointments] Falha ao notificar o profissional:", err);
   }
 }
 
@@ -263,25 +394,37 @@ export function canCancel(appointment: Appointment): { ok: boolean; reason?: str
   const startsAt = parseDatetime(appointment.starts_at);
   const hours = (startsAt.getTime() - Date.now()) / 3600000;
   if (hours < CANCEL_WINDOW_HOURS) {
-    return { ok: false, reason: "O cancelamento deve ser feito com pelo menos 4 horas de antecedência. Contacte a recepção." };
+    return {
+      ok: false,
+      reason: "O cancelamento deve ser feito com pelo menos 4 horas de antecedência. Contacte a recepção.",
+    };
   }
   return { ok: true };
 }
 
-export function cancelAppointment(id: number): AppointmentView {
-  const appointment = getAppointment(id);
-  if (!appointment) throw new Error("Consulta não encontrada.");
+export async function cancelAppointment(id: number): Promise<AppointmentView> {
+  const appointment = await getAppointment(id);
+  if (!appointment) fail("Consulta não encontrada.");
+
   const check = canCancel(appointment);
-  if (!check.ok) throw new Error(check.reason);
-  db.prepare(
-    "UPDATE appointments SET status = 'cancelled', cancelled_at = ?, updated_at = ? WHERE id = ?"
-  ).run(nowStr(), nowStr(), id);
-  const view = getAppointmentView(id)!;
+  if (!check.ok) fail(check.reason ?? "Operação não permitida.");
+
+  const now = nowStr();
+  const { error } = await supabaseAdmin
+    .from("appointments")
+    .update({ status: "cancelled", cancelled_at: now, updated_at: now })
+    .eq("id", id);
+
+  if (error) fail(`[appointments] Falha ao cancelar: ${error.message}`);
+
+  const view = await getAppointmentView(id);
+  if (!view) fail("Consulta não encontrada.");
+
   try {
-    const phone = getDoctorPhone(view.doctor_id);
+    const phone = await getDoctorPhone(view.professional_id);
     if (phone) {
-      notifyDoctorCancelled(
-        view.doctor_id,
+      await notifyDoctorCancelled(
+        view.professional_id,
         view.doctor_name,
         phone,
         view.patient_name,
@@ -290,9 +433,10 @@ export function cancelAppointment(id: number): AppointmentView {
         view.id
       );
     }
-  } catch {
-    // fire-and-forget
+  } catch (err) {
+    console.error("[appointments] Falha ao notificar o profissional:", err);
   }
+
   return view;
 }
 
@@ -301,38 +445,67 @@ export function canReschedule(appointment: Appointment): { ok: boolean; reason?:
     return { ok: false, reason: "Esta consulta já não está ativa." };
   }
   if (appointment.reschedule_count >= MAX_RESCHEDULES) {
-    return { ok: false, reason: "Esta consulta já foi remarcada uma vez. Contacte a recepção para novos ajustes." };
+    return {
+      ok: false,
+      reason: "Esta consulta já foi remarcada uma vez. Contacte a recepção para novos ajustes.",
+    };
   }
   const startsAt = parseDatetime(appointment.starts_at);
   const hours = (startsAt.getTime() - Date.now()) / 3600000;
   if (hours < CANCEL_WINDOW_HOURS) {
-    return { ok: false, reason: "A remarcação deve ser feita com pelo menos 4 horas de antecedência. Contacte a recepção." };
+    return {
+      ok: false,
+      reason: "A remarcação deve ser feita com pelo menos 4 horas de antecedência. Contacte a recepção.",
+    };
   }
   return { ok: true };
 }
 
-export function rescheduleAppointment(id: number, newStartsAt: string): AppointmentView {
-  const appointment = getAppointment(id);
-  if (!appointment) throw new Error("Consulta não encontrada.");
+export async function rescheduleAppointment(
+  id: number,
+  newStartsAt: string
+): Promise<AppointmentView> {
+  const appointment = await getAppointment(id);
+  if (!appointment) fail("Consulta não encontrada.");
+
   const check = canReschedule(appointment);
-  if (!check.ok) throw new Error(check.reason);
-  const doctor = db
-    .prepare("SELECT consultation_duration FROM doctors WHERE id = ?")
-    .get(appointment.doctor_id) as { consultation_duration: number };
-  const startsAt = parseDatetime(newStartsAt);
-  const endsAt = addMinutes(startsAt, doctor.consultation_duration);
-  if (!doctorHasAvailability(appointment.doctor_id, startsAt, doctor.consultation_duration)) {
-    throw new Error("Este horário já não está disponível.");
+  if (!check.ok) fail(check.reason ?? "Operação não permitida.");
+
+  const duration = await getProfessionalDuration(
+    appointment.professional_id ?? ""
+  );
+  if (duration === null || !appointment.professional_id) {
+    fail("Profissional da consulta não encontrado.");
   }
-  db.prepare(
-    "UPDATE appointments SET starts_at = ?, ends_at = ?, rescheduled = 1, reschedule_count = reschedule_count + 1, updated_at = ? WHERE id = ?"
-  ).run(newStartsAt, formatDateTime(endsAt), nowStr(), id);
-  const view = getAppointmentView(id)!;
+
+  const startsAt = parseDatetime(newStartsAt);
+  const endsAt = addMinutes(startsAt, duration);
+
+  if (await hasConflict(appointment.professional_id, startsAt, duration, id)) {
+    fail("Este horário já não está disponível.");
+  }
+
+  const { error } = await supabaseAdmin
+    .from("appointments")
+    .update({
+      starts_at: newStartsAt,
+      ends_at: formatDateTime(endsAt),
+      rescheduled: 1,
+      reschedule_count: appointment.reschedule_count + 1,
+      updated_at: nowStr(),
+    })
+    .eq("id", id);
+
+  if (error) fail(`[appointments] Falha ao remarcar: ${error.message}`);
+
+  const view = await getAppointmentView(id);
+  if (!view) fail("Consulta não encontrada.");
+
   try {
-    const phone = getDoctorPhone(view.doctor_id);
+    const phone = await getDoctorPhone(view.professional_id);
     if (phone) {
-      notifyDoctorRescheduled(
-        view.doctor_id,
+      await notifyDoctorRescheduled(
+        view.professional_id,
         view.doctor_name,
         phone,
         view.patient_name,
@@ -342,43 +515,9 @@ export function rescheduleAppointment(id: number, newStartsAt: string): Appointm
         view.id
       );
     }
-  } catch {
-    // fire-and-forget
+  } catch (err) {
+    console.error("[appointments] Falha ao notificar o profissional:", err);
   }
+
   return view;
-}
-
-export function listAppointmentsByDate(dateStr: string): AppointmentView[] {
-  const next = dateFromStr(dateStr);
-  next.setDate(next.getDate() + 1);
-  const nextStr = formatDate(next);
-  const rows = db
-    .prepare(
-      `SELECT a.*, s.name AS specialty_name, d.name AS doctor_name, c.name AS clinic_name,
-              c.address AS clinic_address, d.consultation_duration, d.price
-       FROM appointments a
-       JOIN specialties s ON s.id = a.specialty_id
-       JOIN doctors d ON d.id = a.doctor_id
-       JOIN clinics c ON c.id = (SELECT id FROM clinics LIMIT 1)
-       WHERE a.starts_at >= ? AND a.starts_at < ?
-       ORDER BY a.starts_at ASC`
-    )
-    .all(`${dateStr} 00:00`, `${nextStr} 00:00`);
-  return rows as unknown as AppointmentView[];
-}
-
-export function upcomingAppointments(): AppointmentView[] {
-  const rows = db
-    .prepare(
-      `SELECT a.*, s.name AS specialty_name, d.name AS doctor_name, c.name AS clinic_name,
-              c.address AS clinic_address, d.consultation_duration, d.price
-       FROM appointments a
-       JOIN specialties s ON s.id = a.specialty_id
-       JOIN doctors d ON d.id = a.doctor_id
-       JOIN clinics c ON c.id = (SELECT id FROM clinics LIMIT 1)
-       WHERE a.status = 'scheduled' AND a.starts_at >= ?
-       ORDER BY a.starts_at ASC`
-    )
-    .all(`${todayStr()} 00:00`);
-  return rows as unknown as AppointmentView[];
 }

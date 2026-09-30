@@ -7,7 +7,7 @@ const ALLOWED_ROLES: AdminRole[] = ["super_admin", "saas_admin"];
 export default async function ChatLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies();
   const token = cookieStore.get(authCookie)?.value;
-  const session = readSessionToken(token);
+  const session = await readSessionToken(token);
 
   const isAllowed =
     process.env.NODE_ENV === "development" ||

@@ -25,6 +25,11 @@ export function proxy(request: NextRequest) {
     }
   );
 
+  // Cliente criado apenas para registrar os callbacks de cookies do Supabase SSR.
+  // Nenhuma chamada de auth é feita neste proxy — a rota protegida é validada
+  // pelo cookie de sessão abaixo.
+  void supabase;
+
   // Atualizar sessão (refresh de token se expirado)
   // Nota: getUser() é síncrono no proxy, mas o Supabase SSR lida com isso internamente
   // Para simplificar, verificamos se o cookie de sessão existe

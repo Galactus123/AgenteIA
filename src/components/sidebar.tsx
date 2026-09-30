@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, memo } from "react";
 import { useTheme } from "next-themes";
 import type { SessionData } from "@/lib/auth";
+import { useMounted } from "@/lib/use-mounted";
 import {
   LayoutDashboard,
   Calendar,
@@ -114,17 +115,19 @@ function SidebarInner({ session }: { session?: SessionData }) {
   const isDark = resolvedTheme === "dark";
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
+  const mounted = useMounted();
 
   const visibleItems = NAV_ITEMS.filter((item) => canAccessItem(item, session));
 
   const closeMobile = useCallback(() => setMobileOpen(false), []);
 
-  useEffect(() => {
-    closeMobile();
-  }, [pathname, closeMobile]);
+  // Fecha o menu móvel quando o utilizador navega (ajuste de estado durante o
+  // render, em vez de um efeito — ver https://react.dev/learn/you-might-not-need-an-effect).
+  const [lastPathname, setLastPathname] = useState(pathname);
+  if (lastPathname !== pathname) {
+    setLastPathname(pathname);
+    setMobileOpen(false);
+  }
 
   useEffect(() => {
     if (mobileOpen) {

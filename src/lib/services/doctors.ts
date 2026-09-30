@@ -1,4 +1,5 @@
-import { db } from "@/lib/db";
+import { supabaseAdmin } from "@/lib/supabase";
+import { getDefaultClinicId } from "@/lib/services/clinics";
 import type { Doctor, DoctorSchedule } from "@/lib/types";
 
 export interface DoctorView extends Doctor {
@@ -6,89 +7,142 @@ export interface DoctorView extends Doctor {
   schedule: DoctorSchedule[];
 }
 
-function rowToDoctor(row: Record<string, unknown>): Doctor {
+export type ScheduleInput = { weekday: number; start_time: string; end_time: string }[];
+
+const DAY_BY_LABEL: Record<string, number> = {
+  dom: 0,
+  seg: 1,
+  ter: 2,
+  qua: 3,
+  qui: 4,
+  sex: 5,
+  sab: 6,
+  sáb: 6,
+};
+
+export function normalizeSchedule(raw: unknown): DoctorSchedule[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item): DoctorSchedule | null => {
+      if (typeof item === "string") {
+        // Compatibilidade com o formato antigo (rotulos de dia).
+        const weekday = DAY_BY_LABEL[item.trim().toLowerCase().slice(0, 3)];
+        if (weekday === undefined) return null;
+        return { weekday, start_time: "08:00", end_time: "17:00" };
+      }
+      if (!item || typeof item !== "object") return null;
+      const o = item as Record<string, unknown>;
+      const weekday = Number(o.weekday);
+      if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) return null;
+      return {
+        weekday,
+        start_time: typeof o.start_time === "string" && o.start_time ? o.start_time : "08:00",
+        end_time: typeof o.end_time === "string" && o.end_time ? o.end_time : "17:00",
+      };
+    })
+    .filter((row): row is DoctorSchedule => row !== null)
+    .sort((a, b) => a.weekday - b.weekday || a.start_time.localeCompare(b.start_time));
+}
+
+function rowToDoctor(row: Record<string, unknown>, specialtyName = ""): DoctorView {
+  const specialty = row.specialties as { name?: string } | null | undefined;
   return {
-    id: row.id as number,
+    id: row.id as string,
     name: row.name as string,
-    specialty_id: row.specialty_id as number,
-    consultation_duration: row.consultation_duration as number,
-    price: row.price as number,
-    status: row.status as string,
+    specialty_id: (row.specialty_id as number | null) ?? null,
+    consultation_duration: (row.consultation_duration as number) ?? 30,
+    price: Number(row.price ?? 0),
+    status: (row.status as string) ?? "active",
     phone: (row.phone as string) ?? "",
+    specialty_name: specialty?.name ?? specialtyName,
+    schedule: normalizeSchedule(row.schedule),
   };
 }
 
-export function listDoctors(): DoctorView[] {
-  const rows = db
-    .prepare(
-      `SELECT d.*, s.name AS specialty_name FROM doctors d
-       JOIN specialties s ON s.id = d.specialty_id
-       ORDER BY d.name`
-    )
-    .all();
-  return rows.map((r) => {
-    const row = r as Record<string, unknown>;
-    const doctor = rowToDoctor(row);
-    return {
-      ...doctor,
-      specialty_name: row.specialty_name as string,
-      schedule: getDoctorSchedule(doctor.id),
-    };
-  });
+export async function listDoctors(): Promise<DoctorView[]> {
+  const { data, error } = await supabaseAdmin
+    .from("professionals")
+    .select("*, specialties(name)")
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("[doctors] Falha ao listar profissionais:", error.message);
+    return [];
+  }
+  return ((data ?? []) as Record<string, unknown>[]).map((row) => rowToDoctor(row));
 }
 
-export function getDoctor(id: number): Doctor | null {
-  const row = db.prepare("SELECT * FROM doctors WHERE id = ?").get(id);
-  return row ? rowToDoctor(row as Record<string, unknown>) : null;
+export async function getDoctor(id: string): Promise<Doctor | null> {
+  const { data, error } = await supabaseAdmin
+    .from("professionals")
+    .select("*, specialties(name)")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[doctors] Falha ao buscar profissional:", error.message);
+    return null;
+  }
+  return data ? rowToDoctor(data as Record<string, unknown>) : null;
 }
 
-export function getDoctorSchedule(doctorId: number): DoctorSchedule[] {
-  const rows = db
-    .prepare("SELECT * FROM doctor_schedule WHERE doctor_id = ? ORDER BY weekday, start_time")
-    .all(doctorId);
-  return rows as unknown as DoctorSchedule[];
+export async function getDoctorSchedule(doctorId: string): Promise<DoctorSchedule[]> {
+  const { data, error } = await supabaseAdmin
+    .from("professionals")
+    .select("schedule")
+    .eq("id", doctorId)
+    .maybeSingle();
+
+  if (error || !data) return [];
+  return normalizeSchedule((data as { schedule?: unknown }).schedule);
 }
 
-export function getActiveDoctorsBySpecialty(specialtyId: number): Doctor[] {
-  const rows = db
-    .prepare("SELECT * FROM doctors WHERE specialty_id = ? AND status = 'active' ORDER BY name")
-    .all(specialtyId);
-  return rows.map((r) => rowToDoctor(r as Record<string, unknown>));
+export async function getActiveDoctorsBySpecialty(specialtyId: number): Promise<Doctor[]> {
+  const { data, error } = await supabaseAdmin
+    .from("professionals")
+    .select("*")
+    .eq("specialty_id", specialtyId)
+    .eq("status", "active")
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("[doctors] Falha ao listar profissionais da especialidade:", error.message);
+    return [];
+  }
+  return ((data ?? []) as Record<string, unknown>[]).map((row) => rowToDoctor(row));
 }
 
-export function createDoctor(data: {
+export async function createDoctor(data: {
   name: string;
   specialty_id: number;
   consultation_duration?: number;
   price?: number;
   status?: string;
   phone?: string;
-  schedule: { weekday: number; start_time: string; end_time: string }[];
-}): DoctorView {
-  const result = db
-    .prepare(
-      "INSERT INTO doctors (name, specialty_id, consultation_duration, price, status, phone) VALUES (?, ?, ?, ?, ?, ?)"
-    )
-    .run(
-      data.name,
-      data.specialty_id,
-      data.consultation_duration ?? 30,
-      data.price ?? 0,
-      data.status ?? "active",
-      data.phone ?? ""
-    );
-  const id = Number(result.lastInsertRowid);
-  const insertSchedule = db.prepare(
-    "INSERT INTO doctor_schedule (doctor_id, weekday, start_time, end_time) VALUES (?, ?, ?, ?)"
-  );
-  for (const s of data.schedule) {
-    insertSchedule.run(id, s.weekday, s.start_time, s.end_time);
-  }
-  return listDoctors().find((d) => d.id === id)!;
+  schedule: ScheduleInput;
+}): Promise<DoctorView> {
+  const clinicId = await getDefaultClinicId();
+  const { data: row, error } = await supabaseAdmin
+    .from("professionals")
+    .insert({
+      name: data.name,
+      clinic_id: clinicId,
+      specialty_id: data.specialty_id,
+      consultation_duration: data.consultation_duration ?? 30,
+      price: data.price ?? 0,
+      status: data.status ?? "active",
+      phone: data.phone ?? "",
+      schedule: data.schedule,
+    })
+    .select("*, specialties(name)")
+    .single();
+
+  if (error) throw new Error(`[doctors] Falha ao criar profissional: ${error.message}`);
+  return rowToDoctor(row as Record<string, unknown>);
 }
 
-export function updateDoctor(
-  id: number,
+export async function updateDoctor(
+  id: string,
   data: {
     name?: string;
     specialty_id?: number;
@@ -96,34 +150,33 @@ export function updateDoctor(
     price?: number;
     status?: string;
     phone?: string;
-    schedule?: { weekday: number; start_time: string; end_time: string }[];
+    schedule?: ScheduleInput;
   }
-): DoctorView | null {
-  const existing = getDoctor(id);
+): Promise<DoctorView | null> {
+  const existing = await getDoctor(id);
   if (!existing) return null;
-  db.prepare(
-    "UPDATE doctors SET name = ?, specialty_id = ?, consultation_duration = ?, price = ?, status = ?, phone = ? WHERE id = ?"
-  ).run(
-    data.name ?? existing.name,
-    data.specialty_id ?? existing.specialty_id,
-    data.consultation_duration ?? existing.consultation_duration,
-    data.price ?? existing.price,
-    data.status ?? existing.status,
-    data.phone ?? existing.phone,
-    id
-  );
-  if (data.schedule) {
-    db.prepare("DELETE FROM doctor_schedule WHERE doctor_id = ?").run(id);
-    const insertSchedule = db.prepare(
-      "INSERT INTO doctor_schedule (doctor_id, weekday, start_time, end_time) VALUES (?, ?, ?, ?)"
-    );
-    for (const s of data.schedule) {
-      insertSchedule.run(id, s.weekday, s.start_time, s.end_time);
-    }
-  }
-  return listDoctors().find((d) => d.id === id)!;
+
+  const patch: Record<string, unknown> = {};
+  if (data.name !== undefined) patch.name = data.name;
+  if (data.specialty_id !== undefined) patch.specialty_id = data.specialty_id;
+  if (data.consultation_duration !== undefined) patch.consultation_duration = data.consultation_duration;
+  if (data.price !== undefined) patch.price = data.price;
+  if (data.status !== undefined) patch.status = data.status;
+  if (data.phone !== undefined) patch.phone = data.phone;
+  if (data.schedule !== undefined) patch.schedule = data.schedule;
+
+  const { data: row, error } = await supabaseAdmin
+    .from("professionals")
+    .update(patch)
+    .eq("id", id)
+    .select("*, specialties(name)")
+    .single();
+
+  if (error) throw new Error(`[doctors] Falha ao atualizar profissional: ${error.message}`);
+  return rowToDoctor(row as Record<string, unknown>);
 }
 
-export function deleteDoctor(id: number): void {
-  db.prepare("DELETE FROM doctors WHERE id = ?").run(id);
+export async function deleteDoctor(id: string): Promise<void> {
+  const { error } = await supabaseAdmin.from("professionals").delete().eq("id", id);
+  if (error) throw new Error(`[doctors] Falha ao excluir profissional: ${error.message}`);
 }

@@ -57,7 +57,9 @@ export default function ChatPage() {
 
   // Carrega histórico ao trocar de phone
   useEffect(() => {
-    fetchHistory(phone);
+    void (async () => {
+      await fetchHistory(phone);
+    })();
     return () => {
       if (abortRef.current) {
         abortRef.current.abort();

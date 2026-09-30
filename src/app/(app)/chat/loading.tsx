@@ -1,4 +1,4 @@
-import { Skeleton, SkeletonCard } from "@/components/skeleton";
+import { Skeleton } from "@/components/skeleton";
 
 export default function ChatLoading() {
   return (

@@ -17,28 +17,28 @@ export async function GET(request: NextRequest) {
   const id = request.nextUrl.searchParams.get("id");
 
   if (phone) {
-    const conversation = getConversationByPhone(phone);
+    const conversation = await getConversationByPhone(phone);
     if (!conversation) {
       return NextResponse.json({ conversation: null, messages: [] });
     }
     return NextResponse.json({
       conversation,
-      messages: getMessages(conversation.id),
+      messages: await getMessages(conversation.id),
     });
   }
 
   if (id) {
-    const conversation = getConversation(Number(id));
+    const conversation = await getConversation(Number(id));
     if (!conversation) {
       return NextResponse.json({ error: "Conversa não encontrada." }, { status: 404 });
     }
     return NextResponse.json({
       conversation,
-      messages: getMessages(conversation.id),
+      messages: await getMessages(conversation.id),
     });
   }
 
-  return NextResponse.json({ conversations: listConversations() });
+  return NextResponse.json({ conversations: await listConversations() });
 }
 
 export async function POST(request: NextRequest) {
@@ -57,17 +57,21 @@ export async function POST(request: NextRequest) {
   }
 
   if (message !== undefined && message !== null && sender) {
-    const conversation = getOrCreateConversation(phone);
-    const added = addMessage(conversation.id, sender as "patient" | "bot" | "system", String(message));
+    const conversation = await getOrCreateConversation(phone);
+    const added = await addMessage(
+      conversation.id,
+      sender as "patient" | "bot" | "system",
+      String(message)
+    );
     return NextResponse.json({ conversation, message: added }, { status: 201 });
   }
 
   if (message !== undefined && message !== null) {
-    const conversation = getOrCreateConversation(phone);
-    const added = addMessage(conversation.id, "patient", String(message));
+    const conversation = await getOrCreateConversation(phone);
+    const added = await addMessage(conversation.id, "patient", String(message));
     return NextResponse.json({ conversation, message: added }, { status: 201 });
   }
 
-  const conversation = getOrCreateConversation(phone);
+  const conversation = await getOrCreateConversation(phone);
   return NextResponse.json({ conversation }, { status: 201 });
 }

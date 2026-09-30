@@ -4,6 +4,7 @@ import { buildSystemPrompt } from "@/lib/agent/prompts";
 import { addMessage, getMessages, getConversation, updateConversation, getOrCreateConversation } from "@/lib/services/conversations";
 import { blockForQuota, consumeTokens, hasAiQuota } from "@/lib/services/subscriptions";
 import { sanitizePatientInput } from "@/lib/agent/security";
+import type { Conversation, Message } from "@/lib/types";
 
 const MAX_ITERATIONS = 8;
 
@@ -19,6 +20,12 @@ const QUOTA_EXHAUSTED_MESSAGE =
 const FALLBACK_BASE =
   "Ainda estou aqui! 😊 Para te ajudar a marcar uma consulta, me conta o que você está sentindo ou qual especialidade você procura. Se preferir, posso transferir para um atendente.";
 
+type AgentReply = {
+  reply: string;
+  conversationId: number;
+  transferred: boolean;
+};
+
 function log(...args: unknown[]): void {
   console.log(`[agent:${new Date().toISOString()}]`, ...args);
 }
@@ -27,44 +34,40 @@ function logError(...args: unknown[]): void {
   console.error(`[agent:${new Date().toISOString()}]`, ...args);
 }
 
-export async function handlePatientMessage(phone: string, text: string): Promise<{
-  reply: string;
-  conversationId: number;
-  transferred: boolean;
-}> {
+export async function handlePatientMessage(phone: string, text: string): Promise<AgentReply> {
   // Sanitizar input do paciente contra prompt injection
   const sanitizedText = sanitizePatientInput(text);
   if (!sanitizedText) {
     log("Mensagem rejeitada por seguranca (prompt injection detectado).");
     const safeReply = "Desculpe, nao consegui processar sua mensagem. Pode reformular?";
-    const conversation = getOrCreateConversation(phone);
-    addMessage(conversation.id, "bot", safeReply);
+    const conversation = await getOrCreateConversation(phone);
+    await addMessage(conversation.id, "bot", safeReply);
     return { reply: safeReply, conversationId: conversation.id, transferred: false };
   }
 
-  const conversation = getOrCreateConversation(phone);
+  const conversation = await getOrCreateConversation(phone);
   log(`Conversa carregada/criada para phone=${phone} id=${conversation.id}, status="${conversation.status}"`);
-  addMessage(conversation.id, "patient", sanitizedText);
+  await addMessage(conversation.id, "patient", sanitizedText);
   log(`Mensagem do paciente [${conversation.id}] gravada (tamanho=${sanitizedText.length})`);
 
   if (!isLlmConfigured()) {
     log("LLM não configurado (OPENAI_API_KEY ausente). Retornando NO_KEY_MESSAGE.");
-    addMessage(conversation.id, "bot", NO_KEY_MESSAGE);
+    await addMessage(conversation.id, "bot", NO_KEY_MESSAGE);
     return { reply: NO_KEY_MESSAGE, conversationId: conversation.id, transferred: false };
   }
 
   // Guard pré-chamada: bloqueia a chamada de IA quando a cota de tokens da clínica está esgotada.
-  if (!hasAiQuota()) {
+  if (!(await hasAiQuota())) {
     log(`Cota de tokens esgotada para phone=${phone}. Transferindo para atendimento humano.`);
     return blockConversationForQuota(conversation.id, phone);
   }
 
-  const history = getMessages(conversation.id);
+  const history = await getMessages(conversation.id);
   log(`Histórico completo carregado: ${history.length} mensagens para conversation_id=${conversation.id}`);
 
   // Monta o contexto completo: system prompt + historico integral + nova mensagem
   const hasHistory = history.length > 1;
-  const systemPrompt = buildSystemPrompt(hasHistory);
+  const systemPrompt = await buildSystemPrompt(hasHistory);
   const messages: LlmMessage[] = [{ role: "system", content: systemPrompt }];
 
   let patientCount = 0;
@@ -92,14 +95,14 @@ export async function handlePatientMessage(phone: string, text: string): Promise
 
   try {
     for (let i = 0; i < MAX_ITERATIONS; i++) {
-      if (!hasAiQuota()) {
+      if (!(await hasAiQuota())) {
         log(`Cota de tokens esgotada na iteração ${i + 1}. Transferindo para atendimento humano.`);
         return blockConversationForQuota(conversation.id, phone);
       }
       log(`Iteração ${i + 1}/${MAX_ITERATIONS}: chamando LLM (${messages.length} mensagens no payload).`);
       const response = await callLlm(messages, toolDefinitions);
       if (response.totalTokens > 0) {
-        const { nearLimitAlert } = consumeTokens(response.totalTokens);
+        const { nearLimitAlert } = await consumeTokens(response.totalTokens);
         if (nearLimitAlert) {
           log(`Alerta de 80% da cota emitido para a clínica (${response.totalTokens} tokens consumidos nesta chamada).`);
         }
@@ -129,7 +132,7 @@ export async function handlePatientMessage(phone: string, text: string): Promise
           log(`Tool "${toolCall.function.name}" executada → output=${result.output.slice(0, 200)}${result.transferToHuman ? " [TRANSFER_TO_HUMAN]" : ""}`);
           if (result.transferToHuman) {
             transferred = true;
-            updateConversation(conversation.id, { status: "transferred" });
+            await updateConversation(conversation.id, { status: "transferred" });
             log(`Conversa ${conversation.id} marcada como transferred.`);
           }
           messages.push({
@@ -143,7 +146,7 @@ export async function handlePatientMessage(phone: string, text: string): Promise
 
       if (response.content) {
         log(`Resposta final gerada na iteração ${i + 1}: "${response.content.slice(0, 150)}"`);
-        addMessage(conversation.id, "bot", response.content);
+        await addMessage(conversation.id, "bot", response.content);
         return { reply: response.content, conversationId: conversation.id, transferred };
       }
 
@@ -154,30 +157,26 @@ export async function handlePatientMessage(phone: string, text: string): Promise
     // Caiu no limite de iterações sem gerar uma resposta final útil.
     const fallback = buildContextAwareFallback(history);
     log(`Loop atingiu o limite (${MAX_ITERATIONS}) sem resposta final. Registrando fallback consciente.`);
-    addMessage(conversation.id, "bot", fallback);
+    await addMessage(conversation.id, "bot", fallback);
     return { reply: fallback, conversationId: conversation.id, transferred };
   } catch (err) {
     logError("Erro processando a mensagem no agente:", err);
-    addMessage(conversation.id, "bot", LLM_ERROR_MESSAGE);
+    await addMessage(conversation.id, "bot", LLM_ERROR_MESSAGE);
     return { reply: LLM_ERROR_MESSAGE, conversationId: conversation.id, transferred };
   }
 }
 
 // Em vez de repetir a mesma mensagem genérica, tenta produzir uma resposta útil
 // baseada no fluxo real da conversa (evita o fallback genérico repetitivo).
-function blockConversationForQuota(conversationId: number, phone: string): {
-  reply: string;
-  conversationId: number;
-  transferred: boolean;
-} {
-  addMessage(conversationId, "bot", QUOTA_EXHAUSTED_MESSAGE);
-  updateConversation(conversationId, { status: "WAITING_HUMAN_INTERVENTION" });
-  blockForQuota(phone);
+async function blockConversationForQuota(conversationId: number, phone: string): Promise<AgentReply> {
+  await addMessage(conversationId, "bot", QUOTA_EXHAUSTED_MESSAGE);
+  await updateConversation(conversationId, { status: "WAITING_HUMAN_INTERVENTION" });
+  await blockForQuota(phone);
   log(`Conversa ${conversationId} marcada como WAITING_HUMAN_INTERVENTION por cota esgotada.`);
   return { reply: QUOTA_EXHAUSTED_MESSAGE, conversationId, transferred: true };
 }
 
-function buildContextAwareFallback(history: { sender: string; content: string }[]): string {
+function buildContextAwareFallback(history: Message[]): string {
   const hasPatientName = history.some(
     (m) => m.sender === "patient" && /\b(meu nome|sou|é o|me chamo|chamo-me|chamo me)\b/i.test(m.content)
   );
@@ -194,11 +193,15 @@ function buildContextAwareFallback(history: { sender: string; content: string }[
   return FALLBACK_BASE;
 }
 
-export function getConversationMessages(conversationId: number) {
-  return {
-    conversation: getConversation(conversationId),
-    messages: getMessages(conversationId),
-  };
+export async function getConversationMessages(conversationId: number): Promise<{
+  conversation: Conversation | null;
+  messages: Message[];
+}> {
+  const [conversation, messages] = await Promise.all([
+    getConversation(conversationId),
+    getMessages(conversationId),
+  ]);
+  return { conversation, messages };
 }
 
 export { getOrCreateConversation, getMessages, updateConversation };

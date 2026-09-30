@@ -5,6 +5,13 @@ import AuthGuard from "@/components/auth-guard";
 import DashboardShell from "@/components/dashboard/dashboard-shell";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  let session: {
+    adminId: number;
+    role: "admin" | "super_admin" | "saas_admin";
+    userId: string;
+    username: string;
+  };
+
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -20,25 +27,25 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .eq("user_id", user.id)
       .single();
 
-    const session = {
+    session = {
       adminId: 0,
       role: (adminProfile?.role ?? "admin") as "admin" | "super_admin" | "saas_admin",
       userId: user.id,
       username: adminProfile?.legacy_username ?? user.email ?? "",
     };
-
-    return (
-      <AuthGuard>
-        <div className="flex min-h-screen bg-background overflow-x-hidden">
-          <Sidebar session={session} />
-          <DashboardShell>{children}</DashboardShell>
-        </div>
-      </AuthGuard>
-    );
   } catch (error) {
     if (error instanceof Error && error.message === "NEXT_REDIRECT") {
       throw error;
     }
     redirect("/login");
   }
+
+  return (
+    <AuthGuard>
+      <div className="flex min-h-screen bg-background overflow-x-hidden">
+        <Sidebar session={session} />
+        <DashboardShell>{children}</DashboardShell>
+      </div>
+    </AuthGuard>
+  );
 }

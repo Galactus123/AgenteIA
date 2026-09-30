@@ -6,9 +6,9 @@ const DAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta",
 
 // Constrói um resumo legível das especialidades e médicos cadastrados na clínica,
 // a partir dos dados reais do banco, e injeta no system prompt.
-function buildCatalogSummary(): string {
-  const specialties = listSpecialties();
-  const doctors = listDoctors();
+async function buildCatalogSummary(): Promise<string> {
+  const specialties = await listSpecialties();
+  const doctors = await listDoctors();
 
   const specLines = specialties.map(
     (s) =>
@@ -41,14 +41,14 @@ function buildCatalogSummary(): string {
   ].join("\n");
 }
 
-export function buildSystemPrompt(hasHistory: boolean = false): string {
-  const clinic = getClinic();
+export async function buildSystemPrompt(hasHistory: boolean = false): Promise<string> {
+  const clinic = await getClinic();
   const clinicName = clinic?.name ?? "a clínica";
   const clinicInfo = clinic
     ? `A clínica se chama "${clinic.name}".\nEndereço: ${clinic.address}\nHorário de funcionamento: ${clinic.opening_hours}\nWhatsApp: ${clinic.whatsapp}`
     : "";
 
-  const catalog = buildCatalogSummary();
+  const catalog = await buildCatalogSummary();
 
   const contextNote = hasHistory
     ? `\n# IMPORTANTE — Contexto de conversa anterior

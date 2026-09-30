@@ -39,7 +39,9 @@ export default function PacientesPage() {
   }, []);
 
   useEffect(() => {
-    load();
+    void (async () => {
+      await load();
+    })();
   }, [load]);
 
   function resetForm() {

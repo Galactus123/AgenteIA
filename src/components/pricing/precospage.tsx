@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { Check, X, ArrowRight, MessageCircle, Sparkles, Zap } from "lucide-react";
-import { PLANS, FEATURE_CATEGORIES, formatPrice, formatLimit, type PlanId, type FeatureId } from "@/lib/plans";
+import { PLANS, FEATURE_CATEGORIES, formatLimit, type PlanId, type FeatureId } from "@/lib/plans";
 
 const planOrder: PlanId[] = ["start", "pro", "business", "enterprise"];
 
@@ -63,8 +62,6 @@ const featureLabels: Record<FeatureId, string> = {
 };
 
 export default function PrecosPage() {
-  const [billingPeriod] = useState<"month">("month");
-
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0D14]">
       {/* Header */}

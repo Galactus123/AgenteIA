@@ -10,9 +10,9 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const plan = getClinicPlan();
-    const subscription = getActiveSubscription();
-    const usage = getUsageDashboard();
+    const plan = await getClinicPlan();
+    const subscription = await getActiveSubscription();
+    const usage = await getUsageDashboard();
 
     return NextResponse.json({
       plan: {

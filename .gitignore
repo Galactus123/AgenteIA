@@ -46,3 +46,6 @@ next-env.d.ts
 # backup files
 *.backup
 *.backup.sql
+
+# copia local desatualizada (nao versionar)
+/AgenteIA/

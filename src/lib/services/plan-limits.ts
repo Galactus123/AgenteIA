@@ -1,15 +1,14 @@
 // ── Serviço de Controle de Planos e Limites ──────────────────────────────
 // Centraliza toda a lógica de verificação de planos, limites e features.
 
-import { db } from "@/lib/db";
+import { supabaseAdmin } from "@/lib/supabase";
 import { nowStr } from "@/lib/datetime";
-import { getPlan, type PlanId, type FeatureId, type Plan, type PlanLimits } from "@/lib/plans";
-import type { Clinic } from "@/lib/types";
+import { getPlan, type PlanId, type FeatureId, type Plan } from "@/lib/plans";
 
 // ── Tipos ──────────────────────────────────────────────────────────────
 
 export interface Subscription {
-  id: number;
+  id: string;
   clinic_id: number;
   plan_id: PlanId;
   status: SubscriptionStatus;
@@ -17,7 +16,7 @@ export interface Subscription {
   lojou_subscription_id: string;
   current_period_start: string;
   current_period_end: string;
-  cancel_at_period_end: number;
+  cancel_at_period_end: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -66,28 +65,58 @@ function getCurrentPeriod(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function getClinicId(): number {
-  const clinic = db.prepare("SELECT id FROM clinics LIMIT 1").get() as { id: number } | undefined;
-  return clinic?.id ?? 1;
+async function getClinicId(): Promise<number> {
+  const { data, error } = await supabaseAdmin.from("clinics").select("id").limit(1);
+  if (error) console.error("[plan-limits] Falha ao resolver a clínica:", error.message);
+  return data?.[0]?.id ?? 1;
+}
+
+async function countRows(
+  table: "professionals" | "clinic_members" | "units",
+  clinicId: number
+): Promise<number> {
+  const query = supabaseAdmin
+    .from(table)
+    .select("id", { count: "exact", head: true })
+    .eq("clinic_id", clinicId);
+
+  const { count, error } =
+    table === "professionals" ? await query.eq("status", "active") : await query.eq("active", true);
+
+  if (error) {
+    console.error(`[plan-limits] Falha ao contar ${table}:`, error.message);
+    return 0;
+  }
+  return count ?? 0;
 }
 
 // ── Subscription ───────────────────────────────────────────────────────
 
-export function getSubscription(clinicId?: number): Subscription | null {
-  const cid = clinicId ?? getClinicId();
-  const row = db.prepare("SELECT * FROM subscriptions WHERE clinic_id = ? ORDER BY id DESC LIMIT 1").get(cid);
-  return (row as Subscription | undefined) ?? null;
+export async function getSubscription(clinicId?: number): Promise<Subscription | null> {
+  const cid = clinicId ?? (await getClinicId());
+  const { data, error } = await supabaseAdmin
+    .from("subscriptions")
+    .select("*")
+    .eq("clinic_id", cid)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (error) {
+    console.error("[plan-limits] Falha ao consultar a assinatura:", error.message);
+    return null;
+  }
+  return (data?.[0] as unknown as Subscription) ?? null;
 }
 
-export function getActiveSubscription(clinicId?: number): Subscription | null {
-  const sub = getSubscription(clinicId);
+export async function getActiveSubscription(clinicId?: number): Promise<Subscription | null> {
+  const sub = await getSubscription(clinicId);
   if (!sub) return null;
   if (sub.status === "active" || sub.status === "trialing") return sub;
   return null;
 }
 
-export function getClinicPlan(clinicId?: number): Plan {
-  const sub = getActiveSubscription(clinicId);
+export async function getClinicPlan(clinicId?: number): Promise<Plan> {
+  const sub = await getActiveSubscription(clinicId);
   if (sub) {
     return getPlan(sub.plan_id);
   }
@@ -95,40 +124,46 @@ export function getClinicPlan(clinicId?: number): Plan {
   return getPlan("start");
 }
 
-export function getSubscriptionStatus(clinicId?: number): SubscriptionStatus {
-  const sub = getSubscription(clinicId);
+export async function getSubscriptionStatus(clinicId?: number): Promise<SubscriptionStatus> {
+  const sub = await getSubscription(clinicId);
   return sub?.status ?? "none";
 }
 
-export function createSubscription(data: {
+export async function createSubscription(data: {
   clinic_id: number;
   plan_id: PlanId;
   lojou_customer_id?: string;
   lojou_subscription_id?: string;
   current_period_start?: string;
   current_period_end?: string;
-}): Subscription {
+}): Promise<Subscription> {
   const now = nowStr();
-  const result = db
-    .prepare(
-      `INSERT INTO subscriptions (clinic_id, plan_id, status, lojou_customer_id, lojou_subscription_id, current_period_start, current_period_end, cancel_at_period_end, created_at, updated_at)
-       VALUES (?, ?, 'active', ?, ?, ?, ?, 0, ?, ?)`
-    )
-    .run(
-      data.clinic_id,
-      data.plan_id,
-      data.lojou_customer_id ?? "",
-      data.lojou_subscription_id ?? "",
-      data.current_period_start ?? now,
-      data.current_period_end ?? now,
-      now,
-      now
-    );
-  return db.prepare("SELECT * FROM subscriptions WHERE id = ?").get(Number(result.lastInsertRowid)) as unknown as Subscription;
+  const { data: row, error } = await supabaseAdmin
+    .from("subscriptions")
+    .insert({
+      clinic_id: data.clinic_id,
+      plan_id: data.plan_id,
+      status: "active",
+      lojou_customer_id: data.lojou_customer_id ?? "",
+      lojou_subscription_id: data.lojou_subscription_id ?? "",
+      current_period_start: data.current_period_start ?? now,
+      current_period_end: data.current_period_end ?? now,
+      cancel_at_period_end: false,
+      created_at: now,
+      updated_at: now,
+    })
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("[plan-limits] Falha ao criar a assinatura:", error.message);
+    throw new Error(`Falha ao criar a assinatura: ${error.message}`);
+  }
+  return row as unknown as Subscription;
 }
 
-export function updateSubscription(
-  id: number,
+export async function updateSubscription(
+  id: string,
   data: {
     status?: SubscriptionStatus;
     plan_id?: PlanId;
@@ -136,48 +171,55 @@ export function updateSubscription(
     lojou_subscription_id?: string;
     current_period_start?: string;
     current_period_end?: string;
-    cancel_at_period_end?: number;
+    cancel_at_period_end?: boolean;
   }
-): Subscription | null {
-  const existing = db.prepare("SELECT * FROM subscriptions WHERE id = ?").get(id) as Subscription | undefined;
+): Promise<Subscription | null> {
+  const { data: existing, error: fetchError } = await supabaseAdmin
+    .from("subscriptions")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (fetchError) {
+    console.error("[plan-limits] Falha ao consultar a assinatura:", fetchError.message);
+    return null;
+  }
   if (!existing) return null;
 
-  const now = nowStr();
-  db.prepare(
-    `UPDATE subscriptions SET
-      status = ?,
-      plan_id = ?,
-      lojou_customer_id = ?,
-      lojou_subscription_id = ?,
-      current_period_start = ?,
-      current_period_end = ?,
-      cancel_at_period_end = ?,
-      updated_at = ?
-    WHERE id = ?`
-  ).run(
-    data.status ?? existing.status,
-    data.plan_id ?? existing.plan_id,
-    data.lojou_customer_id ?? existing.lojou_customer_id,
-    data.lojou_subscription_id ?? existing.lojou_subscription_id,
-    data.current_period_start ?? existing.current_period_start,
-    data.current_period_end ?? existing.current_period_end,
-    data.cancel_at_period_end ?? existing.cancel_at_period_end,
-    now,
-    id
-  );
-  return db.prepare("SELECT * FROM subscriptions WHERE id = ?").get(id) as unknown as Subscription;
+  const current = existing as unknown as Subscription;
+  const { data: updated, error } = await supabaseAdmin
+    .from("subscriptions")
+    .update({
+      status: data.status ?? current.status,
+      plan_id: data.plan_id ?? current.plan_id,
+      lojou_customer_id: data.lojou_customer_id ?? current.lojou_customer_id,
+      lojou_subscription_id: data.lojou_subscription_id ?? current.lojou_subscription_id,
+      current_period_start: data.current_period_start ?? current.current_period_start,
+      current_period_end: data.current_period_end ?? current.current_period_end,
+      cancel_at_period_end: data.cancel_at_period_end ?? current.cancel_at_period_end,
+      updated_at: nowStr(),
+    })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    console.error("[plan-limits] Falha ao actualizar a assinatura:", error.message);
+    return null;
+  }
+  return (updated as unknown as Subscription) ?? null;
 }
 
 // ── Feature Gating ─────────────────────────────────────────────────────
 
-export function hasFeature(clinicId: number | undefined, feature: FeatureId): boolean {
-  const plan = getClinicPlan(clinicId);
+export async function hasFeature(clinicId: number | undefined, feature: FeatureId): Promise<boolean> {
+  const plan = await getClinicPlan(clinicId);
   return plan.features.includes(feature);
 }
 
-export function requireFeature(clinicId: number | undefined, feature: FeatureId): void {
-  if (!hasFeature(clinicId, feature)) {
-    const plan = getClinicPlan(clinicId);
+export async function requireFeature(clinicId: number | undefined, feature: FeatureId): Promise<void> {
+  if (!(await hasFeature(clinicId, feature))) {
+    const plan = await getClinicPlan(clinicId);
     throw new PlanLimitError(
       `O recurso "${feature}" não está disponível no plano ${plan.name}. Faça upgrade para desbloquear.`,
       plan.name
@@ -196,96 +238,120 @@ export class PlanLimitError extends Error {
   }
 }
 
-function countActiveDoctors(clinicId: number): number {
-  const row = db.prepare("SELECT COUNT(*) as c FROM doctors WHERE clinic_id = ? AND status = 'active'").get(clinicId) as { c: number };
-  return row.c;
-}
-
-function countActiveAdminUsers(clinicId: number): number {
-  const row = db.prepare("SELECT COUNT(*) as c FROM clinic_members WHERE clinic_id = ? AND active = 1").get(clinicId) as { c: number } | undefined;
-  return row?.c ?? 0;
-}
-
-function countUnits(clinicId: number): number {
-  const row = db.prepare("SELECT COUNT(*) as c FROM clinic_units WHERE clinic_id = ? AND active = 1").get(clinicId) as { c: number } | undefined;
-  return row?.c ?? 0;
-}
-
-export function canAddProfessional(clinicId?: number): LimitCheck {
-  const cid = clinicId ?? getClinicId();
-  const plan = getClinicPlan(cid);
-  const current = countActiveDoctors(cid);
-  const limit = plan.limits.maxProfessionals;
+function buildLimitCheck(
+  current: number,
+  limit: number,
+  planName: string,
+  nouns: { limit: string; more: string; add: string }
+): LimitCheck {
   const remaining = isFinite(limit) ? limit - current : Infinity;
-
   return {
     allowed: isFinite(limit) ? current < limit : true,
     current,
     limit,
     remaining,
-    planName: plan.name,
+    planName,
     message: isFinite(limit)
       ? current >= limit
-        ? `Você atingiu o limite de ${limit} profissionais do plano ${plan.name}. Faça upgrade para adicionar mais profissionais.`
-        : `Pode adicionar ${remaining} profissional(is).`
+        ? `Você atingiu o limite de ${limit} ${nouns.limit} do plano ${planName}. Faça upgrade para adicionar ${nouns.more}.`
+        : `Pode adicionar ${remaining} ${nouns.add}.`
       : "Limite personalizado.",
   };
 }
 
-export function canAddAdminUser(clinicId?: number): LimitCheck {
-  const cid = clinicId ?? getClinicId();
-  const plan = getClinicPlan(cid);
-  const current = countActiveAdminUsers(cid);
-  const limit = plan.limits.maxAdminUsers;
-  const remaining = isFinite(limit) ? limit - current : Infinity;
-
-  return {
-    allowed: isFinite(limit) ? current < limit : true,
-    current,
-    limit,
-    remaining,
-    planName: plan.name,
-    message: isFinite(limit)
-      ? current >= limit
-        ? `Você atingiu o limite de ${limit} usuários administrativos do plano ${plan.name}. Faça upgrade para adicionar mais.`
-        : `Pode adicionar ${remaining} usuário(s) administrativo(s).`
-      : "Limite personalizado.",
-  };
+export async function canAddProfessional(clinicId?: number): Promise<LimitCheck> {
+  const cid = clinicId ?? (await getClinicId());
+  const plan = await getClinicPlan(cid);
+  const current = await countRows("professionals", cid);
+  return buildLimitCheck(current, plan.limits.maxProfessionals, plan.name, {
+    limit: "profissionais",
+    more: "mais profissionais",
+    add: "profissional(is)",
+  });
 }
 
-export function canAddUnit(clinicId?: number): LimitCheck {
-  const cid = clinicId ?? getClinicId();
-  const plan = getClinicPlan(cid);
-  const current = countUnits(cid);
-  const limit = plan.limits.maxUnits;
-  const remaining = isFinite(limit) ? limit - current : Infinity;
+export async function canAddAdminUser(clinicId?: number): Promise<LimitCheck> {
+  const cid = clinicId ?? (await getClinicId());
+  const plan = await getClinicPlan(cid);
+  const current = await countRows("clinic_members", cid);
+  return buildLimitCheck(current, plan.limits.maxAdminUsers, plan.name, {
+    limit: "usuários administrativos",
+    more: "mais",
+    add: "usuário(s) administrativo(s)",
+  });
+}
 
-  return {
-    allowed: isFinite(limit) ? current < limit : true,
-    current,
-    limit,
-    remaining,
-    planName: plan.name,
-    message: isFinite(limit)
-      ? current >= limit
-        ? `Você atingiu o limite de ${limit} unidade(s) do plano ${plan.name}. Faça upgrade para adicionar mais.`
-        : `Pode adicionar ${remaining} unidade(s).`
-      : "Limite personalizado.",
-  };
+export async function canAddUnit(clinicId?: number): Promise<LimitCheck> {
+  const cid = clinicId ?? (await getClinicId());
+  const plan = await getClinicPlan(cid);
+  const current = await countRows("units", cid);
+  return buildLimitCheck(current, plan.limits.maxUnits, plan.name, {
+    limit: "unidade(s)",
+    more: "mais",
+    add: "unidade(s)",
+  });
 }
 
 // ── WhatsApp Usage ─────────────────────────────────────────────────────
 
-export function getWhatsappUsage(clinicId?: number): UsageCheck {
-  const cid = clinicId ?? getClinicId();
-  const plan = getClinicPlan(cid);
+async function readUsage(
+  clinicId: number,
+  period: string
+): Promise<{ whatsapp: number; ai: number; id: string | null }> {
+  const { data, error } = await supabaseAdmin
+    .from("usage")
+    .select("id, whatsapp_conversations, ai_interactions")
+    .eq("clinic_id", clinicId)
+    .eq("period", period)
+    .limit(1);
+
+  if (error) {
+    console.error("[plan-limits] Falha ao consultar o consumo:", error.message);
+    return { whatsapp: 0, ai: 0, id: null };
+  }
+  const row = data?.[0];
+  return {
+    whatsapp: row?.whatsapp_conversations ?? 0,
+    ai: row?.ai_interactions ?? 0,
+    id: row?.id ?? null,
+  };
+}
+
+async function writeUsage(
+  clinicId: number,
+  period: string,
+  patch: Record<string, unknown>
+): Promise<void> {
+  const now = nowStr();
+  const existing = await readUsage(clinicId, period);
+
+  if (existing.id) {
+    const { error } = await supabaseAdmin
+      .from("usage")
+      .update({ ...patch, updated_at: now })
+      .eq("id", existing.id);
+    if (error) console.error("[plan-limits] Falha ao actualizar o consumo:", error.message);
+    return;
+  }
+
+  const { error } = await supabaseAdmin.from("usage").insert({
+    clinic_id: clinicId,
+    period,
+    whatsapp_conversations: 0,
+    ai_interactions: 0,
+    ...patch,
+    created_at: now,
+    updated_at: now,
+  });
+  if (error) console.error("[plan-limits] Falha ao criar o consumo:", error.message);
+}
+
+export async function getWhatsappUsage(clinicId?: number): Promise<UsageCheck> {
+  const cid = clinicId ?? (await getClinicId());
+  const plan = await getClinicPlan(cid);
   const period = getCurrentPeriod();
   const limit = plan.limits.maxWhatsappConversations;
-
-  const row = db
-    .prepare("SELECT whatsapp_conversations FROM usage WHERE clinic_id = ? AND period = ?")
-    .get(cid, period) as { whatsapp_conversations: number } | undefined;
-  const current = row?.whatsapp_conversations ?? 0;
+  const current = (await readUsage(cid, period)).whatsapp;
 
   const remaining = isFinite(limit) ? Math.max(0, limit - current) : Infinity;
 
@@ -302,42 +368,25 @@ export function getWhatsappUsage(clinicId?: number): UsageCheck {
   };
 }
 
-export function canSendWhatsapp(clinicId?: number): boolean {
-  return getWhatsappUsage(clinicId).allowed;
+export async function canSendWhatsapp(clinicId?: number): Promise<boolean> {
+  return (await getWhatsappUsage(clinicId)).allowed;
 }
 
-export function incrementWhatsappUsage(clinicId?: number, amount = 1): void {
-  const cid = clinicId ?? getClinicId();
+export async function incrementWhatsappUsage(clinicId?: number, amount = 1): Promise<void> {
+  const cid = clinicId ?? (await getClinicId());
   const period = getCurrentPeriod();
-  const now = nowStr();
-
-  const existing = db
-    .prepare("SELECT id FROM usage WHERE clinic_id = ? AND period = ?")
-    .get(cid, period) as { id: number } | undefined;
-
-  if (existing) {
-    db.prepare(
-      "UPDATE usage SET whatsapp_conversations = whatsapp_conversations + ?, updated_at = ? WHERE id = ?"
-    ).run(amount, now, existing.id);
-  } else {
-    db.prepare(
-      "INSERT INTO usage (clinic_id, period, whatsapp_conversations, ai_interactions, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?)"
-    ).run(cid, period, amount, now, now);
-  }
+  const current = (await readUsage(cid, period)).whatsapp;
+  await writeUsage(cid, period, { whatsapp_conversations: current + amount });
 }
 
 // ── AI Usage ───────────────────────────────────────────────────────────
 
-export function getAiUsage(clinicId?: number): UsageCheck {
-  const cid = clinicId ?? getClinicId();
-  const plan = getClinicPlan(cid);
+export async function getAiUsage(clinicId?: number): Promise<UsageCheck> {
+  const cid = clinicId ?? (await getClinicId());
+  const plan = await getClinicPlan(cid);
   const period = getCurrentPeriod();
   const limit = plan.limits.maxAiInteractions;
-
-  const row = db
-    .prepare("SELECT ai_interactions FROM usage WHERE clinic_id = ? AND period = ?")
-    .get(cid, period) as { ai_interactions: number } | undefined;
-  const current = row?.ai_interactions ?? 0;
+  const current = (await readUsage(cid, period)).ai;
 
   const remaining = isFinite(limit) ? Math.max(0, limit - current) : Infinity;
 
@@ -354,44 +403,33 @@ export function getAiUsage(clinicId?: number): UsageCheck {
   };
 }
 
-export function canUseAI(clinicId?: number): boolean {
-  return getAiUsage(clinicId).allowed;
+export async function canUseAI(clinicId?: number): Promise<boolean> {
+  return (await getAiUsage(clinicId)).allowed;
 }
 
-export function canUseAiInteraction(clinicId?: number): boolean {
+export async function canUseAiInteraction(clinicId?: number): Promise<boolean> {
   return canUseAI(clinicId);
 }
 
-export function incrementAiUsage(clinicId?: number, amount = 1): void {
-  const cid = clinicId ?? getClinicId();
+export async function incrementAiUsage(clinicId?: number, amount = 1): Promise<void> {
+  const cid = clinicId ?? (await getClinicId());
   const period = getCurrentPeriod();
-  const now = nowStr();
-
-  const existing = db
-    .prepare("SELECT id FROM usage WHERE clinic_id = ? AND period = ?")
-    .get(cid, period) as { id: number } | undefined;
-
-  if (existing) {
-    db.prepare(
-      "UPDATE usage SET ai_interactions = ai_interactions + ?, updated_at = ? WHERE id = ?"
-    ).run(amount, now, existing.id);
-  } else {
-    db.prepare(
-      "INSERT INTO usage (clinic_id, period, whatsapp_conversations, ai_interactions, created_at, updated_at) VALUES (?, ?, 0, ?, ?, ?)"
-    ).run(cid, period, amount, now, now);
-  }
+  const current = (await readUsage(cid, period)).ai;
+  await writeUsage(cid, period, { ai_interactions: current + amount });
 }
 
 // ── Dashboard Usage ────────────────────────────────────────────────────
 
-export function getUsageDashboard(clinicId?: number) {
-  const cid = clinicId ?? getClinicId();
-  const plan = getClinicPlan(cid);
-  const whatsapp = getWhatsappUsage(cid);
-  const ai = getAiUsage(cid);
-  const professionals = canAddProfessional(cid);
-  const adminUsers = canAddAdminUser(cid);
-  const units = canAddUnit(cid);
+export async function getUsageDashboard(clinicId?: number) {
+  const cid = clinicId ?? (await getClinicId());
+  const plan = await getClinicPlan(cid);
+  const [whatsapp, ai, professionals, adminUsers, units] = await Promise.all([
+    getWhatsappUsage(cid),
+    getAiUsage(cid),
+    canAddProfessional(cid),
+    canAddAdminUser(cid),
+    canAddUnit(cid),
+  ]);
 
   return {
     plan: {
@@ -436,29 +474,32 @@ export function getUsageDashboard(clinicId?: number) {
 
 // ── Downgrade Check ────────────────────────────────────────────────────
 
-export function canDowngradeTo(targetPlanId: PlanId, clinicId?: number): {
-  allowed: boolean;
-  issues: string[];
-} {
-  const cid = clinicId ?? getClinicId();
+export async function canDowngradeTo(
+  targetPlanId: PlanId,
+  clinicId?: number
+): Promise<{ allowed: boolean; issues: string[] }> {
+  const cid = clinicId ?? (await getClinicId());
   const targetPlan = getPlan(targetPlanId);
   const issues: string[] = [];
 
-  const professionalCheck = canAddProfessional(cid);
+  const [professionalCheck, adminCheck, unitsCheck] = await Promise.all([
+    canAddProfessional(cid),
+    canAddAdminUser(cid),
+    canAddUnit(cid),
+  ]);
+
   if (professionalCheck.current > targetPlan.limits.maxProfessionals && isFinite(targetPlan.limits.maxProfessionals)) {
     issues.push(
       `Sua clínica possui ${professionalCheck.current} profissionais, mas o plano ${targetPlan.name} permite apenas ${targetPlan.limits.maxProfessionals}. Reduza a quantidade de profissionais ativos ou escolha outro plano.`
     );
   }
 
-  const adminCheck = canAddAdminUser(cid);
   if (adminCheck.current > targetPlan.limits.maxAdminUsers && isFinite(targetPlan.limits.maxAdminUsers)) {
     issues.push(
       `Sua clínica possui ${adminCheck.current} usuários administrativos, mas o plano ${targetPlan.name} permite apenas ${targetPlan.limits.maxAdminUsers}.`
     );
   }
 
-  const unitsCheck = canAddUnit(cid);
   if (unitsCheck.current > targetPlan.limits.maxUnits && isFinite(targetPlan.limits.maxUnits)) {
     issues.push(
       `Sua clínica possui ${unitsCheck.current} unidades, mas o plano ${targetPlan.name} permite apenas ${targetPlan.limits.maxUnits}.`

@@ -5,20 +5,18 @@ const globalForScheduler = globalThis as unknown as { saudesyncScheduler?: NodeJ
 
 const INTERVAL_MS = 60_000;
 
+function safe(task: () => Promise<unknown>, label: string): void {
+  void task().catch((err) => {
+    console.error(`[scheduler] Falha em ${label}:`, err);
+  });
+}
+
 export function startReminderScheduler(): void {
   if (globalForScheduler.saudesyncScheduler) return;
-  runReminderCheck();
-  runSubscriptionCycleCheck();
+  safe(runReminderCheck, "runReminderCheck");
+  safe(runSubscriptionCycleCheck, "runSubscriptionCycleCheck");
   globalForScheduler.saudesyncScheduler = setInterval(() => {
-    try {
-      runReminderCheck();
-    } catch {
-      // mantém o agendador vivo mesmo em caso de erro pontual
-    }
-    try {
-      runSubscriptionCycleCheck();
-    } catch {
-      // mantém o agendador vivo mesmo em caso de erro pontual
-    }
+    safe(runReminderCheck, "runReminderCheck");
+    safe(runSubscriptionCycleCheck, "runSubscriptionCycleCheck");
   }, INTERVAL_MS);
 }

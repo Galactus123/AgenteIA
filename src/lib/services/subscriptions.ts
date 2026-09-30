@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { supabaseAdmin } from "@/lib/supabase";
 import { getClinic } from "@/lib/services/clinics";
 import { nowStr } from "@/lib/datetime";
 import { sendKomunikaMessage } from "@/lib/services/komunika";
@@ -15,8 +15,8 @@ const overagePackPrice = () => {
   return Number.isFinite(configured) && configured > 0 ? configured : OVERAGE_PACK_PRICE_MZN;
 };
 
-export function getSubscription(): SubscriptionInfo | null {
-  const clinic = getClinic();
+export async function getSubscription(): Promise<SubscriptionInfo | null> {
+  const clinic = await getClinic();
   if (!clinic) return null;
   const usagePercent =
     clinic.token_limit > 0
@@ -31,73 +31,95 @@ export function getSubscription(): SubscriptionInfo | null {
 }
 
 // Guard pré-chamada de IA: só libera a chamada se houver cota disponível.
-export function hasAiQuota(): boolean {
-  const clinic = getClinic();
+export async function hasAiQuota(): Promise<boolean> {
+  const clinic = await getClinic();
   if (!clinic) return false;
   return clinic.current_token_usage < clinic.token_limit;
 }
 
 // Contabilidade pós-chamada: acumula tokens consumidos e dispara alerta de 80%.
-export function consumeTokens(amount: number): { clinic: Clinic | null; nearLimitAlert: boolean } {
-  const clinic = getClinic();
+export async function consumeTokens(
+  amount: number
+): Promise<{ clinic: Clinic | null; nearLimitAlert: boolean }> {
+  const clinic = await getClinic();
   if (!clinic) return { clinic: null, nearLimitAlert: false };
 
   const usage = clinic.current_token_usage + Math.max(0, Math.round(amount));
-  db.prepare("UPDATE clinics SET current_token_usage = ? WHERE id = ?").run(usage, clinic.id);
-
+  const patch: Record<string, unknown> = { current_token_usage: usage };
   let nearLimitAlert = false;
+
   if (usage >= clinic.token_limit) {
-    db.prepare("UPDATE clinics SET subscription_status = 'quota_exhausted' WHERE id = ?").run(clinic.id);
+    patch.subscription_status = "quota_exhausted";
   } else if (!clinic.near_limit_notified && usage >= clinic.token_limit * NEAR_LIMIT_THRESHOLD) {
-    db.prepare("UPDATE clinics SET near_limit_notified = 1 WHERE id = ?").run(clinic.id);
-    createAlert(
-      "near_limit",
-      "A clínica atingiu 80% da cota mensal de tokens da IA. Considere adquirir um pacote excedente."
-    );
+    patch.near_limit_notified = 1;
     nearLimitAlert = true;
   }
 
-  return { clinic: getClinic(), nearLimitAlert };
+  await updateClinicRow(clinic.id, patch);
+
+  if (nearLimitAlert) {
+    await createAlert(
+      "near_limit",
+      "A clínica atingiu 80% da cota mensal de tokens da IA. Considere adquirir um pacote excedente."
+    );
+  }
+
+  return { clinic: await getClinic(), nearLimitAlert };
 }
 
 // Bloqueia a clínica por cota esgotada e notifica a recepção (uma única vez por ciclo).
-export function blockForQuota(patientPhone?: string): void {
-  const clinic = getClinic();
+export async function blockForQuota(patientPhone?: string): Promise<void> {
+  const clinic = await getClinic();
   if (!clinic) return;
   const alreadyBlocked = clinic.subscription_status === "quota_exhausted";
-  db.prepare("UPDATE clinics SET subscription_status = 'quota_exhausted' WHERE id = ?").run(clinic.id);
+  await updateClinicRow(clinic.id, { subscription_status: "quota_exhausted" });
   if (alreadyBlocked) return;
 
-  createAlert(
+  await createAlert(
     "quota_exhausted",
     "A cota de tokens da IA foi esgotada. As novas conversas serão transferidas para atendimento humano até a compra de um pacote excedente."
   );
   if (patientPhone) {
-    void notifyReception(
+    await notifyReception(
       `Atenção recepção: a cota de tokens da IA da clínica foi esgotada. O paciente ${patientPhone} foi transferido para atendimento manual.`
     );
   }
 }
 
-export function createAlert(type: string, message: string): ClinicAlert {
-  const clinic = getClinic();
+export async function createAlert(type: string, message: string): Promise<ClinicAlert> {
+  const clinic = await getClinic();
   const clinicId = clinic?.id ?? 1;
-  const result = db
-    .prepare("INSERT INTO clinic_alerts (clinic_id, type, message, created_at) VALUES (?, ?, ?, ?)")
-    .run(clinicId, type, message, nowStr());
-  return db
-    .prepare("SELECT * FROM clinic_alerts WHERE id = ?")
-    .get(Number(result.lastInsertRowid)) as unknown as ClinicAlert;
+
+  const { data, error } = await supabaseAdmin
+    .from("clinic_alerts")
+    .insert({ clinic_id: clinicId, type, message, created_at: nowStr() })
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error("[subscriptions] Falha ao criar alerta:", error.message);
+    throw new Error(`Falha ao criar alerta: ${error.message}`);
+  }
+  return data as unknown as ClinicAlert;
 }
 
-export function listAlerts(limit = 30): ClinicAlert[] {
-  return db
-    .prepare("SELECT * FROM clinic_alerts ORDER BY created_at DESC, id DESC LIMIT ?")
-    .all(limit) as unknown as ClinicAlert[];
+export async function listAlerts(limit = 30): Promise<ClinicAlert[]> {
+  const { data, error } = await supabaseAdmin
+    .from("clinic_alerts")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("[subscriptions] Falha ao listar alertas:", error.message);
+    return [];
+  }
+  return (data ?? []) as unknown as ClinicAlert[];
 }
 
 export async function notifyReception(message: string): Promise<void> {
-  const clinic = getClinic();
+  const clinic = await getClinic();
   if (!clinic?.whatsapp) return;
   try {
     await sendKomunikaMessage(clinic.whatsapp, message, { type: "text" });
@@ -107,43 +129,57 @@ export async function notifyReception(message: string): Promise<void> {
 }
 
 // Compra de pacote excedente de 50.000 tokens (gestor/admin autenticado).
-export function buyOveragePack(): { clinic: Clinic | null; billingEvent: BillingEvent } {
-  const clinic = getClinic();
+export async function buyOveragePack(): Promise<{ clinic: Clinic | null; billingEvent: BillingEvent }> {
+  const clinic = await getClinic();
   if (!clinic) throw new Error("Clínica não encontrada.");
 
   const newTokenLimit = clinic.token_limit + OVERAGE_PACK_TOKENS;
-  db.prepare(
-    "UPDATE clinics SET token_limit = token_limit + ?, overage_blocks_purchased = overage_blocks_purchased + 1, subscription_status = 'active' WHERE id = ?"
-  ).run(OVERAGE_PACK_TOKENS, clinic.id);
+  const { error: limitError } = await supabaseAdmin
+    .from("clinics")
+    .update({
+      token_limit: clinic.token_limit + OVERAGE_PACK_TOKENS,
+      overage_blocks_purchased: clinic.overage_blocks_purchased + 1,
+      subscription_status: "active",
+    })
+    .eq("id", clinic.id);
 
-  const eventResult = db
-    .prepare(
-      "INSERT INTO billing_events (clinic_id, type, amount, currency, tokens, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-    )
-    .run(
-      clinic.id,
-      "overage_pack",
-      overagePackPrice(),
-      OVERAGE_PACK_CURRENCY,
-      OVERAGE_PACK_TOKENS,
-      `Pacote excedente de ${OVERAGE_PACK_TOKENS.toLocaleString("pt-BR")} tokens`,
-      nowStr()
-    );
-  const billingEvent = db
-    .prepare("SELECT * FROM billing_events WHERE id = ?")
-    .get(Number(eventResult.lastInsertRowid)) as unknown as BillingEvent;
+  if (limitError) throw new Error(`Falha ao atualizar a cota: ${limitError.message}`);
 
-  createAlert("overage_pack", "Pacote excedente de 50.000 tokens adquirido. Atendimento automático por IA reativado.");
+  const { data: billingData, error: billingError } = await supabaseAdmin
+    .from("billing_events")
+    .insert({
+      clinic_id: clinic.id,
+      type: "overage_pack",
+      amount: overagePackPrice(),
+      currency: OVERAGE_PACK_CURRENCY,
+      tokens: OVERAGE_PACK_TOKENS,
+      description: `Pacote excedente de ${OVERAGE_PACK_TOKENS.toLocaleString("pt-BR")} tokens`,
+      created_at: nowStr(),
+    })
+    .select("*")
+    .single();
+
+  if (billingError) throw new Error(`Falha ao registar a cobrança: ${billingError.message}`);
+  const billingEvent = billingData as unknown as BillingEvent;
+
+  await createAlert(
+    "overage_pack",
+    "Pacote excedente de 50.000 tokens adquirido. Atendimento automático por IA reativado."
+  );
   console.log(
     `[subscriptions] Pacote excedente adquirido: token_limit=${newTokenLimit.toLocaleString("pt-BR")}, blocos=${clinic.overage_blocks_purchased + 1}`
   );
 
-  sendReceiptByWhatsApp(clinic, billingEvent, newTokenLimit);
+  await sendReceiptByWhatsApp(clinic, billingEvent, newTokenLimit);
 
-  return { clinic: getClinic(), billingEvent };
+  return { clinic: await getClinic(), billingEvent };
 }
 
-function sendReceiptByWhatsApp(clinic: Clinic, billingEvent: BillingEvent, newTokenLimit: number): void {
+async function sendReceiptByWhatsApp(
+  clinic: Clinic,
+  billingEvent: BillingEvent,
+  newTokenLimit: number
+): Promise<void> {
   if (!clinic.whatsapp) return;
   const receiptData: OverageReceiptData = {
     clinicName: clinic.name,
@@ -154,12 +190,20 @@ function sendReceiptByWhatsApp(clinic: Clinic, billingEvent: BillingEvent, newTo
     tokens: OVERAGE_PACK_TOKENS,
     newTokenLimit,
   };
-  void sendKomunikaMessage(clinic.whatsapp, renderOverageReceiptText(receiptData), { type: "text" });
+  try {
+    await sendKomunikaMessage(
+      clinic.whatsapp,
+      renderOverageReceiptText(receiptData),
+      { type: "text" }
+    );
+  } catch (err) {
+    console.error("[subscriptions] Falha ao enviar o recibo:", err);
+  }
 }
 
 // Reset mensal de ciclo de faturamento (cron job no scheduler do processo).
-export function runSubscriptionCycleCheck(): void {
-  const clinic = getClinic();
+export async function runSubscriptionCycleCheck(): Promise<void> {
+  const clinic = await getClinic();
   if (!clinic) return;
 
   const now = new Date();
@@ -169,17 +213,38 @@ export function runSubscriptionCycleCheck(): void {
   const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   if (clinic.last_reset_at && clinic.last_reset_at.slice(0, 7) === monthKey) return;
 
-  resetSubscriptionCycle();
+  await resetSubscriptionCycle();
 }
 
-export function resetSubscriptionCycle(): void {
-  const clinic = getClinic();
+export async function resetSubscriptionCycle(): Promise<void> {
+  const clinic = await getClinic();
   if (!clinic) return;
 
-  db.prepare(
-    "UPDATE clinics SET current_token_usage = 0, near_limit_notified = 0, overage_blocks_purchased = 0, token_limit = base_token_limit, subscription_status = 'active', last_reset_at = ? WHERE id = ?"
-  ).run(nowStr(), clinic.id);
+  const { error } = await supabaseAdmin
+    .from("clinics")
+    .update({
+      current_token_usage: 0,
+      near_limit_notified: 0,
+      overage_blocks_purchased: 0,
+      token_limit: clinic.base_token_limit,
+      subscription_status: "active",
+      last_reset_at: nowStr(),
+    })
+    .eq("id", clinic.id);
 
-  createAlert("cycle_reset", "Novo ciclo de faturamento iniciado. A cota de tokens da IA foi restaurada.");
+  if (error) {
+    console.error("[subscriptions] Falha ao reiniciar o ciclo:", error.message);
+    return;
+  }
+
+  await createAlert(
+    "cycle_reset",
+    "Novo ciclo de faturamento iniciado. A cota de tokens da IA foi restaurada."
+  );
   console.log(`[subscriptions] Ciclo de faturamento resetado para a clínica ${clinic.id}`);
+}
+
+async function updateClinicRow(clinicId: number, patch: Record<string, unknown>): Promise<void> {
+  const { error } = await supabaseAdmin.from("clinics").update(patch).eq("id", clinicId);
+  if (error) console.error("[subscriptions] Falha ao atualizar a clínica:", error.message);
 }

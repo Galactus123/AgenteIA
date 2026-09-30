@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent, useEffect } from "react";
+import { useState, FormEvent, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
 import { Activity } from "lucide-react";
@@ -14,18 +14,30 @@ const inter = Inter({
 
 type Panel = "signin" | "signup";
 
+const MOBILE_MEDIA_QUERY = "(max-width: 767px)";
+
+function subscribeMobile(onStoreChange: () => void) {
+  const mq = window.matchMedia(MOBILE_MEDIA_QUERY);
+  mq.addEventListener("change", onStoreChange);
+  return () => mq.removeEventListener("change", onStoreChange);
+}
+
+function getIsMobileSnapshot() {
+  return window.matchMedia(MOBILE_MEDIA_QUERY).matches;
+}
+
+function getIsMobileServerSnapshot() {
+  return false;
+}
+
 export default function AuthPage() {
   const router = useRouter();
   const [activePanel, setActivePanel] = useState<Panel>("signin");
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
-    setIsMobile(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
+  const isMobile = useSyncExternalStore(
+    subscribeMobile,
+    getIsMobileSnapshot,
+    getIsMobileServerSnapshot
+  );
 
   // ── Sign In state ──────────────────────────────────────────────────
   const [loginEmail, setLoginEmail] = useState("");

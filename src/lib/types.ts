@@ -52,9 +52,9 @@ export interface Specialty {
 }
 
 export interface Doctor {
-  id: number;
+  id: string;
   name: string;
-  specialty_id: number;
+  specialty_id: number | null;
   consultation_duration: number;
   price: number;
   status: string;
@@ -62,8 +62,6 @@ export interface Doctor {
 }
 
 export interface DoctorSchedule {
-  id: number;
-  doctor_id: number;
   weekday: number;
   start_time: string;
   end_time: string;
@@ -74,7 +72,7 @@ export interface Appointment {
   patient_name: string;
   patient_phone: string;
   specialty_id: number;
-  doctor_id: number;
+  professional_id: string | null;
   starts_at: string;
   ends_at: string;
   status: AppointmentStatus;
@@ -115,7 +113,7 @@ export interface Message {
 }
 
 export interface AvailableSlot {
-  doctor_id: number;
+  professional_id: string;
   doctor_name: string;
   specialty_id: number;
   specialty_name: string;
@@ -133,7 +131,7 @@ export interface Notification {
   title: string;
   message: string;
   appointment_id: number | null;
-  doctor_id: number | null;
+  professional_id: string | null;
   read: number;
   channel_status: NotificationChannelStatus;
   created_at: string;
@@ -152,7 +150,7 @@ export interface User {
 }
 
 export interface SubscriptionRecord {
-  id: number;
+  id: string;
   clinic_id: number;
   plan_id: string;
   status: string;
@@ -160,34 +158,32 @@ export interface SubscriptionRecord {
   lojou_subscription_id: string;
   current_period_start: string;
   current_period_end: string;
-  cancel_at_period_end: number;
+  cancel_at_period_end: boolean;
   created_at: string;
   updated_at: string;
 }
 
 export interface ClinicMember {
-  id: number;
+  id: string;
   clinic_id: number;
-  user_id: number | null;
-  admin_id: number | null;
+  user_id: string;
   role: string;
-  professional_id: number | null;
-  active: number;
+  active: boolean;
   created_at: string;
 }
 
 export interface ClinicUnit {
-  id: number;
+  id: string;
   clinic_id: number;
   name: string;
   address: string;
   phone: string;
-  active: number;
+  active: boolean;
   created_at: string;
 }
 
 export interface ClinicUsage {
-  id: number;
+  id: string;
   clinic_id: number;
   period: string;
   whatsapp_conversations: number;

@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
   const phone = request.nextUrl.searchParams.get("phone");
   if (!phone) return NextResponse.json({ error: "Número obrigatório." }, { status: 400 });
-  const conversation = getConversationByPhone(phone);
+  const conversation = await getConversationByPhone(phone);
   if (!conversation) return NextResponse.json({ conversation: null, messages: [] });
-  return NextResponse.json(getConversationMessages(conversation.id));
+  return NextResponse.json(await getConversationMessages(conversation.id));
 }

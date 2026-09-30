@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const result = buyOveragePack();
+    const result = await buyOveragePack();
     return NextResponse.json(result);
   } catch (err) {
     console.error("[api/subscription/buy-overage-pack]", err);

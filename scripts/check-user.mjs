@@ -25,7 +25,7 @@ async function main() {
   console.log("admin_profiles for OLD_ID:", JSON.stringify(apOld, null, 2));
 
   console.log("\n--- Check clinic_members ---");
-  const { data: cm, error: cmErr } = await client.from("clinic_members").select("*").eq("user_id", NEW_ID);
+  const { data: cm } = await client.from("clinic_members").select("*").eq("user_id", NEW_ID);
   console.log("clinic_members for NEW_ID:", JSON.stringify(cm, null, 2));
 
   const { data: cmOld } = await client.from("clinic_members").select("*").eq("user_id", OLD_ID);

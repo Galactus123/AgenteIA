@@ -43,11 +43,6 @@ interface PlanData {
   };
 }
 
-function formatLimit(v: number): string {
-  if (!isFinite(v) || v <= 0) return "Personalizado";
-  return v.toLocaleString("pt-BR");
-}
-
 function formatDate(d: string): string {
   if (!d) return "—";
   try {
@@ -64,7 +59,6 @@ function formatDate(d: string): string {
 export default function AssinaturaPage() {
   const [data, setData] = useState<PlanData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   useEffect(() => {
     fetch("/api/subscription/plan")
@@ -72,28 +66,6 @@ export default function AssinaturaPage() {
       .then(setData)
       .finally(() => setLoading(false));
   }, []);
-
-  async function handleCheckout() {
-    if (!data) return;
-    setCheckoutLoading(true);
-    try {
-      const res = await fetch("/api/subscription/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId: data.plan.id === "enterprise" ? "enterprise" : data.plan.id }),
-      });
-      const json = await res.json();
-      if (json.type === "checkout" && json.checkoutUrl) {
-        window.location.href = json.checkoutUrl;
-      } else if (json.type === "contact") {
-        window.location.href = json.contactUrl;
-      }
-    } catch {
-      // silently fail
-    } finally {
-      setCheckoutLoading(false);
-    }
-  }
 
   if (loading) {
     return (
@@ -240,16 +212,6 @@ export default function AssinaturaPage() {
           ))}
         </div>
       </div>
-
-      {/* Checkout Loading Overlay */}
-      {checkoutLoading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-[#161926] rounded-2xl p-8 text-center">
-            <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-sm text-slate-600 dark:text-slate-300">Redirecionando para o checkout...</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

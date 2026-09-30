@@ -27,7 +27,7 @@ const DEFAULT_STATS = {
   totalPatients: 0,
   todayAppointments: [] as { id: number; patient_name: string; doctor_name: string; specialty_name: string; starts_at: string; status: string }[],
   pendingRequests: [] as { id: number; patient_name: string; patient_phone: string; specialty_name: string; preferred_date: string; preferred_time: string; reason: string; source: string; created_at: string }[],
-  doctors: [] as { id: number; name: string; specialty_name: string; status: string; schedule: { weekday: number; start_time: string; end_time: string }[] }[],
+  doctors: [] as { id: string; name: string; specialty_name: string; status: string; schedule: { weekday: number; start_time: string; end_time: string }[] }[],
 };
 
 function safeDateLabel(): string {
@@ -61,11 +61,11 @@ function IconBox({ children, color }: { children: React.ReactNode; color: string
   );
 }
 
-function DashboardContent() {
+async function DashboardContent() {
   let stats = DEFAULT_STATS;
 
   try {
-    const loaded = getStats();
+    const loaded = await getStats();
     stats = {
       scheduled: loaded?.scheduled ?? 0,
       cancelled: loaded?.cancelled ?? 0,

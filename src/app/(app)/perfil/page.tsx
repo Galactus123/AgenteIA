@@ -35,7 +35,9 @@ export default function PerfilPage() {
   }, []);
 
   useEffect(() => {
-    loadProfile();
+    void (async () => {
+      await loadProfile();
+    })();
   }, [loadProfile]);
 
   async function handleEmailSubmit(e: FormEvent) {

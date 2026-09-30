@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { hashSync } from "bcryptjs";
-import { db } from "@/lib/db";
+import { supabaseAdmin } from "@/lib/supabase";
 import { nowStr } from "@/lib/datetime";
 import { isKomunikaConfigured, sendKomunikaMessage } from "@/lib/services/komunika";
 import { isValidPayloadSize } from "@/lib/agent/security";
-import { getPlanByPriceId, type PlanId } from "@/lib/plans";
+import { getPlanByPriceId } from "@/lib/plans";
 import {
   createSubscription,
   updateSubscription,
@@ -235,15 +235,30 @@ export async function POST(request: NextRequest) {
     // 5. Verificar idempotencia: se ja existe um utilizador com este order_id, ignorar
     //    (previne duplicacao por reenvio do webhook)
     if (orderId) {
-      const existingByOrder = db.prepare("SELECT id FROM users WHERE lojou_order_id = ?").get(orderId) as { id: number } | undefined;
-      if (existingByOrder) {
+      const { data: existingByOrder, error: orderByOrderError } = await supabaseAdmin
+        .from("users")
+        .select("id")
+        .eq("lojou_order_id", orderId)
+        .limit(1);
+      if (orderByOrderError) {
+        console.error("[lojou-webhook] Falha ao verificar pedido:", orderByOrderError.message);
+      }
+      if (existingByOrder?.length) {
         console.log("[lojou-webhook] Pedido ja processado (order_id), ignorando.");
-        return NextResponse.json({ success: true, user_id: existingByOrder.id, created: false });
+        return NextResponse.json({ success: true, user_id: existingByOrder[0].id, created: false });
       }
     }
 
     // 6. Verificar se o utilizador ja existe por email
-    const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email) as { id: number } | undefined;
+    const { data: existingRows, error: existingError } = await supabaseAdmin
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .limit(1);
+    if (existingError) {
+      console.error("[lojou-webhook] Falha ao verificar utilizador:", existingError.message);
+    }
+    const existing = existingRows?.[0];
     if (existing) {
       console.log("[lojou-webhook] Utilizador ja existe, ignorando.");
       return NextResponse.json({ success: true, user_id: existing.id, created: false });
@@ -253,14 +268,27 @@ export async function POST(request: NextRequest) {
     const tempPassword = generateTempPassword();
     const passwordHash = hashSync(tempPassword, 10);
 
-    const result = db
-      .prepare(
-        `INSERT INTO users (name, email, phone, password_hash, lojou_order_id, product_id, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, 'active', ?)`
-      )
-      .run(name, email, phone, passwordHash, orderId, productId, nowStr());
+    const { data: createdRow, error: createError } = await supabaseAdmin
+      .from("users")
+      .insert({
+        name,
+        email,
+        phone,
+        password_hash: passwordHash,
+        lojou_order_id: orderId,
+        product_id: productId,
+        status: "active",
+        created_at: nowStr(),
+      })
+      .select("id")
+      .single();
 
-    const userId = Number(result.lastInsertRowid);
+    if (createError) {
+      console.error("[lojou-webhook] Falha ao criar utilizador:", createError.message);
+      return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
+    }
+
+    const userId = Number(createdRow.id);
     console.log("[lojou-webhook] Utilizador criado: id=", userId);
 
     // 7. Enviar credenciais via Komunika WhatsApp
@@ -295,7 +323,7 @@ export async function POST(request: NextRequest) {
     // 8. Criar notificação no dashboard
     try {
       const { createNotification } = await import("@/lib/services/notifications");
-      createNotification({
+      await createNotification({
         type: "scheduled",
         title: "Nova conta criada via Lojou",
         message: `Conta criada para ${name || email} (pedido #${orderId || "N/A"}).`,
@@ -345,18 +373,36 @@ async function handleSubscriptionEvent(params: {
       return;
     }
 
-    // Buscar a clínica do utilizador (via admin_id)
-    const admin = db.prepare("SELECT id FROM admins WHERE email = ? OR id = ?").get(email, userId) as { id: number } | undefined;
-    if (!admin) {
+    // Buscar a clínica do utilizador.
+    // Nota: clinic_members não possui admin_id no Postgres (apenas user_id UUID do auth),
+    // por isso usamos o primeiro admin existente apenas para validar o contexto e
+    // recorremos à primeira clínica registada como fallback.
+    const { data: admins, error: adminError } = await supabaseAdmin
+      .from("admins")
+      .select("id")
+      .or(`email.eq.${email},id.eq.${userId}`)
+      .limit(1);
+    if (adminError) {
+      console.error("[lojou-webhook] Falha ao consultar admins:", adminError.message);
+      return;
+    }
+    if (!admins?.length) {
       console.log("[lojou-webhook] Admin não encontrado para assinatura:", email);
       return;
     }
 
-    const clinicRow = db.prepare("SELECT clinic_id FROM clinic_members WHERE admin_id = ? AND active = 1 LIMIT 1").get(admin.id) as { clinic_id: number } | undefined;
-    const clinicId = clinicRow?.clinic_id ?? 1;
+    const { data: clinics, error: clinicError } = await supabaseAdmin
+      .from("clinics")
+      .select("id")
+      .order("id", { ascending: true })
+      .limit(1);
+    const clinicId = clinics?.[0]?.id ?? 1;
+    if (clinicError) {
+      console.error("[lojou-webhook] Falha ao resolver a clínica:", clinicError.message);
+    }
 
     // Verificar idempotência
-    const existingSub = getActiveSubscription(clinicId);
+    const existingSub = await getActiveSubscription(clinicId);
     if (existingSub && existingSub.status === "active" && existingSub.plan_id === plan.id) {
       console.log("[lojou-webhook] Assinatura já ativa para este plano, ignorando.");
       return;
@@ -369,18 +415,18 @@ async function handleSubscriptionEvent(params: {
 
     if (existingSub) {
       // Atualizar assinatura existente
-      updateSubscription(existingSub.id, {
+      await updateSubscription(existingSub.id, {
         status: "active",
         plan_id: plan.id,
         lojou_subscription_id: subscriptionId,
         current_period_start: periodStart,
         current_period_end: periodEnd,
-        cancel_at_period_end: 0,
+        cancel_at_period_end: false,
       });
       console.log(`[lojou-webhook] Assinatura atualizada: clinic=${clinicId}, plan=${plan.id}`);
     } else {
       // Criar nova assinatura
-      createSubscription({
+      await createSubscription({
         clinic_id: clinicId,
         plan_id: plan.id,
         lojou_customer_id: String(userId),
@@ -394,7 +440,7 @@ async function handleSubscriptionEvent(params: {
     // Notificar
     try {
       const { createNotification } = await import("@/lib/services/notifications");
-      createNotification({
+      await createNotification({
         type: "scheduled",
         title: `Assinatura ${eventName.includes("renewed") ? "renovada" : "ativada"}`,
         message: `Plano ${plan.name} ${eventName.includes("renewed") ? "renovado" : "ativado"} para a clínica.`,

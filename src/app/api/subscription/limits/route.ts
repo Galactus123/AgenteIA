@@ -22,17 +22,17 @@ export async function GET(request: NextRequest) {
     const feature = url.searchParams.get("feature") as FeatureId | null;
 
     const limits = {
-      professionals: canAddProfessional(),
-      adminUsers: canAddAdminUser(),
-      units: canAddUnit(),
-      ai: canUseAI(),
-      whatsapp: canSendWhatsapp(),
+      professionals: await canAddProfessional(),
+      adminUsers: await canAddAdminUser(),
+      units: await canAddUnit(),
+      ai: await canUseAI(),
+      whatsapp: await canSendWhatsapp(),
     };
 
     if (feature) {
       return NextResponse.json({
         feature,
-        allowed: hasFeature(undefined, feature),
+        allowed: await hasFeature(undefined, feature),
       });
     }
 

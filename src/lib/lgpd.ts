@@ -2,7 +2,7 @@
 // Funcoes para anonimizacao, retencao e gestao de dados pessoais
 // conforme a Lei Geral de Protecao de Dados (Lei 13.709/2018).
 
-import { db } from "@/lib/db";
+import { supabaseAdmin } from "@/lib/supabase";
 import { createHash } from "node:crypto";
 
 // ── Anonimizacao ──────────────────────────────────────────────────────
@@ -63,18 +63,20 @@ export interface RetentionResult {
  * Remove mensagens de conversas antigas (acima de N dias).
  * Padrao: 90 dias para mensagens de WhatsApp.
  */
-export function retainMessages(maxAgeDays: number = 90): RetentionResult {
+export async function retainMessages(maxAgeDays: number = 90): Promise<RetentionResult> {
   const cutoff = new Date(Date.now() - maxAgeDays * 86400000).toISOString();
 
-  const messagesToDelete = db
-    .prepare("SELECT COUNT(*) as c FROM messages WHERE created_at < ?")
-    .get(cutoff) as { c: number };
+  const { count } = await supabaseAdmin
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .lt("created_at", cutoff);
 
-  db.prepare("DELETE FROM messages WHERE created_at < ?").run(cutoff);
+  const { error } = await supabaseAdmin.from("messages").delete().lt("created_at", cutoff);
+  if (error) console.error("[lgpd] Falha ao remover mensagens:", error.message);
 
   return {
     table: "messages",
-    deleted: messagesToDelete.c,
+    deleted: error ? 0 : (count ?? 0),
     anonymized: 0,
   };
 }
@@ -83,30 +85,47 @@ export function retainMessages(maxAgeDays: number = 90): RetentionResult {
  * Anonimiza dados de pacientes inativos (sem consultas nos ultimos N dias).
  * Remove nome, telefone e email, mantendo apenas dados agregados para estatisticas.
  */
-export function anonymizeInactivePatients(inactiveDays: number = 365): RetentionResult {
+export async function anonymizeInactivePatients(
+  inactiveDays: number = 365
+): Promise<RetentionResult> {
   const cutoff = new Date(Date.now() - inactiveDays * 86400000).toISOString();
 
   // Encontrar conversas sem atividade recente
-  const inactiveConversations = db
-    .prepare(
-      `SELECT id, phone, patient_name FROM conversations
-       WHERE updated_at < ? AND status != 'open'`
-    )
-    .all(cutoff) as { id: number; phone: string; patient_name: string }[];
+  const { data: inactiveConversations, error } = await supabaseAdmin
+    .from("conversations")
+    .select("id, phone, patient_name")
+    .lt("updated_at", cutoff)
+    .neq("status", "open");
+
+  if (error) {
+    console.error("[lgpd] Falha ao consultar conversas inativas:", error.message);
+    return { table: "conversations", deleted: 0, anonymized: 0 };
+  }
 
   let anonymized = 0;
-  for (const conv of inactiveConversations) {
+  for (const conv of inactiveConversations ?? []) {
     const pseudonym = pseudonymize(conv.phone);
 
     // Anonimizar conversa
-    db.prepare(
-      "UPDATE conversations SET patient_name = ?, phone = ? WHERE id = ?"
-    ).run(`Paciente-${pseudonym}`, `anon-${pseudonym}`, conv.id);
+    const { error: convError } = await supabaseAdmin
+      .from("conversations")
+      .update({ patient_name: `Paciente-${pseudonym}`, phone: `anon-${pseudonym}` })
+      .eq("id", conv.id);
+    if (convError) {
+      console.error("[lgpd] Falha ao anonimizar conversa:", convError.message);
+      continue;
+    }
 
     // Anonimizar mensagens
-    db.prepare(
-      "UPDATE messages SET content = '[DADO ANONIMIZADO]' WHERE conversation_id = ? AND sender = 'patient'"
-    ).run(conv.id);
+    const { error: msgError } = await supabaseAdmin
+      .from("messages")
+      .update({ content: "[DADO ANONIMIZADO]" })
+      .eq("conversation_id", conv.id)
+      .eq("sender", "patient");
+    if (msgError) {
+      console.error("[lgpd] Falha ao anonimizar mensagens:", msgError.message);
+      continue;
+    }
 
     anonymized++;
   }
@@ -121,18 +140,25 @@ export function anonymizeInactivePatients(inactiveDays: number = 365): Retention
 /**
  * Remove contas de usuarios deletados/inescapaveis apos periodo de retencao.
  */
-export function purgeDeletedUsers(retentionDays: number = 30): RetentionResult {
+export async function purgeDeletedUsers(retentionDays: number = 30): Promise<RetentionResult> {
   const cutoff = new Date(Date.now() - retentionDays * 86400000).toISOString();
 
-  const usersToDelete = db
-    .prepare("SELECT COUNT(*) as c FROM users WHERE status = 'inactive' AND created_at < ?")
-    .get(cutoff) as { c: number };
+  const { count } = await supabaseAdmin
+    .from("users")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "inactive")
+    .lt("created_at", cutoff);
 
-  db.prepare("DELETE FROM users WHERE status = 'inactive' AND created_at < ?").run(cutoff);
+  const { error } = await supabaseAdmin
+    .from("users")
+    .delete()
+    .eq("status", "inactive")
+    .lt("created_at", cutoff);
+  if (error) console.error("[lgpd] Falha ao remover utilizadores:", error.message);
 
   return {
     table: "users",
-    deleted: usersToDelete.c,
+    deleted: error ? 0 : (count ?? 0),
     anonymized: 0,
   };
 }
@@ -141,23 +167,23 @@ export function purgeDeletedUsers(retentionDays: number = 30): RetentionResult {
  * Executa todas as politicas de retencao de dados.
  * Chamado periodicamente pelo scheduler.
  */
-export function runRetentionPolicies(): RetentionResult[] {
+export async function runRetentionPolicies(): Promise<RetentionResult[]> {
   const results: RetentionResult[] = [];
 
   try {
-    results.push(retainMessages(90));
+    results.push(await retainMessages(90));
   } catch (err) {
     console.error("[lgpd] Erro na retencao de mensagens:", err);
   }
 
   try {
-    results.push(anonymizeInactivePatients(365));
+    results.push(await anonymizeInactivePatients(365));
   } catch (err) {
     console.error("[lgpd] Erro na anonimizacao de pacientes:", err);
   }
 
   try {
-    results.push(purgeDeletedUsers(30));
+    results.push(await purgeDeletedUsers(30));
   } catch (err) {
     console.error("[lgpd] Erro na limpeza de usuarios:", err);
   }

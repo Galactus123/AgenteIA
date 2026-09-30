@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status") ?? undefined;
 
   return NextResponse.json(
-    listAppointmentsFiltered({ date, status })
+    await listAppointmentsFiltered({ date, status })
   );
 }
 
@@ -39,7 +39,11 @@ export async function POST(request: NextRequest) {
     ? String(body.patient_phone).replace(/\D/g, "")
     : undefined;
   const specialtyId = body.specialty_id ? Number(body.specialty_id) : undefined;
-  const doctorId = body.doctor_id ? Number(body.doctor_id) : undefined;
+  const professionalId = body.professional_id
+    ? String(body.professional_id)
+    : body.doctor_id
+      ? String(body.doctor_id)
+      : undefined;
   const startsAt = body.starts_at ? String(body.starts_at) : undefined;
   const reason = body.reason !== undefined ? String(body.reason).slice(0, MAX_REASON_LENGTH) : "";
 
@@ -61,7 +65,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  if (!doctorId) {
+  if (!professionalId) {
     return NextResponse.json(
       { error: "ID do medico e obrigatorio." },
       { status: 400 }
@@ -74,7 +78,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!isSlotAvailable(doctorId, startsAt)) {
+  if (!(await isSlotAvailable(professionalId, startsAt))) {
     return NextResponse.json(
       { error: "Este horario ja esta ocupado." },
       { status: 409 }
@@ -82,11 +86,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const appointment = createAppointment({
+    const appointment = await createAppointment({
       patient_name: patientName,
       patient_phone: patientPhone,
       specialty_id: specialtyId,
-      doctor_id: doctorId,
+      professional_id: professionalId,
       starts_at: startsAt,
       reason,
       source: body.source ?? "api",

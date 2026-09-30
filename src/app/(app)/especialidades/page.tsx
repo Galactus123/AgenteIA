@@ -25,7 +25,9 @@ export default function EspecialidadesPage() {
   }, []);
 
   useEffect(() => {
-    load();
+    void (async () => {
+      await load();
+    })();
   }, [load]);
 
   function startEdit(s: Specialty) {

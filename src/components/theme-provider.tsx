@@ -2,15 +2,13 @@
 
 import * as React from "react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
+import { useMounted } from "@/lib/use-mounted";
 
 const SCRIPT_ERROR_RE =
   /Encountered a script tag while rendering React component/i;
 
 export function ThemeProvider({ children, ...props }: React.ComponentProps<typeof NextThemesProvider>) {
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useMounted();
 
   React.useEffect(() => {
     const originalError = console.error;

@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Backup copy of the working tree, not part of the app.
+    "AgenteIA/**",
+    // Gitignored scratch/inspection scripts.
+    "data/**",
   ]),
 ]);
 

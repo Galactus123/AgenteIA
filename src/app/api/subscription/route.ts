@@ -10,10 +10,10 @@ export async function GET(request: NextRequest) {
   const authError = await requireAuth(request);
   if (authError) return authError;
 
-  const subscription = getSubscription();
+  const subscription = await getSubscription();
   if (!subscription) {
     return NextResponse.json({ error: "Clínica não encontrada." }, { status: 404 });
   }
 
-  return NextResponse.json({ subscription, alerts: listAlerts(30) });
+  return NextResponse.json({ subscription, alerts: await listAlerts(30) });
 }

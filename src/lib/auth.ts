@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual, randomBytes } from "node:crypto";
-import { db } from "@/lib/db";
+import { supabaseAdmin } from "@/lib/supabase";
 import { compareSync } from "bcryptjs";
 
 export type AdminRole = "admin" | "super_admin" | "saas_admin";
@@ -52,10 +52,13 @@ function sign(payload: string): string {
   return createHmac("sha256", getSessionSecret()).update(payload).digest("base64url");
 }
 
-export function verifyPassword(identifier: string, password: string): boolean {
-  const admin = db
-    .prepare("SELECT password_hash FROM admins WHERE username = ? OR email = ?")
-    .get(identifier, identifier) as { password_hash: string } | undefined;
+export async function verifyPassword(identifier: string, password: string): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
+    .from("admins")
+    .select("password_hash")
+    .or(`username.eq.${identifier},email.eq.${identifier}`)
+    .limit(1);
+  const admin = error ? undefined : ((data ?? [])[0] as { password_hash: string } | undefined);
   if (!admin) return false;
   try {
     return compareSync(password, admin.password_hash);
@@ -64,10 +67,13 @@ export function verifyPassword(identifier: string, password: string): boolean {
   }
 }
 
-export function getAdminByIdentifier(identifier: string): { id: number; role: AdminRole } | null {
-  const admin = db
-    .prepare("SELECT id, role FROM admins WHERE username = ? OR email = ?")
-    .get(identifier, identifier) as { id: number; role: string } | undefined;
+export async function getAdminByIdentifier(identifier: string): Promise<{ id: number; role: AdminRole } | null> {
+  const { data, error } = await supabaseAdmin
+    .from("admins")
+    .select("id, role")
+    .or(`username.eq.${identifier},email.eq.${identifier}`)
+    .limit(1);
+  const admin = error ? undefined : ((data ?? [])[0] as { id: number; role: string } | undefined);
   if (!admin) return null;
   return { id: admin.id, role: (admin.role as AdminRole) || "admin" };
 }
@@ -79,7 +85,7 @@ export function createSessionToken(adminId: number, role: AdminRole): string {
   return `${payload}.${sign(payload)}`;
 }
 
-export function readSessionToken(token: string | undefined | null): SessionData | null {
+export async function readSessionToken(token: string | undefined | null): Promise<SessionData | null> {
   if (!token) return null;
   const [payload, sig] = token.split(".");
   if (!payload || !sig) return null;
@@ -94,8 +100,12 @@ export function readSessionToken(token: string | undefined | null): SessionData 
       exp: number;
     };
     if (data.exp < Date.now()) return null;
-    const exists = db.prepare("SELECT id FROM admins WHERE id = ?").get(data.adminId);
-    if (!exists) return null;
+    const { data: exists, error } = await supabaseAdmin
+      .from("admins")
+      .select("id")
+      .eq("id", data.adminId)
+      .limit(1);
+    if (error || !exists?.length) return null;
     return { adminId: data.adminId, role: (data.role as AdminRole) || "admin" };
   } catch {
     return null;
@@ -104,6 +114,6 @@ export function readSessionToken(token: string | undefined | null): SessionData 
 
 export const authCookie = SESSION_COOKIE;
 
-export function getAuthFromCookies(cookieValue: string | undefined | null): SessionData | null {
+export async function getAuthFromCookies(cookieValue: string | undefined | null): Promise<SessionData | null> {
   return readSessionToken(cookieValue);
 }

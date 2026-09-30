@@ -10,9 +10,9 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dashboard = getUsageDashboard();
-    const whatsapp = getWhatsappUsage();
-    const ai = getAiUsage();
+    const dashboard = await getUsageDashboard();
+    const whatsapp = await getWhatsappUsage();
+    const ai = await getAiUsage();
 
     return NextResponse.json({
       dashboard,

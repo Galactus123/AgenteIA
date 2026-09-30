@@ -11,7 +11,7 @@ export async function register() {
     // Politicas de retencao LGPD (executa uma vez no startup)
     const { runRetentionPolicies } = await import("@/lib/lgpd");
     try {
-      const results = runRetentionPolicies();
+      const results = await runRetentionPolicies();
       const total = results.reduce((acc, r) => acc + r.deleted + r.anonymized, 0);
       if (total > 0) {
         console.log("[lgpd] Retencao executada:", results);

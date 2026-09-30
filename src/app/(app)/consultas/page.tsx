@@ -3,10 +3,10 @@ import { displayDateTime } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
-export default function ConsultasPage() {
+export default async function ConsultasPage() {
   let appointments;
   try {
-    appointments = listAppointments();
+    appointments = await listAppointments();
   } catch {
     return (
       <div className="space-y-6">
