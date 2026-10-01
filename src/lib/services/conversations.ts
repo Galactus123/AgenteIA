@@ -17,7 +17,7 @@ export async function getOrCreateConversation(phone: string): Promise<Conversati
     .maybeSingle();
 
   if (readError) fail("conversations", readError.message);
-  if (existing) return existing as unknown as Conversation;
+  if (existing) return existing;
 
   const { data: created, error: insertError } = await supabaseAdmin
     .from("conversations")
@@ -31,7 +31,7 @@ export async function getOrCreateConversation(phone: string): Promise<Conversati
     .select("*")
     .single();
 
-  if (!insertError && created) return created as unknown as Conversation;
+  if (!insertError && created) return created;
 
   // 23505 = outra requisicao criou a mesma conversa entre o SELECT e o INSERT.
   if (insertError?.code === "23505") {
@@ -40,7 +40,7 @@ export async function getOrCreateConversation(phone: string): Promise<Conversati
       .select("*")
       .eq("phone", normalized)
       .maybeSingle();
-    if (concurrent) return concurrent as unknown as Conversation;
+    if (concurrent) return concurrent;
   }
 
   fail("conversations", insertError?.message ?? "nao foi possivel criar a conversa");
@@ -54,7 +54,7 @@ export async function getConversation(id: number): Promise<Conversation | null> 
     .maybeSingle();
 
   if (error) fail("conversations", error.message);
-  return (data as unknown as Conversation | null) ?? null;
+  return (data) ?? null;
 }
 
 export async function getConversationByPhone(phone: string): Promise<Conversation | null> {
@@ -66,7 +66,7 @@ export async function getConversationByPhone(phone: string): Promise<Conversatio
     .maybeSingle();
 
   if (error) fail("conversations", error.message);
-  return (data as unknown as Conversation | null) ?? null;
+  return (data) ?? null;
 }
 
 export async function updateConversation(
@@ -113,7 +113,7 @@ export async function addMessage(
 
   if (touchError) fail("conversations", touchError.message);
 
-  return message as unknown as Message;
+  return message;
 }
 
 export async function getMessages(conversationId: number): Promise<Message[]> {
@@ -125,7 +125,7 @@ export async function getMessages(conversationId: number): Promise<Message[]> {
     .order("id", { ascending: true });
 
   if (error) fail("messages", error.message);
-  return (data ?? []) as unknown as Message[];
+  return data ?? [];
 }
 
 export async function listConversations(): Promise<Conversation[]> {
@@ -135,5 +135,5 @@ export async function listConversations(): Promise<Conversation[]> {
     .order("updated_at", { ascending: false });
 
   if (error) fail("conversations", error.message);
-  return (data ?? []) as unknown as Conversation[];
+  return data ?? [];
 }

@@ -13,7 +13,7 @@ export async function getClinic(): Promise<Clinic | null> {
     console.error("[clinics] Falha ao consultar a clinica:", error.message);
     return null;
   }
-  return (data as unknown as Clinic | null) ?? null;
+  return (data) ?? null;
 }
 
 export async function getDefaultClinicId(): Promise<number> {

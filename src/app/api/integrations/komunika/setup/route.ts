@@ -11,7 +11,7 @@ const baseUrl = () =>
 // Aceita autenticação via cookie de sessão do painel OU via Bearer token (INTERNAL_API_TOKEN)
 export async function POST(request: NextRequest) {
   if (process.env.INTERNAL_API_TOKEN) {
-    const internalAuthError = requireInternalAuth(request);
+    const internalAuthError = await requireInternalAuth(request);
     if (!internalAuthError) {
       // autenticou via INTERNAL_API_TOKEN — segue
     } else {

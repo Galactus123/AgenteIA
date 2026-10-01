@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api-auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { getDefaultClinicId } from "@/lib/services/clinics";
 
 export async function GET(request: NextRequest) {
   const authError = await requireAuth(request);
@@ -10,14 +11,25 @@ export async function GET(request: NextRequest) {
   const phone = searchParams.get("phone") || searchParams.get("telefone");
 
   if (phone) {
+    // maybeSingle: "0 linhas" e "N linhas" nao podem virar o mesmo 404 generico.
     const { data, error } = await supabaseAdmin
       .from("patients")
       .select("*")
       .eq("phone", phone)
-      .single();
+      .order("created_at", { ascending: false })
+      .maybeSingle();
 
     if (error) {
-      return NextResponse.json({ error: "Paciente não encontrado." }, { status: 404 });
+      return NextResponse.json(
+        { error: `Falha ao consultar o paciente: ${error.message}` },
+        { status: 500 }
+      );
+    }
+    if (!data) {
+      return NextResponse.json(
+        { error: "Paciente não encontrado para este telefone." },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json(data);
@@ -47,9 +59,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // clinic_id e NOT NULL sem default (migracao ...000003) — sem ele o
+  // insert devolve erro de null constraint.
+  const clinicId = body.clinic_id ? Number(body.clinic_id) : await getDefaultClinicId();
+
   const { data, error } = await supabaseAdmin
     .from("patients")
     .insert({
+      clinic_id: clinicId,
       name: String(body.name),
       phone: String(body.phone),
       email: body.email ? String(body.email) : "",

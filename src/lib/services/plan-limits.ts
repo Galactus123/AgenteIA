@@ -105,7 +105,7 @@ export async function getSubscription(clinicId?: number): Promise<Subscription |
     console.error("[plan-limits] Falha ao consultar a assinatura:", error.message);
     return null;
   }
-  return (data?.[0] as unknown as Subscription) ?? null;
+  return (data?.[0]) ?? null;
 }
 
 export async function getActiveSubscription(clinicId?: number): Promise<Subscription | null> {
@@ -159,7 +159,7 @@ export async function createSubscription(data: {
     console.error("[plan-limits] Falha ao criar a assinatura:", error.message);
     throw new Error(`Falha ao criar a assinatura: ${error.message}`);
   }
-  return row as unknown as Subscription;
+  return row;
 }
 
 export async function updateSubscription(
@@ -207,7 +207,7 @@ export async function updateSubscription(
     console.error("[plan-limits] Falha ao actualizar a assinatura:", error.message);
     return null;
   }
-  return (updated as unknown as Subscription) ?? null;
+  return (updated) ?? null;
 }
 
 // ── Feature Gating ─────────────────────────────────────────────────────

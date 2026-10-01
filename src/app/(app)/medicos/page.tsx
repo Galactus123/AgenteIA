@@ -104,12 +104,9 @@ export default function MedicosPage() {
     async function loadSpecialties() {
       const { data, error } = await supabase.from("specialties").select("*");
       if (error) console.error("Erro ao buscar especialidades:", error);
-      else {
-        console.log("Especialidades carregadas:", data);
-        setSpecialties(data || []);
-      }
+      else setSpecialties(data || []);
     }
-    loadSpecialties();
+    void loadSpecialties();
   }, []);
 
   const load = useCallback(async () => {
@@ -252,13 +249,13 @@ export default function MedicosPage() {
   async function handleDelete(id: string) {
     if (!confirm("Excluir este profissional?")) return;
     const { error: delError } = await supabase.from("professionals").delete().eq("id", id);
-    if (!delError) load();
+    if (!delError) await load();
   }
 
   async function toggleStatus(d: Professional) {
     const newStatus = d.status === "active" ? "inactive" : "active";
     await supabase.from("professionals").update({ status: newStatus }).eq("id", d.id);
-    load();
+    await load();
   }
 
   return (

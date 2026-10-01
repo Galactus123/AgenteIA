@@ -100,7 +100,7 @@ export async function createAlert(type: string, message: string): Promise<Clinic
     console.error("[subscriptions] Falha ao criar alerta:", error.message);
     throw new Error(`Falha ao criar alerta: ${error.message}`);
   }
-  return data as unknown as ClinicAlert;
+  return data;
 }
 
 export async function listAlerts(limit = 30): Promise<ClinicAlert[]> {
@@ -115,7 +115,7 @@ export async function listAlerts(limit = 30): Promise<ClinicAlert[]> {
     console.error("[subscriptions] Falha ao listar alertas:", error.message);
     return [];
   }
-  return (data ?? []) as unknown as ClinicAlert[];
+  return data ?? [];
 }
 
 export async function notifyReception(message: string): Promise<void> {

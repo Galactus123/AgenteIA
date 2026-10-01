@@ -5,5 +5,5 @@ import { getStats } from "@/lib/services/stats";
 export async function GET(request: NextRequest) {
   const authError = await requireAuth(request);
   if (authError) return authError;
-  return NextResponse.json(getStats());
+  return NextResponse.json(await getStats());
 }

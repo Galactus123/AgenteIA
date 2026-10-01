@@ -5,7 +5,7 @@ import { getClinic, updateClinic } from "@/lib/services/clinics";
 export async function GET(request: NextRequest) {
   const authError = await requireAuth(request);
   if (authError) return authError;
-  return NextResponse.json(getClinic());
+  return NextResponse.json(await getClinic());
 }
 
 export async function PUT(request: NextRequest) {
@@ -13,7 +13,7 @@ export async function PUT(request: NextRequest) {
   if (authError) return authError;
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Corpo inválido." }, { status: 400 });
-  const clinic = updateClinic({
+  const clinic = await updateClinic({
     name: body.name,
     address: body.address,
     phone: body.phone,

@@ -61,7 +61,7 @@ export default function AssinaturaPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/subscription/plan")
+    void fetch("/api/subscription/plan")
       .then((r) => (r.ok ? r.json() : null))
       .then(setData)
       .finally(() => setLoading(false));

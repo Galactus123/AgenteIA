@@ -67,7 +67,7 @@ export default function EspecialidadesPage() {
     const data = await res.json().catch(() => null);
     if (res.ok) {
       resetForm();
-      load();
+      await load();
     } else {
       setError(data?.error ?? "Erro ao salvar.");
     }
@@ -77,7 +77,7 @@ export default function EspecialidadesPage() {
   async function handleDelete(id: number) {
     if (!confirm("Excluir esta especialidade?")) return;
     const res = await fetch(`/api/especialidades/${id}`, { method: "DELETE" });
-    if (res.ok) load();
+    if (res.ok) await load();
   }
 
   return (

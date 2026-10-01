@@ -5,7 +5,7 @@ import { listSpecialties, createSpecialty } from "@/lib/services/specialties";
 export async function GET(request: NextRequest) {
   const authError = await requireAuth(request);
   if (authError) return authError;
-  return NextResponse.json(listSpecialties());
+  return NextResponse.json(await listSpecialties());
 }
 
 export async function POST(request: NextRequest) {
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   if (!body?.name) return NextResponse.json({ error: "Nome é obrigatório." }, { status: 400 });
   try {
-    const specialty = createSpecialty({
+    const specialty = await createSpecialty({
       name: String(body.name),
       description: body.description ? String(body.description) : "",
       keywords: Array.isArray(body.keywords) ? body.keywords.map(String) : [],

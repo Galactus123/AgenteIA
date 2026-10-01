@@ -9,10 +9,10 @@ export async function PUT(request: NextRequest, ctx: RouteContext) {
   if (authError) return authError;
   const { id } = await ctx.params;
   const body = await request.json().catch(() => null);
-  const existing = getSpecialty(Number(id));
+  const existing = await getSpecialty(Number(id));
   if (!existing) return NextResponse.json({ error: "Especialidade não encontrada." }, { status: 404 });
   try {
-    const specialty = updateSpecialty(Number(id), {
+    const specialty = await updateSpecialty(Number(id), {
       name: body?.name ? String(body.name) : undefined,
       description: body?.description !== undefined ? String(body.description) : undefined,
       keywords: Array.isArray(body?.keywords) ? body.keywords.map(String) : undefined,
@@ -27,8 +27,8 @@ export async function DELETE(request: NextRequest, ctx: RouteContext) {
   const authError = await requireAuth(request);
   if (authError) return authError;
   const { id } = await ctx.params;
-  const existing = getSpecialty(Number(id));
+  const existing = await getSpecialty(Number(id));
   if (!existing) return NextResponse.json({ error: "Especialidade não encontrada." }, { status: 404 });
-  deleteSpecialty(Number(id));
+  await deleteSpecialty(Number(id));
   return NextResponse.json({ ok: true });
 }

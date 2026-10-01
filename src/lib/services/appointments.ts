@@ -115,7 +115,7 @@ export async function getAppointment(id: number): Promise<Appointment | null> {
     .maybeSingle();
 
   if (error) fail(`[appointments] Falha ao consultar a consulta: ${error.message}`);
-  return (data as unknown as Appointment | null) ?? null;
+  return (data) ?? null;
 }
 
 export async function getAppointmentView(id: number): Promise<AppointmentView | null> {
@@ -351,7 +351,7 @@ export async function createAppointment(data: {
 
   if (error) fail(`[appointments] Falha ao criar a consulta: ${error.message}`);
 
-  const view = await getAppointmentView((row as { id: number }).id);
+  const view = await getAppointmentView((row).id);
   if (!view) fail("Consulta criada mas não encontrada.");
 
   await triggerNewAppointmentNotification(view);

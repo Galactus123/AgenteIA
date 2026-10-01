@@ -32,7 +32,7 @@ export async function PATCH(request: NextRequest) {
 
   const body = await request.json().catch(() => null);
   if (body?.action === "read_all") {
-    markAllAsRead();
+    await markAllAsRead();
     return NextResponse.json({ ok: true, unreadCount: 0 });
   }
 

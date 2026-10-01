@@ -30,7 +30,7 @@ export async function createNotification(data: {
     .single();
 
   if (error) fail(`[notifications] Falha ao criar notificacao: ${error.message}`);
-  return row as unknown as Notification;
+  return row;
 }
 
 export async function listNotifications(opts?: {
@@ -48,7 +48,7 @@ export async function listNotifications(opts?: {
     .limit(opts?.limit ?? 50);
 
   if (error) fail(`[notifications] Falha ao listar notificacoes: ${error.message}`);
-  return (data ?? []) as unknown as Notification[];
+  return data ?? [];
 }
 
 export async function getUnreadCount(): Promise<number> {

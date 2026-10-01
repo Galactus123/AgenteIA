@@ -34,7 +34,7 @@ export default function SubscriptionPanel() {
   const [message, setMessage] = useState("");
 
   const load = () => {
-    fetch("/api/subscription")
+    void fetch("/api/subscription")
       .then((res) => (res.ok ? res.json() : null))
       .then(setData);
   };

@@ -77,7 +77,7 @@ export default function PacientesPage() {
     if (res.ok) {
       resetForm();
       setSuccess("Paciente cadastrado com sucesso.");
-      load();
+      await load();
       setTimeout(() => setSuccess(""), 3000);
     } else {
       setError(data?.error ?? "Erro ao cadastrar paciente.");

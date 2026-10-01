@@ -18,6 +18,6 @@ export async function PATCH(
     return NextResponse.json({ error: "ID inválido." }, { status: 400 });
   }
 
-  markAsRead(notificationId);
+  await markAsRead(notificationId);
   return NextResponse.json({ ok: true });
 }

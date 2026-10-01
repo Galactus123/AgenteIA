@@ -31,7 +31,7 @@ export default function ClinicaPage() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    fetch("/api/clinica")
+    void fetch("/api/clinica")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) {
