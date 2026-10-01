@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, memo } from "react";
 import { useTheme } from "next-themes";
-import type { SessionData } from "@/lib/auth";
 import { useMounted } from "@/lib/use-mounted";
 import {
   LayoutDashboard,
@@ -27,27 +26,17 @@ interface NavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
-  superAdminOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} strokeWidth={1.75} /> },
   { href: "/consultas", label: "Consultas", icon: <Calendar size={18} strokeWidth={1.75} /> },
-  { href: "/chat", label: "Atendimento IA", icon: <MessageSquare size={18} strokeWidth={1.75} />, superAdminOnly: true },
+  { href: "/chat", label: "Atendimento IA", icon: <MessageSquare size={18} strokeWidth={1.75} /> },
   { href: "/pacientes", label: "Pacientes", icon: <Users size={18} strokeWidth={1.75} /> },
   { href: "/medicos", label: "Médicos", icon: <Stethoscope size={18} strokeWidth={1.75} /> },
   { href: "/especialidades", label: "Especialidades", icon: <Tag size={18} strokeWidth={1.75} /> },
   { href: "/clinica", label: "Clínica", icon: <Building2 size={18} strokeWidth={1.75} /> },
 ];
-
-const isSuperAdmin = (role?: string) =>
-  role === "super_admin" || role === "saas_admin";
-
-const canAccessItem = (item: NavItem, session?: SessionData) => {
-  if (!item.superAdminOnly) return true;
-  if (process.env.NODE_ENV === "development") return true;
-  return isSuperAdmin(session?.role);
-};
 
 const SidebarLink = memo(function SidebarLink({
   href,
@@ -108,7 +97,7 @@ const SidebarLink = memo(function SidebarLink({
   );
 });
 
-function SidebarInner({ session }: { session?: SessionData }) {
+function SidebarInner() {
   const pathname = usePathname();
   const router = useRouter();
   const { resolvedTheme } = useTheme();
@@ -116,8 +105,6 @@ function SidebarInner({ session }: { session?: SessionData }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const mounted = useMounted();
-
-  const visibleItems = NAV_ITEMS.filter((item) => canAccessItem(item, session));
 
   const closeMobile = useCallback(() => setMobileOpen(false), []);
 
@@ -179,7 +166,7 @@ function SidebarInner({ session }: { session?: SessionData }) {
 
         {/* Navigation */}
         <nav className="flex-1 px-2 py-4 space-y-0.5" aria-label="Navegação lateral">
-          {visibleItems.map((item) => {
+          {NAV_ITEMS.map((item) => {
             const active =
               pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             return (
@@ -282,7 +269,7 @@ function SidebarInner({ session }: { session?: SessionData }) {
         </div>
 
         <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto" aria-label="Navegação lateral">
-          {visibleItems.map((item) => {
+          {NAV_ITEMS.map((item) => {
             const active =
               pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             return (
