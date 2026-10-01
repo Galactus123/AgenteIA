@@ -1,8 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-export function proxy(request: NextRequest) {
+// Páginas autenticadas: tudo que fica sob o grupo `(app)`.
+// Precisa bater com `config.matcher` — `src/__tests__/proxy.test.ts` falha se
+// um dos lados mudar sozinho.
+export const PROTECTED_ROUTES = [
+  "/chat",
+  "/clinica",
+  "/configuracoes",
+  "/consultas",
+  "/dashboard",
+  "/especialidades",
+  "/medicos",
+  "/pacientes",
+  "/perfil",
+] as const;
+
+export function isProtectedRoute(pathname: string): boolean {
+  return PROTECTED_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+}
+
+function authCookiePrefix(): string | null {
+  const projectRef =
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/https?:\/\/([^.]+)/)?.[1];
+  return projectRef ? `sb-${projectRef}-auth-token` : null;
+}
+
+function hasSessionCookie(request: NextRequest): boolean {
+  const prefix = authCookiePrefix();
+  if (!prefix) return false;
+  // Sessão grande pode ser dividida em chunks (sb-<ref>-auth-token.0, .1, ...).
+  return request.cookies
+    .getAll()
+    .some(({ name }) => name === prefix || name.startsWith(`${prefix}.`));
+}
+
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
+  const pathname = request.nextUrl.pathname;
+
+  if (!isProtectedRoute(pathname) && !pathname.startsWith("/api/")) {
+    return supabaseResponse;
+  }
+
+  if (!hasSessionCookie(request)) {
+    // Só página vai para /login: rota de API devolve 401 do próprio handler.
+    if (isProtectedRoute(pathname)) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    return supabaseResponse;
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,33 +74,14 @@ export function proxy(request: NextRequest) {
     }
   );
 
-  // Cliente criado apenas para registrar os callbacks de cookies do Supabase SSR.
-  // Nenhuma chamada de auth é feita neste proxy — a rota protegida é validada
-  // pelo cookie de sessão abaixo.
-  void supabase;
-
-  // Atualizar sessão (refresh de token se expirado)
-  // Nota: getUser() é síncrono no proxy, mas o Supabase SSR lida com isso internamente
-  // Para simplificar, verificamos se o cookie de sessão existe
-  const sessionCookie = request.cookies.get("sb-" + process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/https?:\/\/([^.]+)/)?.[1] + "-auth-token")?.value;
-
-  // Rotas protegidas
-  const pathname = request.nextUrl.pathname;
-  const isProtectedRoute =
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/consultas") ||
-    pathname.startsWith("/pacientes") ||
-    pathname.startsWith("/medicos") ||
-    pathname.startsWith("/especialidades") ||
-    pathname.startsWith("/perfil") ||
-    pathname.startsWith("/clinica") ||
-    pathname.startsWith("/chat") ||
-    pathname.startsWith("/settings") ||
-    pathname.startsWith("/appointments");
-
-  if (isProtectedRoute && !sessionCookie) {
-    const loginUrl = new URL("/login", request.url);
-    return NextResponse.redirect(loginUrl);
+  // A sessão expira em 1h e o refresh só pode ser gravado aqui: Server Component
+  // não consegue escrever cookie e a maioria das rotas de API usa `setAll() {}`,
+  // então sem este passo o token girado é descartado e toda requisição seguinte
+  // refaz o refresh com o mesmo refresh token.
+  try {
+    await supabase.auth.getSession();
+  } catch {
+    // Supabase indisponível: segue sem refresh; a página faz getUser() e decide.
   }
 
   return supabaseResponse;
@@ -59,15 +89,15 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/dashboard/:path*",
+    "/chat/:path*",
     "/perfil/:path*",
     "/medicos/:path*",
     "/especialidades/:path*",
     "/consultas/:path*",
     "/clinica/:path*",
-    "/chat/:path*",
-    "/settings/:path*",
-    "/appointments/:path*",
+    "/configuracoes/:path*",
     "/pacientes/:path*",
+    "/dashboard/:path*",
+    "/api/:path*",
   ],
 };
