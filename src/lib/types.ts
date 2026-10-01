@@ -54,6 +54,7 @@ export interface Specialty {
 export interface Doctor {
   id: string;
   name: string;
+  email: string;
   specialty_id: number | null;
   consultation_duration: number;
   price: number;

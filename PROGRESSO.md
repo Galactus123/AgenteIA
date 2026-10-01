@@ -103,7 +103,7 @@ Páginas: `src/app/(app)/dashboard`, `consultas`, `pacientes`, `medicos`, `espec
 | Cadastro | PRD | Status | Backend real | Problema |
 |---|---|---|---|---|
 | Clínica (nome, endereço, telefone, WhatsApp, horário, localização, redes sociais) | ✅ | ✅ | `GET/PUT /api/clinica` → **Supabase** `clinics` (`services/clinics.ts`) | ✅ `await` corrigido em 01/10/2026 e rota testada (200 + corpo real). |
-| Médicos (nome, especialidade, horários, dias, duração, valor, status) | 🟡 | 🟡 | Página `/medicos` fala **direto com Supabase** (`page.tsx:4,105,115,218-257`) — tabela `professionals` | **RLS vazia (Fase 2.1):** usa `src/lib/supabase.ts` (client anônimo), mas a sessão vive em *cookies* (`@supabase/ssr`) → sem sessão no client → policy `tenant_select` (005) devolve **vazio** e bloqueia INSERT/UPDATE/DELETE. |
+| Médicos (nome, especialidade, horários, dias, duração, valor, status) | ✅ | ✅ | `GET/POST /api/professionals` + `PATCH/PUT/DELETE /api/professionals/[id]` → `services/doctors.ts` (`supabaseAdmin`) | ✅ **Fase 2.1 (01/10/2026):** a página deixou de falar com Supabase direto (client anônimo sem sessão) e passou para rotas de API como os demais cadastros. `clinic_id` é resolvido no servidor (`getDefaultClinicId()`), o que **eliminava o 42501 do `WITH CHECK` do RLS**. `email` entrou no `Doctor`/`DoctorView`. `src/lib/supabase.ts` perdeu o export `supabase` (anon) — só resta `supabaseAdmin`, fora do bundle de cliente. |
 | Especialidades (nome, descrição, médicos relacionados) | 🟡 | ✅ | `GET/POST/PUT/DELETE /api/especialidades` → **Supabase** `specialties` | ✅ `await` corrigido e rota testada (200 + corpo real); `/medicos` lê a mesma tabela → dropdown consistente. Falta o vínculo "médicos relacionados" no modelo de UI. |
 | Pacientes | ✅ | ✅ | `GET/POST /api/pacientes` → **Supabase** `patients` | ✅ **Fase 1.7 (01/10/2026):** `POST` agora resolve `clinic_id` via `getDefaultClinicId()` (coluna `NOT NULL` sem default) e `GET ?phone=` usa `maybeSingle()` — "não encontrado" (404) deixou de ser mascarado como erro de servidor. |
 | Perfil / senha / e-mail | ✅ | ✅ | `/api/auth/{me,email,password}` → Supabase Auth | |
@@ -181,6 +181,7 @@ O PRD coloca isto **fora** do MVP, mas já está no código — e consome manute
 
 - ~~**Produção (Vercel):** SQLite em `/tmp`, efêmero.~~ → não há mais SQLite no runtime; a fonte é sempre o Supabase.
 - ~~**Divisão de cadastros:** médico de `/medicos` não era oferecido pelo agente.~~ → agente, `/medicos` e `/especialidades` leem `professionals`/`specialties`.
+- ~~**Painel sem sessão:** `/medicos` gravava com client anônimo e o RLS rejeitava o INSERT (`42501` por `clinic_id` nulo).~~ → **corrigido na Fase 2.1:** rotas `/api/professionals` com `service_role` + `clinic_id` resolvido no servidor.
 - ~~**Endpoint órfão:** dois CRUDs paralelos (`/api/appointments` × `/api/consultas`).~~ → **resolvido (Fase 1.5, 01/10/2026):** mantido `/api/appointments` (único com as regras do PRD: janela de 4h, limite de remarcação, `isSlotAvailable`); `/api/consultas` e `/api/consultas/[id]` **removidos** — nenhuma página os chamava (a página `/consultas` é server component e usa `listAppointments()`).
 - ~~**Novo usuário sem tenant:** `signup` não criava `clinic_members` nem clínica.~~ → **resolvido (Fase 0.2, 01/10/2026).**
 
@@ -191,6 +192,7 @@ O PRD coloca isto **fora** do MVP, mas já está no código — e consome manute
 ### 1.10 Órfãos e dívida técnica observada
 
 - **Componentes não importados:** `kpi-card`, `appointments-list`, `doctor-status-list`, `appointment-requests-card`, `subscription-panel`, `upgrade-modal`, `animated-table-rows`, `animated-entry`.
+- **`src/utils/supabase/client.ts`** (helper `createBrowserClient`) não é usado por nenhum componente — mantido como entry point para consultas client-side autenticadas futuras (pode virar órfão se a Fase 2.4 decidir que tudo passa por API).
 - **Rotas sem consumidor na UI:** `/api/appointments`, `/api/stats`, `/api/conversations`, `/api/chat/history`, `/api/notifications/[id]`, `/api/especialidades/[id]`, `/api/pacientes/[id]`, `/api/subscription/{limits,usage}` (algumas são legítimas para uso externo/cron).
 - ~~**Debug remanescente:** `console.log` extensivo em `api/auth/login/route.ts`.~~ → **removido (Fase 0.3).** Restam `console.log` por request em `webhooks/komunika/route.ts` (sem PII, só status/ids).
 - **Testes (42, todos verdes)** cobrem apenas: tokens/hash/cookie da **autenticação legada** (`auth.test.ts`), sanitização (`security.test.ts`) e HMAC/filtro de eventos (`webhook.test.ts`). **Zero testes** para: agente, tools, `appointments` (regras de 4h/1 remarcação), lembretes, RLS, multi-tenant.
@@ -257,6 +259,7 @@ Evidências do estado em que ficou (27/09) e do que a sessão 2 fez:
 | Cadastro de paciente | `POST /api/pacientes` → `GET /api/pacientes?phone=` | ✅ 201 (com `clinic_id` preenchido) → 200; telefone inexistente → **404** com mensagem própria (antes mascarado). Registro de teste removido após o teste |
 | `/api/consultas` | — | ➖ **rota removida na Fase 1.5** (CRUD duplicado; use `/api/appointments`) — hoje devolve **404** |
 | CRUD único de consultas | `GET /api/appointments` (com sessão) + página `/consultas` | ✅ **200** com `[]` (tabela vazia — o SQLite também não tinha consultas) e página **200** |
+| Profissionais (Fase 2.1) | `GET/POST/PATCH/DELETE /api/professionals` (com sessão) | ✅ **401** sem sessão → **200** (10 itens) → **201** (criado) → **200** (patch) → **200** `{ok:true}` (delete); registro de teste removido (0 restantes) |
 | CI (`.github/workflows/ci.yml`) | lint → typecheck → test → build | ⚠️ **depende do Node** — `scripts/setup-supabase.mjs` e `scripts/ops/*.mjs` exigem Node ≥ 22; o job usa 20 |
 | Migrações | — | ✅ **`002→009` no banco** (`008`/`009` aplicadas em 01/10/2026; preflight exit 0). Ainda falta o `...000001_schema_base.sql` (Fase 1.6) para banco limpo |
 | E2E / smoke em produção | — | ❌ não realizado |
@@ -319,13 +322,13 @@ Evidências do estado em que ficou (27/09) e do que a sessão 2 fez:
 - [x] **1.8** **Dados do SQLite → Supabase** — **feito (01/10/2026)**: `006`, `007`, `008` e `009` aplicadas, `node scripts/setup-supabase.mjs --apply` executado (161 inseridos / 5 atualizados; reexecução = 0). Preflight com exit 0 e smoke pós-migração: `/dashboard`, `/consultas`, `/api/auth/me`, `/api/appointments`, `/api/stats`, `/api/pacientes`, `/api/clinica`, `/api/especialidades` → **todos 200**.
 
 > **Próximo passo (é onde paramos agora):** Fase 1 está **7/8** (resta a `1.6` —
-> `...000001_schema_base.sql` para banco limpo). Seguir para a **Fase 2**,
-> começando pela `2.1` (trocar o client anônimo de `/medicos` por `@supabase/ssr`
-> — hoje a página lê vazio por causa do RLS).
+> `...000001_schema_base.sql` para banco limpo) e a Fase 2.1 está **feita**.
+> Seguir para a **2.2** (`chat/layout.tsx` lê o cookie HMAC antigo → **`/chat`
+> está inacessível em produção**) e depois 2.3–2.6.
 
 ### Fase 2 — Auth, tenant e RLS (P0/P1)
 
-- [ ] **2.1** Trocar `src/lib/supabase.ts` (client anônimo sem sessão) por `createBrowserClient` de `@supabase/ssr` em **`src/app/(app)/medicos/page.tsx`** — hoje a página quase certamente lê vazio e não consegue gravar por causa do RLS.
+- [x] **2.1** Trocar `src/lib/supabase.ts` (client anônimo sem sessão) por `createBrowserClient` de `@supabase/ssr` em **`src/app/(app)/medicos/page.tsx`** — hoje a página quase certamente lê vazio e não consegue gravar por causa do RLS. — **feito (01/10/2026), em vez do caminho literal:** diagnóstico primeiro mostrou que a **leitura** funcionava com a sessão (anon key + JWT → `clinic_id: 1`, `get_user_clinic_ids()` = `[1]`), mas o **INSERT devolvia `42501`** porque a página não envia `clinic_id` (coluna sem default) e o `WITH CHECK` do `tenant_insert` rejeita. Decisão do produto: seguir pelo caminho dos demais cadastros — criadas `GET/POST /api/professionals` e `PATCH/PUT/DELETE /api/professionals/[id]` sobre `services/doctors.ts` (`supabaseAdmin` + `getDefaultClinicId()`), página reescrita para `fetch`, `email` adicionado a `Doctor`/`DoctorView`/`createDoctor`/`updateDoctor` e o export `supabase` (anon) removido de `src/lib/supabase.ts` (agora só existe `supabaseAdmin`, e nenhum componente de cliente importa Supabase direto). **E2E:** sem sessão → 401; GET → 200 (10 profissionais, com `specialty_name` e agenda); POST → 201; PATCH → 200; DELETE → 200; página `/medicos` → 200.
 - [ ] **2.2** Aposentar o auth legado: `chat/layout.tsx:5,8` lê o cookie HMAC antigo → **`/chat` está inacessível em produção**. Migrar para `supabase.auth.getUser()` + checagem de papel.
 - [ ] **2.3** Revisar `proxy.ts`: matcher não cobre `/configuracoes`, `/pacientes` está no matcher mas o redirect checa `/settings` e `/appointments` (rotas que não existem).
 - [ ] **2.4** Definir quem usa `service_role` × `anon` × `authenticated`; remover o `GRANT ALL ... TO anon` da migração `004`.

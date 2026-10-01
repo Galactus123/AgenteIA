@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, FormEvent } from "react";
-import { supabase } from "@/lib/supabase";
 
 interface ScheduleRow {
   weekday: number;
@@ -37,41 +36,6 @@ interface Specialty {
 
 const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-const DAY_BY_LABEL: Record<string, number> = {
-  dom: 0,
-  seg: 1,
-  ter: 2,
-  qua: 3,
-  qui: 4,
-  sex: 5,
-  sab: 6,
-  sáb: 6,
-};
-
-function normalizeSchedule(raw: unknown): ScheduleEntry[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item): ScheduleEntry | null => {
-      if (typeof item === "string") {
-        // Compatibilidade com o formato antigo (rótulos de dia).
-        const weekday = DAY_BY_LABEL[item.trim().toLowerCase().slice(0, 3)];
-        if (weekday === undefined) return null;
-        return { weekday, start_time: "08:00", end_time: "17:00" };
-      }
-      if (!item || typeof item !== "object") return null;
-      const o = item as Record<string, unknown>;
-      const weekday = Number(o.weekday);
-      if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) return null;
-      return {
-        weekday,
-        start_time: typeof o.start_time === "string" && o.start_time ? o.start_time : "08:00",
-        end_time: typeof o.end_time === "string" && o.end_time ? o.end_time : "17:00",
-      };
-    })
-    .filter((row): row is ScheduleEntry => row !== null)
-    .sort((a, b) => a.weekday - b.weekday || a.start_time.localeCompare(b.start_time));
-}
-
 const EMPTY_SCHEDULE: ScheduleRow[] = Array.from({ length: 7 }, (_, weekday) => ({
   weekday,
   enabled: false,
@@ -102,9 +66,14 @@ export default function MedicosPage() {
 
   useEffect(() => {
     async function loadSpecialties() {
-      const { data, error } = await supabase.from("specialties").select("*");
-      if (error) console.error("Erro ao buscar especialidades:", error);
-      else setSpecialties(data || []);
+      try {
+        const res = await fetch("/api/especialidades");
+        if (!res.ok) throw new Error(String(res.status));
+        const data: unknown = await res.json();
+        setSpecialties(Array.isArray(data) ? (data as Specialty[]) : []);
+      } catch (err) {
+        console.error("Erro ao buscar especialidades:", err);
+      }
     }
     void loadSpecialties();
   }, []);
@@ -112,26 +81,14 @@ export default function MedicosPage() {
   const load = useCallback(async () => {
     setFetching(true);
 
-    const { data, error } = await supabase
-      .from("professionals")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (!error && data) {
-      setProfessionals(
-        data.map((d: Record<string, unknown>) => ({
-          id: d.id as string,
-          name: d.name as string,
-          email: (d.email as string) ?? "",
-          specialty_id: d.specialty_id as number | null,
-          specialty_name: (d.specialty_name as string) ?? "",
-          consultation_duration: (d.consultation_duration as number) ?? 30,
-          price: (d.price as number) ?? 0,
-          status: (d.status as string) ?? "active",
-          phone: (d.phone as string) ?? "",
-          schedule: normalizeSchedule(d.schedule),
-        }))
-      );
+    try {
+      const res = await fetch("/api/professionals");
+      if (!res.ok) throw new Error(String(res.status));
+      const data: unknown = await res.json();
+      setProfessionals(Array.isArray(data) ? (data as Professional[]) : []);
+    } catch (err) {
+      console.error("Erro ao buscar profissionais:", err);
+      setError("Erro ao carregar os profissionais.");
     }
 
     setFetching(false);
@@ -195,16 +152,11 @@ export default function MedicosPage() {
         end_time: r.end_time,
       }));
 
-    const selectedSpecialty = specialties.find(
-      (s) => s.id === Number(form.specialty_id)
-    );
-
     const payload = {
       name: form.name,
       email: form.email || "",
       phone: form.phone || "",
       specialty_id: form.specialty_id ? Number(form.specialty_id) : null,
-      specialty_name: selectedSpecialty ? String(selectedSpecialty.name ?? "") : "",
       consultation_duration: Number(form.consultation_duration || 30),
       price: Number(form.price || 0),
       status: form.status || "active",
@@ -212,26 +164,17 @@ export default function MedicosPage() {
     };
 
     try {
-      let result;
+      const url = editingId ? `/api/professionals/${editingId}` : "/api/professionals";
+      const res = await fetch(url, {
+        method: editingId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data: { error?: string } | null = await res.json().catch(() => null);
 
-      if (editingId) {
-        result = await supabase
-          .from("professionals")
-          .update(payload)
-          .eq("id", editingId)
-          .select()
-          .single();
-      } else {
-        result = await supabase
-          .from("professionals")
-          .insert([payload])
-          .select()
-          .single();
-      }
-
-      if (result.error) {
-        console.error("Erro ao salvar profissional:", result.error);
-        setError(result.error.message ?? "Erro ao salvar profissional.");
+      if (!res.ok) {
+        console.error("Erro ao salvar profissional:", res.status, data?.error);
+        setError(data?.error ?? "Erro ao salvar profissional.");
       } else {
         resetForm();
         setSuccess(editingId ? "Profissional atualizado com sucesso!" : "Profissional cadastrado com sucesso!");
@@ -248,14 +191,31 @@ export default function MedicosPage() {
 
   async function handleDelete(id: string) {
     if (!confirm("Excluir este profissional?")) return;
-    const { error: delError } = await supabase.from("professionals").delete().eq("id", id);
-    if (!delError) await load();
+    try {
+      const res = await fetch(`/api/professionals/${id}`, { method: "DELETE" });
+      if (res.ok) await load();
+      else {
+        const data: { error?: string } | null = await res.json().catch(() => null);
+        setError(data?.error ?? "Erro ao excluir profissional.");
+      }
+    } catch (err) {
+      console.error("Erro ao excluir profissional:", err);
+      setError("Erro de conexão ao excluir profissional.");
+    }
   }
 
   async function toggleStatus(d: Professional) {
     const newStatus = d.status === "active" ? "inactive" : "active";
-    await supabase.from("professionals").update({ status: newStatus }).eq("id", d.id);
-    await load();
+    try {
+      const res = await fetch(`/api/professionals/${d.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) await load();
+    } catch (err) {
+      console.error("Erro ao alterar status do profissional:", err);
+    }
   }
 
   return (

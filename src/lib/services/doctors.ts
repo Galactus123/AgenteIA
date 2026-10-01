@@ -49,6 +49,7 @@ function rowToDoctor(row: Record<string, unknown>, specialtyName = ""): DoctorVi
   return {
     id: row.id as string,
     name: row.name as string,
+    email: (row.email as string) ?? "",
     specialty_id: (row.specialty_id as number | null) ?? null,
     consultation_duration: (row.consultation_duration as number) ?? 30,
     price: Number(row.price ?? 0),
@@ -114,7 +115,8 @@ export async function getActiveDoctorsBySpecialty(specialtyId: number): Promise<
 
 export async function createDoctor(data: {
   name: string;
-  specialty_id: number;
+  email?: string;
+  specialty_id: number | null;
   consultation_duration?: number;
   price?: number;
   status?: string;
@@ -126,6 +128,7 @@ export async function createDoctor(data: {
     .from("professionals")
     .insert({
       name: data.name,
+      email: data.email ?? "",
       clinic_id: clinicId,
       specialty_id: data.specialty_id,
       consultation_duration: data.consultation_duration ?? 30,
@@ -145,7 +148,8 @@ export async function updateDoctor(
   id: string,
   data: {
     name?: string;
-    specialty_id?: number;
+    email?: string;
+    specialty_id?: number | null;
     consultation_duration?: number;
     price?: number;
     status?: string;
@@ -158,6 +162,7 @@ export async function updateDoctor(
 
   const patch: Record<string, unknown> = {};
   if (data.name !== undefined) patch.name = data.name;
+  if (data.email !== undefined) patch.email = data.email;
   if (data.specialty_id !== undefined) patch.specialty_id = data.specialty_id;
   if (data.consultation_duration !== undefined) patch.consultation_duration = data.consultation_duration;
   if (data.price !== undefined) patch.price = data.price;
