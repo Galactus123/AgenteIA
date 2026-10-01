@@ -21,7 +21,7 @@
 2. ~~**O projeto está dividido em dois bancos de dados que não conversam.**~~ **RESOLVIDO (01/10/2026):** `src/lib/db.ts` e `src/lib/multi-tenant.ts` foram removidos e todos os serviços, rotas, server components, o agente e a LGPD passaram a usar `supabaseAdmin` de forma assíncrona. Persistência única: Supabase.
 3. **As migrações em `supabase/migrations/` avançaram, mas a fonte de verdade executável continua quebrada:** `006`, `007` **aplicadas** (FKs de embedding confirmadas por probe no PostgREST), `008` e `009` **escritas e ainda não aplicadas**; e **continua sem `...000001`** — o schema base (17 tabelas + seed) segue em `supabase-migration.sql`, na raiz. A `005` perdeu a FASE 5 (a que corrompeu `auth.users`), agora extraída para a `009` idempotente.
 4. **O MVP não está pronto para produção:** lembretes 24h/2h dependem de um `setInterval` (morre em serverless, não há `vercel.json`/cron), não há fila de reenvio em falha da API de WhatsApp, não há trava de conflito de horário, e a transferência para humano não interrompe a IA.
-5. **Validação atual (01/10/2026, sessão 2):** `tsc` ✅ · `next build` ✅ · `vitest` ✅ (42 testes) · `eslint` ✅ **0 erros / 0 warnings com regras type-aware novas** (`await-thenable`, `no-floating-promises`, `no-misused-promises`) — estas regras pegaram e foi corrigido um bug de classe da conversão SQLite → Supabase (services viraram `async` e 15 chamadas ficaram sem `await`, serializando `Promise` como `{}`).
+5. **Validação atual (01/10/2026, sessão 2):** `tsc` ✅ · `next build` ✅ · `vitest` ✅ (38 testes — os 9 da autenticação legada saíram na Fase 2.2 e 5 de rota/proxy entraram na 2.3) · `eslint` ✅ **0 erros / 0 warnings com regras type-aware novas** (`await-thenable`, `no-floating-promises`, `no-misused-promises`) — estas regras pegaram e foi corrigido um bug de classe da conversão SQLite → Supabase (services viraram `async` e 15 chamadas ficaram sem `await`, serializando `Promise` como `{}`).
 
 ---
 
@@ -124,8 +124,8 @@ Páginas: `src/app/(app)/dashboard`, `consultas`, `pacientes`, `medicos`, `espec
 
 | Exigência | Status | Onde / observação |
 |---|---|---|
-| Login seguro | 🟡 | Supabase Auth (e-mail/senha) + cookies `@supabase/ssr`; `requireAuth` em quase todas as rotas. **Restos do auth legado:** `src/lib/auth.ts` (HMAC em SQLite) ainda é usado por `chat/layout.tsx:5,8` → em produção `readSessionToken` retorna `null` e **`/chat` redireciona para `/dashboard`** (só passa em `NODE_ENV=development`). |
-| Controle de acesso por perfil | 🟡 | `AdminRole`, `proxy.ts` (Next 16) protege rotas por cookie; papéis em `admin_profiles`/`clinic_members`. ~~**signup não cria `clinic_members` nem clínica**~~ → **corrigido (Fase 0.2, 01/10/2026):** o signup cria `profiles` → `admin_profiles` → `clinics` → `clinic_members` com rollback em cascata, então `get_user_clinic_ids()` não fica vazio para usuário novo. |
+| Login seguro | ✅ | Supabase Auth (e-mail/senha) + cookies `@supabase/ssr`; `requireAuth` em quase todas as rotas. ~~**Restos do auth legado:** `src/lib/auth.ts` (HMAC em SQLite) usado por `chat/layout.tsx`.~~ → **resolvido na Fase 2.2 (01/10/2026):** `/chat` agora usa `supabase.auth.getUser()` + papel de `admin_profiles`, `src/lib/auth.ts` e `auth.test.ts` foram **apagados** (zero consumidores). |
+| Controle de acesso por perfil | ✅ | `AdminRole`, `proxy.ts` (Next 16) protege rotas por cookie; papéis em `admin_profiles`/`clinic_members`. **Fase 2.3 (01/10/2026):** lista `PROTECTED_ROUTES` == `config.matcher` (guardado por teste), `/configuracoes` coberto, API nunca redireciona e o **refresh da sessão agora é persistido pelo proxy** (antes era feito e descartado). ~~**signup não cria `clinic_members` nem clínica**~~ → **corrigido (Fase 0.2, 01/10/2026):** o signup cria `profiles` → `admin_profiles` → `clinics` → `clinic_members` com rollback em cascata, então `get_user_clinic_ids()` não fica vazio para usuário novo. |
 | Criptografia dos dados | 🟡 | TLS/HSTS via `next.config.ts`; sem criptografia de repouso configurável pelo app. |
 | Registro de atividades (audit log) | ❌ | Não existe tabela/fluxo de auditoria de ações. |
 | Backup automático | ❌ | Fora do código, mas **não há nem documentação/verificação**; e o SQLite de produção vive em `/tmp`. |
@@ -174,7 +174,7 @@ O PRD coloca isto **fora** do MVP, mas já está no código — e consome manute
 
 | Caminho de dados | Backend | Arquivos |
 |---|---|---|
-| ~~Agente IA, conversas, mensagens, lembretes, notificações, especialidades, clínica, assinatura/limites, stats, auth-antiga~~ | ~~**SQLite** (`node:sqlite`)~~ → **Supabase/Postgres** | `src/lib/services/*`, `src/lib/auth.ts`, `src/lib/lgpd.ts` (todos com `supabaseAdmin` async); `src/lib/db.ts` e `src/lib/multi-tenant.ts` **removidos** |
+| ~~Agente IA, conversas, mensagens, lembretes, notificações, especialidades, clínica, assinatura/limites, stats, auth-antiga~~ | ~~**SQLite** (`node:sqlite`)~~ → **Supabase/Postgres** | `src/lib/services/*`, `src/lib/lgpd.ts` (ambos com `supabaseAdmin` async); `src/lib/db.ts`, `src/lib/multi-tenant.ts` e `src/lib/auth.ts` **removidos** |
 | `pacientes`, `appointments` (API), `professionals`/`specialties` (página `/medicos`), `auth` (Supabase Auth), `profiles`/`admin_profiles`/`clinic_members` | **Supabase/Postgres** | `src/lib/supabase.ts`, `src/utils/supabase/*`, `src/app/api/{pacientes,appointments,auth}/*`, `src/app/(app)/medicos/page.tsx` |
 
 **O que foi corrigido:**
@@ -195,7 +195,7 @@ O PRD coloca isto **fora** do MVP, mas já está no código — e consome manute
 - **`src/utils/supabase/client.ts`** (helper `createBrowserClient`) não é usado por nenhum componente — mantido como entry point para consultas client-side autenticadas futuras (pode virar órfão se a Fase 2.4 decidir que tudo passa por API).
 - **Rotas sem consumidor na UI:** `/api/appointments`, `/api/stats`, `/api/conversations`, `/api/chat/history`, `/api/notifications/[id]`, `/api/especialidades/[id]`, `/api/pacientes/[id]`, `/api/subscription/{limits,usage}` (algumas são legítimas para uso externo/cron).
 - ~~**Debug remanescente:** `console.log` extensivo em `api/auth/login/route.ts`.~~ → **removido (Fase 0.3).** Restam `console.log` por request em `webhooks/komunika/route.ts` (sem PII, só status/ids).
-- **Testes (42, todos verdes)** cobrem apenas: tokens/hash/cookie da **autenticação legada** (`auth.test.ts`), sanitização (`security.test.ts`) e HMAC/filtro de eventos (`webhook.test.ts`). **Zero testes** para: agente, tools, `appointments` (regras de 4h/1 remarcação), lembretes, RLS, multi-tenant.
+- **Testes (38, todos verdes)** cobrem: sanitização anti prompt-injection (`security.test.ts`), HMAC/filtro de eventos do webhook (`webhook.test.ts`) e a lista de rotas protegidas × `config.matcher` do `proxy.ts` (`src/__tests__/proxy.test.ts`, Fase 2.3). ~~Os 9 de **autenticação legada** (`auth.test.ts`) foram apagados na Fase 2.2 — testavam uma reimplementação dentro do próprio arquivo, não `src/lib/auth.ts`.~~ **Zero testes** para: agente, tools, `appointments` (regras de 4h/1 remarcação), lembretes, RLS, multi-tenant, login/signup reais (ver Fase 5.3).
 - **README desatualizado:** ainda documenta `admin/admin123` e "o MVP usa `node:sqlite`" como se fosse definitivo.
 - **`.github/workflows/ci.yml` usa Node 20**, enquanto `package.json` exige `>=22` e `.node-version` = 22 (local: v24.18.0). Com a remoção de `db.ts` o `node:sqlite` saiu de `src/`, então o **build** do CI deve passar; ainda assim o `engines` diverge e os `scripts/*.mjs` que usam `node:sqlite` (`setup-supabase.mjs`) exigem Node ≥ 22 — ver Fase 5.2.
 
@@ -250,16 +250,19 @@ Evidências do estado em que ficou (27/09) e do que a sessão 2 fez:
 |---|---|---|
 | Typecheck | `npx tsc --noEmit` | ✅ **0 erros** |
 | Build | `npm run build` | ✅ **exit 0** — rotas geradas (API + páginas) + `ƒ Proxy (Middleware)` |
-| Testes | `npm test` (vitest) | ✅ **42/42** em 3 arquivos |
+| Testes | `npm test` (vitest) | ✅ **38/38** em 3 arquivos (42 até a Fase 2.2, que apagou os 9 do auth legado; +5 do proxy na 2.3) |
 | Lint | `npm run lint` (eslint) | ✅ **0 erros + 0 warnings**, agora com `await-thenable`, `no-floating-promises` e `no-misused-promises` ativos |
 | Login E2E | `POST /api/auth/login` → `/api/auth/me` → `/dashboard` | ✅ 200 → 200 → 200 |
 | Signup E2E | `POST /api/auth/signup` (usuário de teste) | ✅ 201; `profiles`+`admin_profiles`+`clinics`+`clinic_members` criados; login do novo usuário devolveu `clinicIds: ["2"]`; **usuário de teste removido após o teste** |
 | Páginas com sessão | `/dashboard /consultas /medicos /especialidades /pacientes /chat /perfil /clinica /configuracoes/assinatura` | ✅ todas 200 |
+| Portaria do `proxy.ts` (Fase 2.3) | 9 páginas protegidas + públicas + API | ✅ **sem sessão:** `/dashboard /configuracoes/assinatura /pacientes /chat /perfil` → **307 `/login`**; `/login /precos /agendamento-clinica-geral /landing` → **200**; `/api/auth/me` → 200, `/api/appointments` e `/api/stats` → **401** (nunca redirect). **Com sessão:** as 9 páginas → **200** |
+| Renovação de sessão (Fase 2.3) | cookie com `expires_at` no passado → `/dashboard` e `/api/auth/me` | ✅ devolvem **`Set-Cookie`** com sessão nova (`expires_at` +60min, refresh token rotacionado) e a requisição seguinte dá 200 — **antes: 0 `Set-Cookie`** (o refresh era feito e descartado) |
 | Rotas de dados | `/api/stats`, `/api/clinica`, `/api/especialidades`, `/api/conversations`, `/api/pacientes` | ✅ 200 com conteúdo real (antes `stats`/`clinica`/`especialidades` devolviam `{}`) |
 | Cadastro de paciente | `POST /api/pacientes` → `GET /api/pacientes?phone=` | ✅ 201 (com `clinic_id` preenchido) → 200; telefone inexistente → **404** com mensagem própria (antes mascarado). Registro de teste removido após o teste |
 | `/api/consultas` | — | ➖ **rota removida na Fase 1.5** (CRUD duplicado; use `/api/appointments`) — hoje devolve **404** |
 | CRUD único de consultas | `GET /api/appointments` (com sessão) + página `/consultas` | ✅ **200** com `[]` (tabela vazia — o SQLite também não tinha consultas) e página **200** |
 | Profissionais (Fase 2.1) | `GET/POST/PATCH/DELETE /api/professionals` (com sessão) | ✅ **401** sem sessão → **200** (10 itens) → **201** (criado) → **200** (patch) → **200** `{ok:true}` (delete); registro de teste removido (0 restantes) |
+| Portaria das páginas (Fase 2.2) | `/chat`, `/dashboard` sem sessão vs. com sessão | ✅ sem sessão → **307** para `/login`; com sessão → **200** (`/chat`, `/dashboard`, `/medicos`, `/perfil`) |
 | CI (`.github/workflows/ci.yml`) | lint → typecheck → test → build | ⚠️ **depende do Node** — `scripts/setup-supabase.mjs` e `scripts/ops/*.mjs` exigem Node ≥ 22; o job usa 20 |
 | Migrações | — | ✅ **`002→009` no banco** (`008`/`009` aplicadas em 01/10/2026; preflight exit 0). Ainda falta o `...000001_schema_base.sql` (Fase 1.6) para banco limpo |
 | E2E / smoke em produção | — | ❌ não realizado |
@@ -322,15 +325,15 @@ Evidências do estado em que ficou (27/09) e do que a sessão 2 fez:
 - [x] **1.8** **Dados do SQLite → Supabase** — **feito (01/10/2026)**: `006`, `007`, `008` e `009` aplicadas, `node scripts/setup-supabase.mjs --apply` executado (161 inseridos / 5 atualizados; reexecução = 0). Preflight com exit 0 e smoke pós-migração: `/dashboard`, `/consultas`, `/api/auth/me`, `/api/appointments`, `/api/stats`, `/api/pacientes`, `/api/clinica`, `/api/especialidades` → **todos 200**.
 
 > **Próximo passo (é onde paramos agora):** Fase 1 está **7/8** (resta a `1.6` —
-> `...000001_schema_base.sql` para banco limpo) e a Fase 2.1 está **feita**.
-> Seguir para a **2.2** (`chat/layout.tsx` lê o cookie HMAC antigo → **`/chat`
-> está inacessível em produção**) e depois 2.3–2.6.
+> `...000001_schema_base.sql` para banco limpo) e a Fase 2 está em **3 de 6**
+> (2.1, 2.2 e 2.3 ✅). Seguir para a **2.4** (definir quem usa `service_role` ×
+> `anon` × `authenticated` e remover o `GRANT ALL ... TO anon` da migração `004`).
 
-### Fase 2 — Auth, tenant e RLS (P0/P1)
+### Fase 2 — Auth, tenant e RLS (P0/P1) — ⏳ 3 de 6 concluídas
 
 - [x] **2.1** Trocar `src/lib/supabase.ts` (client anônimo sem sessão) por `createBrowserClient` de `@supabase/ssr` em **`src/app/(app)/medicos/page.tsx`** — hoje a página quase certamente lê vazio e não consegue gravar por causa do RLS. — **feito (01/10/2026), em vez do caminho literal:** diagnóstico primeiro mostrou que a **leitura** funcionava com a sessão (anon key + JWT → `clinic_id: 1`, `get_user_clinic_ids()` = `[1]`), mas o **INSERT devolvia `42501`** porque a página não envia `clinic_id` (coluna sem default) e o `WITH CHECK` do `tenant_insert` rejeita. Decisão do produto: seguir pelo caminho dos demais cadastros — criadas `GET/POST /api/professionals` e `PATCH/PUT/DELETE /api/professionals/[id]` sobre `services/doctors.ts` (`supabaseAdmin` + `getDefaultClinicId()`), página reescrita para `fetch`, `email` adicionado a `Doctor`/`DoctorView`/`createDoctor`/`updateDoctor` e o export `supabase` (anon) removido de `src/lib/supabase.ts` (agora só existe `supabaseAdmin`, e nenhum componente de cliente importa Supabase direto). **E2E:** sem sessão → 401; GET → 200 (10 profissionais, com `specialty_name` e agenda); POST → 201; PATCH → 200; DELETE → 200; página `/medicos` → 200.
-- [ ] **2.2** Aposentar o auth legado: `chat/layout.tsx:5,8` lê o cookie HMAC antigo → **`/chat` está inacessível em produção**. Migrar para `supabase.auth.getUser()` + checagem de papel.
-- [ ] **2.3** Revisar `proxy.ts`: matcher não cobre `/configuracoes`, `/pacientes` está no matcher mas o redirect checa `/settings` e `/appointments` (rotas que não existem).
+- [x] **2.2** Aposentar o auth legado: `chat/layout.tsx:5,8` lê o cookie HMAC antigo → **`/chat` está inacessível em produção**. Migrar para `supabase.auth.getUser()` + checagem de papel. — **feito (01/10/2026):** `chat/layout.tsx` agora usa `createClient()` (server) + `getUser()` + papel de `admin_profiles` (RLS de próprio registro) e **liberou para qualquer papel de admin** (decisão de produto: `admin` é o papel real do usuário; antes o gate `super_admin`/`saas_admin` + bypass de dev escondia o problema). `sidebar.tsx` perdeu `superAdminOnly`, `canAccessItem` e o bypass `NODE_ENV===development`; `(app)/layout.tsx` parou de buscar `admin_profiles` só para a sidebar. **`src/lib/auth.ts` e `src/lib/__tests__/auth.test.ts` apagados** (zero consumidores; os testes reimplementavam a lógica em vez de importar o módulo). **E2E:** sem sessão → 307 `/login`; com sessão → `/chat` 200, `/dashboard` 200, `/medicos` 200, `/perfil` 200.
+- [x] **2.3** Revisar `proxy.ts`: matcher não cobre `/configuracoes`, `/pacientes` está no matcher mas o redirect checa `/settings` e `/appointments` (rotas que não existem). — **feito (01/10/2026):** lista `PROTECTED_ROUTES` derivada das 9 páginas reais do grupo `(app)`, removidos `/settings` e `/appointments` (não existem), **`/configuracoes` adicionado** (antes `configuracoes/assinatura` passava pelo proxy e só o `layout` fazia a checagem), matcher alinhado à lista e **`/api/:path*` incluído** com comportamento de refresh-only (API nunca redireciona — continua 401 do handler). Checagem de cookie agora aceita **chunks** (`sb-<ref>-auth-token.0`). **Achado corrigido:** o proxy criava o client do Supabase e o descartava (`void supabase`), então o **refresh da sessão era feito e jogado fora** — Server Component não consegue gravar cookie e `/api/auth/me` usa `setAll() {}`; um cookie com `expires_at` no passado devolvia **0 `Set-Cookie`**. Agora o proxy chama `getSession()` (em `try/catch`) e persiste a sessão: mesmo cookie expirado → **`Set-Cookie`** com `expires_at` +60min e o próximo request dá 200. **Teste de regressão:** `src/__tests__/proxy.test.ts` (5 testes) falha se `PROTECTED_ROUTES` e `config.matcher` saírem de sincronia. **E2E:** sem sessão → 307 nas 9 páginas e 200 nas públicas (`/login`, `/precos`, `/agendamento-*`, `/landing`), API sem sessão → 401/200 **nunca** redirect; com sessão → 9/9 páginas 200.
 - [ ] **2.4** Definir quem usa `service_role` × `anon` × `authenticated`; remover o `GRANT ALL ... TO anon` da migração `004`.
 - [ ] **2.5** Aplicar/verificar as migrações 002→005 **num banco limpo** e registrar o resultado (log anexado a este documento).
 - [ ] **2.6** Remover as policies mortas `USING (false)` e corrigir as policies de `doctor_schedule` (apontam para `doctors_legacy`).
@@ -356,7 +359,7 @@ Evidências do estado em que ficou (27/09) e do que a sessão 2 fez:
 
 - [x] **5.1** Zerar os **36 erros** de ESLint (20 `set-state-in-effect`, 8 `error-boundaries`, 8 `no-require-imports`) — **feito em 01/10/2026** (`eslint` agora 0 erros / 0 warnings).
 - [ ] **5.2** CI: trocar Node 20 → 22/24 (hoje o job de build quebraria por `node:sqlite`) e alinhar `README` ("Node 20.9+"), `.node-version` e `engines`.
-- [ ] **5.3** Alçar cobertura: testes de regras de negócio (`appointments`: 4h/1 remarcação/2h), do agente (loop, transferência, quota) e do scheduler de lembretes. Hoje 42 testes cobrem apenas auth legada, sanitização e HMAC.
+- [ ] **5.3** Alçar cobertura: testes de regras de negócio (`appointments`: 4h/1 remarcação/2h), do agente (loop, transferência, quota), do scheduler de lembretes **e do fluxo real de login/signup** (a Fase 2.2 apagou os 9 do auth legado). Hoje 33 testes cobrem apenas sanitização e HMAC de webhook.
 - [ ] **5.4** Ligar `test:coverage`/status check obrigatório no GitHub.
 
 ### Fase 6 — Segurança e operação (P0/P1)
@@ -404,7 +407,7 @@ Evidências do estado em que ficou (27/09) e do que a sessão 2 fez:
 ```bash
 npx tsc --noEmit                        # ✅ 0 erros
 npm run build                           # ✅ exit 0
-npm test                                # ✅ 42/42
+npm test                                # ✅ 38/38
 npm run lint                            # ✅ 0 erros, 0 warnings
 node scripts/setup-supabase.mjs         # dry-run do SQLite -> Supabase
 node scripts/setup-supabase.mjs --apply # executa (rode depois da migração 006)
