@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 
+// Papéis que podem operar sem clinic_members (plataforma, não tenant).
+const PLATFORM_ROLES = new Set(["super_admin", "saas_admin"]);
+
 export async function POST(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -42,20 +45,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Email e senha são obrigatórios." }, { status: 400 });
   }
 
-  console.log("[auth/login] Tentando signInWithPassword para:", email);
-  console.log("DEBUG LOGIN ERROR: STEP 1 - email:", email);
-
-  // Usar o client com anon key + cookies para signInWithPassword (service_role causa "Database error querying schema")
+  // signInWithPassword precisa do client anon + cookies: usar service_role
+  // aqui dispara "Database error querying schema" no GoTrue.
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
-  console.log("DEBUG LOGIN ERROR: STEP 2 - signIn result:", JSON.stringify({ hasData: !!data, hasError: !!error, errorMessage: error?.message, errorCode: error?.code, userId: data?.user?.id }));
-
   if (error) {
-    console.error("[auth/login] signInWithPassword error:", JSON.stringify(error, null, 2));
-    console.error("DEBUG LOGIN ERROR: STEP 2 FAILED:", JSON.stringify(error, null, 2));
+    // Sem e-mail/ID nos logs (PII); o código do GoTrue já orienta a causa.
+    console.error("[auth/login] signInWithPassword:", error.code ?? error.status, error.message);
     return NextResponse.json(
       { error: error.message, code: error.code, status: error.status },
       { status: 401 }
@@ -63,67 +62,73 @@ export async function POST(request: NextRequest) {
   }
 
   if (!data.user) {
-    console.error("DEBUG LOGIN ERROR: STEP 2 FAILED - no user in data");
     return NextResponse.json({ error: "Usuário não encontrado." }, { status: 401 });
   }
 
-  console.log("[auth/login] signInWithPassword OK, user:", data.user.id, data.user.email);
+  const userId = data.user.id;
 
-  // Buscar dados do admin_profiles com service_role (bypassa RLS)
-  let adminProfile = null;
-  try {
-    console.log("DEBUG LOGIN ERROR: STEP 3 - querying admin_profiles for user_id:", data.user.id);
-    const { data: profile, error: profileError } = await serviceClient
-      .from("admin_profiles")
-      .select("role, legacy_username")
-      .eq("user_id", data.user.id)
-      .single();
+  const { data: adminProfile, error: profileError } = await serviceClient
+    .from("admin_profiles")
+    .select("role, legacy_username")
+    .eq("user_id", userId)
+    .maybeSingle();
 
-    if (profileError) {
-      console.error("[auth/login] admin_profiles query error:", JSON.stringify(profileError, null, 2));
-      console.error("DEBUG LOGIN ERROR: STEP 3 FAILED:", JSON.stringify(profileError, null, 2));
-    } else {
-      adminProfile = profile;
-      console.log("[auth/login] admin_profile found:", profile);
-      console.log("DEBUG LOGIN ERROR: STEP 3 OK:", JSON.stringify(profile));
-    }
-  } catch (e) {
-    console.error("[auth/login] admin_profiles unexpected error:", e);
-    console.error("DEBUG LOGIN ERROR: STEP 3 EXCEPTION:", JSON.stringify(e));
+  if (profileError) {
+    console.error("[auth/login] falha ao ler admin_profiles:", profileError.code, profileError.message);
+    return NextResponse.json(
+      { error: "Não foi possível verificar o perfil do usuário.", code: "PROFILE_QUERY_FAILED" },
+      { status: 500 }
+    );
   }
 
-  // Buscar clínicas do usuário com service_role
-  let clinicIds: string[] = [];
-  try {
-    console.log("DEBUG LOGIN ERROR: STEP 4 - querying clinic_members for user_id:", data.user.id);
-    const { data: clinics, error: clinicError } = await serviceClient
-      .from("clinic_members")
-      .select("clinic_id")
-      .eq("user_id", data.user.id)
-      .eq("active", true);
-
-    if (clinicError) {
-      console.error("[auth/login] clinic_members query error:", JSON.stringify(clinicError, null, 2));
-      console.error("DEBUG LOGIN ERROR: STEP 4 FAILED:", JSON.stringify(clinicError, null, 2));
-    } else if (clinics) {
-      clinicIds = clinics.map((c) => String(c.clinic_id));
-      console.log("[auth/login] clinic_ids:", clinicIds);
-      console.log("DEBUG LOGIN ERROR: STEP 4 OK:", JSON.stringify(clinicIds));
-    }
-  } catch (e) {
-    console.error("[auth/login] clinic_members unexpected error:", e);
-    console.error("DEBUG LOGIN ERROR: STEP 4 EXCEPTION:", JSON.stringify(e));
+  // Sem perfil não há papel: hoje isso virava fallback silencioso ("admin").
+  if (!adminProfile) {
+    console.error("[auth/login] admin_profiles ausente para user_id:", userId);
+    return NextResponse.json(
+      {
+        error: "Perfil administrativo não encontrado para este usuário. Contate o suporte.",
+        code: "PROFILE_MISSING",
+      },
+      { status: 403 }
+    );
   }
 
-  console.log("DEBUG LOGIN ERROR: STEP 5 - returning response with user:", data.user.id, "adminProfile:", adminProfile, "clinicIds:", clinicIds);
+  const { data: clinics, error: clinicError } = await serviceClient
+    .from("clinic_members")
+    .select("clinic_id")
+    .eq("user_id", userId)
+    .eq("active", true);
+
+  if (clinicError) {
+    console.error("[auth/login] falha ao ler clinic_members:", clinicError.code, clinicError.message);
+    return NextResponse.json(
+      { error: "Não foi possível verificar as clínicas do usuário.", code: "CLINIC_QUERY_FAILED" },
+      { status: 500 }
+    );
+  }
+
+  const clinicIds = (clinics ?? []).map((c) => String(c.clinic_id));
+
+  // Sem clínica o RLS devolve vazio em toda leitura autenticada — bloquear
+  // aqui é melhor do que entregar um painel em branco.
+  if (clinicIds.length === 0 && !PLATFORM_ROLES.has(adminProfile.role)) {
+    console.error("[auth/login] clinic_members vazio para user_id:", userId);
+    return NextResponse.json(
+      {
+        error: "Este usuário não está vinculado a nenhuma clínica. Contate o suporte.",
+        code: "CLINIC_MISSING",
+      },
+      { status: 403 }
+    );
+  }
 
   const response = NextResponse.json({
     ok: true,
     user: {
       id: data.user.id,
       email: data.user.email,
-      role: adminProfile?.role ?? "admin",
-      username: adminProfile?.legacy_username ?? data.user.email,
+      role: adminProfile.role,
+      username: adminProfile.legacy_username ?? data.user.email,
       clinicIds,
     },
   });

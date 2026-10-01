@@ -217,111 +217,20 @@ CREATE POLICY clinics_member_select ON clinics
 
 
 -- ============================================================
--- FASE 5: MIGRAR ADMINS EXISTENTES → AUTH.USERS
+-- FASE 5: MIGRAR ADMINS EXISTENTES → AUTH.USERS  (REMOVIDA)
 -- ============================================================
--- Para cada admin na tabela admins:
---   1. Gerar UUID
---   2. Criar auth.users com email (ou fallback)
---   3. Inserir em admin_profiles
---   4. Inserir em clinic_members (vínculo à clínica)
+-- A versao original desta fase fazia INSERT direto em auth.users
+-- (colunas e triggers que nem sempre existem) e CORROMPEU o schema
+-- auth do projeto — causa do incidente de login de 27/09/2026.
+--
+-- Ela foi extraida para:
+--   supabase/migrations/20260930000009_admins_auth_link.sql
+-- que NAO escreve em auth.users (GoTrue e a unica fonte de usuarios),
+-- e idempotente — pode ser reexecutada num banco vivo.
+--
+-- Se esta migration ja rodou no seu banco, nao ha nada a desfazer:
+-- a funcao auxiliar era droppada no final e nao deixa residuo.
 -- ============================================================
-
--- Função auxiliar para migrar um admin
-CREATE OR REPLACE FUNCTION migrate_admin_to_auth(
-  p_admin_id BIGINT,
-  p_username TEXT,
-  p_email TEXT,
-  p_role TEXT,
-  p_clinic_id BIGINT
-)
-RETURNS UUID
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_user_uuid UUID;
-  v_email TEXT;
-  v_password TEXT;
-BEGIN
-  -- Se não tem email, gerar fallback
-  v_email := COALESCE(
-    NULLIF(TRIM(p_email), ''),
-    p_username || '@saudesync.local'
-  );
-
-  -- Gerar UUID para o novo usuário
-  v_user_uuid := gen_random_uuid();
-
-  -- Gerar senha temporária (será resetada no primeiro login)
-  v_password := encode(gen_random_bytes(16), 'hex');
-
-  -- Inserir em auth.users
-  INSERT INTO auth.users (
-    instance_id, id, aud, role, email, encrypted_password,
-    email_confirmed_at, recovery_token, confirmation_token,
-    confirmation_token_current_sent_at,
-    created_at, updated_at, confirmation_sent_at
-  ) VALUES (
-    '00000000-0000-0000-0000-000000000000',
-    v_user_uuid,
-    'authenticated',
-    'authenticated',
-    v_email,
-    crypt(v_password, gen_salt('bf')),
-    now(),
-    '',
-    '',
-    now(),
-    now(),
-    now(),
-    now()
-  );
-
-  -- Inserir em admin_profiles
-  INSERT INTO admin_profiles (user_id, legacy_admin_id, legacy_username, role)
-  VALUES (v_user_uuid, p_admin_id, p_username, COALESCE(p_role, 'admin'));
-
-  -- Vincular à clínica via clinic_members
-  IF p_clinic_id IS NOT NULL THEN
-    INSERT INTO clinic_members (clinic_id, user_id, role, active)
-    VALUES (p_clinic_id, v_user_uuid, 'owner', true)
-    ON CONFLICT (clinic_id, user_id) DO NOTHING;
-  END IF;
-
-  RAISE NOTICE 'Admin migrado: % → % (%)', p_username, v_user_uuid, v_email;
-
-  RETURN v_user_uuid;
-END;
-$$;
-
--- Executar migração para todos os admins
-DO $$
-DECLARE
-  admin_rec RECORD;
-  v_clinic_id BIGINT;
-BEGIN
-  -- Buscar a primeira clínica (padrão para migração)
-  SELECT id INTO v_clinic_id FROM clinics LIMIT 1;
-
-  FOR admin_rec IN
-    SELECT id, username, email, role FROM admins
-  LOOP
-    BEGIN
-      PERFORM migrate_admin_to_auth(
-        admin_rec.id,
-        admin_rec.username,
-        COALESCE(admin_rec.email, ''),
-        admin_rec.role,
-        v_clinic_id
-      );
-    EXCEPTION WHEN OTHERS THEN
-      RAISE NOTICE 'Erro ao migrar admin %: %', admin_rec.username, SQLERRM;
-    END;
-  END LOOP;
-END $$;
-
--- Limpar função auxiliar (não é necessária após migração)
-DROP FUNCTION IF EXISTS migrate_admin_to_auth(BIGINT, TEXT, TEXT, TEXT, BIGINT);
 
 
 -- ============================================================

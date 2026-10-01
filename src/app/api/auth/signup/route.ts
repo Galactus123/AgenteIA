@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { supabaseAdmin } from "@/lib/supabase";
 
+// Cria o usuario e, na mesma requisicao, o tenant minimo que o RLS exige:
+//   profiles -> admin_profiles -> clinics -> clinic_members
+// Sem clinic_members o get_user_clinic_ids() volta vazio e TODA leitura
+// autenticada devolve [] (paginas em branco).
+//
+// Nao ha transacao no PostgREST: cada passo e verificado e, em falha, o
+// que ja foi criado e removido em ordem inversa (inclusive o usuario em
+// auth.users), para nunca deixar usuario orfao sem clínica.
 export async function POST(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -28,7 +37,8 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const email = String(body?.email ?? "").trim().toLowerCase();
   const password = String(body?.password ?? "");
-  const name = String(body?.name ?? "").trim();
+  const name = String(body?.name ?? body?.username ?? "").trim();
+  const clinicName = String(body?.clinicName ?? "").trim() || name;
 
   if (!email || !password || !name) {
     return NextResponse.json(
@@ -44,13 +54,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Criar usuário no Supabase Auth
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: {
-      data: { display_name: name },
-    },
+    options: { data: { display_name: name } },
   });
 
   if (error) {
@@ -61,19 +68,64 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Erro ao criar usuário." }, { status: 500 });
   }
 
-  // Criar perfil
-  await supabase.from("profiles").insert({
-    user_id: data.user.id,
-    display_name: name,
-  });
+  // Supabase devolve o usuario existente sem erro quando o e-mail ja existe.
+  if (data.user.identities && data.user.identities.length === 0) {
+    return NextResponse.json(
+      { error: "Este e-mail já está cadastrado." },
+      { status: 409 }
+    );
+  }
 
-  // Criar admin_profile
-  await supabase.from("admin_profiles").insert({
-    user_id: data.user.id,
-    role: "admin",
-  });
+  const userId = data.user.id;
+  let clinicId: number | null = null;
 
-  const response = NextResponse.json({ ok: true, userId: data.user.id }, { status: 201 });
+  try {
+    const { error: profilesError } = await supabaseAdmin
+      .from("profiles")
+      .insert({ user_id: userId, display_name: name });
+    if (profilesError) throw new Error(`profiles: ${profilesError.message}`);
+
+    const { error: adminError } = await supabaseAdmin
+      .from("admin_profiles")
+      .insert({ user_id: userId, role: "admin" });
+    if (adminError) throw new Error(`admin_profiles: ${adminError.message}`);
+
+    const { data: clinic, error: clinicError } = await supabaseAdmin
+      .from("clinics")
+      .insert({ name: clinicName })
+      .select("id")
+      .single();
+    if (clinicError || !clinic) {
+      throw new Error(`clinics: ${clinicError?.message ?? "sem id retornado"}`);
+    }
+    clinicId = Number(clinic.id);
+
+    const { error: memberError } = await supabaseAdmin
+      .from("clinic_members")
+      .insert({ clinic_id: clinicId, user_id: userId, role: "owner", active: true });
+    if (memberError) throw new Error(`clinic_members: ${memberError.message}`);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    console.error("[auth/signup] falha ao criar tenant, revertendo:", reason);
+
+    await supabaseAdmin.from("clinic_members").delete().eq("user_id", userId);
+    if (clinicId !== null) {
+      await supabaseAdmin.from("clinics").delete().eq("id", clinicId);
+    }
+    await supabaseAdmin.from("admin_profiles").delete().eq("user_id", userId);
+    await supabaseAdmin.from("profiles").delete().eq("user_id", userId);
+    await supabaseAdmin.auth.admin.deleteUser(userId);
+
+    return NextResponse.json(
+      { error: "Não foi possível completar o cadastro. Tente novamente." },
+      { status: 500 }
+    );
+  }
+
+  const response = NextResponse.json(
+    { ok: true, userId, clinicId },
+    { status: 201 }
+  );
   supabaseResponse.cookies.getAll().forEach((cookie) => {
     response.cookies.set(cookie.name, cookie.value, cookie);
   });

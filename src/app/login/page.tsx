@@ -91,7 +91,7 @@ export default function AuthPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        username: signupName,
+        name: signupName,
         email: signupEmail,
         password: signupPass,
       }),
