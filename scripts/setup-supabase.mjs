@@ -201,14 +201,28 @@ async function main() {
         migration: "20260930000007_appointments_clinic_fk.sql",
         path: "appointments?select=id,clinics(name,address)&limit=1",
       },
+      {
+        label: "appointments -> patients",
+        migration: "20260930000008_appointments_patient_fk.sql",
+        path: "appointments?select=id,patients(name)&limit=1",
+        // Nenhum SELECT do app embute patients (a rota que usava isso foi
+        // removida na Fase 1.5) — a FK vale por integridade, nao por UI.
+        optional: true,
+      },
     ];
     const broken = [];
+    const optionalBroken = [];
     for (const p of probes) {
       try {
         await select(p.path);
       } catch (err) {
-        broken.push(p);
-        fail(`${p.label}: ${err.message}`);
+        if (p.optional) {
+          optionalBroken.push(p);
+          warn(`${p.label}: FK ausente (${p.migration}) — integridade, nao bloqueia o app`);
+        } else {
+          broken.push(p);
+          fail(`${p.label}: ${err.message}`);
+        }
       }
     }
     if (broken.length) {
@@ -224,7 +238,11 @@ async function main() {
       fail("(ou use --skip-preflight para migrar mesmo assim)");
       process.exit(1);
     }
-    ok("Foreign keys de 006 e 007 presentes (embeddings OK)");
+    ok(
+      optionalBroken.length
+        ? "Foreign keys de 006 e 007 presentes (embeddings do app OK)"
+        : "Foreign keys de 006, 007 e 008 presentes (embeddings OK)"
+    );
   } else {
     warn("preflight de FKs ignorado (--skip-preflight)");
   }
