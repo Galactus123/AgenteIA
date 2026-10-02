@@ -7,7 +7,7 @@
 --
 -- BANCO ALVO: Supabase (PostgreSQL)
 -- ESTADO ATUAL DO BANCO (inspecionado):
---   14 tabelas English (RLS ativo, criadas por supabase-migration.sql)
+--   14 tabelas English (RLS ativo, criadas pela 20260911000001)
 --   3 tabelas Portuguese (SEM RLS, com dados reais)
 --   12 tabelas NAO EXISTEM
 --
@@ -307,19 +307,29 @@ UPDATE admins SET clinic_id = (SELECT id FROM clinics LIMIT 1) WHERE clinic_id I
 -- ── 2.1 especialidades → specialties ─────────────────────────
 -- especialidades: id UUID, nome, created_at
 -- specialties: id BIGSERIAL, name, description, keywords, clinic_id
+-- Guarda (Fase 2.5): num banco limpo nao ha tabelas Portuguese —
+-- a secao inteira e pulada com NOTICE quando a fonte nao existe.
 
-INSERT INTO specialties (name, description, keywords, clinic_id, created_at)
-SELECT
-  e.nome,
-  '',
-  '[]'::text,
-  (SELECT id FROM clinics LIMIT 1),
-  e.created_at
-FROM especialidades e
-WHERE NOT EXISTS (
-  SELECT 1 FROM specialties s WHERE s.name = e.nome
-)
-ON CONFLICT (name) DO NOTHING;
+DO $$
+BEGIN
+  IF to_regclass('public.especialidades') IS NULL THEN
+    RAISE NOTICE '2.1 pulada: tabela especialidades nao existe (banco limpo)';
+    RETURN;
+  END IF;
+
+  INSERT INTO specialties (name, description, keywords, clinic_id, created_at)
+  SELECT
+    e.nome,
+    '',
+    '[]'::text,
+    (SELECT id FROM clinics LIMIT 1),
+    e.created_at
+  FROM especialidades e
+  WHERE NOT EXISTS (
+    SELECT 1 FROM specialties s WHERE s.name = e.nome
+  )
+  ON CONFLICT (name) DO NOTHING;
+END $$;
 
 
 -- ── 2.2 medicos → professionals ──────────────────────────────
@@ -329,31 +339,40 @@ ON CONFLICT (name) DO NOTHING;
 -- professionals: id UUID (novo), clinic_id, name, specialty_name,
 --   specialty_id, phone, email, consultation_duration, price,
 --   status, schedule, created_at
+-- Guarda (Fase 2.5): pula num banco limpo (tabela medicos ausente).
 
-INSERT INTO professionals (
-  clinic_id, name, specialty_name, specialty_id, phone, email,
-  consultation_duration, price, status, schedule, created_at
-)
-SELECT
-  (SELECT id FROM clinics LIMIT 1),
-  m.nome,
-  COALESCE(m.especialidade, ''),
-  (
-    SELECT s.id FROM specialties s
-    WHERE s.name = m.especialidade
-    LIMIT 1
-  ),
-  COALESCE(m.telefone, ''),
-  COALESCE(m.email, ''),
-  COALESCE(m.duracao_consulta, 30),
-  COALESCE(m.valor_consulta, 0),
-  CASE WHEN LOWER(m.status) IN ('ativo', 'active') THEN 'active' ELSE 'inactive' END,
-  COALESCE(m.dias_atendimento, '[]'::jsonb),
-  m.created_at
-FROM medicos m
-WHERE NOT EXISTS (
-  SELECT 1 FROM professionals p WHERE p.name = m.nome AND p.clinic_id = (SELECT id FROM clinics LIMIT 1)
-);
+DO $$
+BEGIN
+  IF to_regclass('public.medicos') IS NULL THEN
+    RAISE NOTICE '2.2 pulada: tabela medicos nao existe (banco limpo)';
+    RETURN;
+  END IF;
+
+  INSERT INTO professionals (
+    clinic_id, name, specialty_name, specialty_id, phone, email,
+    consultation_duration, price, status, schedule, created_at
+  )
+  SELECT
+    (SELECT id FROM clinics LIMIT 1),
+    m.nome,
+    COALESCE(m.especialidade, ''),
+    (
+      SELECT s.id FROM specialties s
+      WHERE s.name = m.especialidade
+      LIMIT 1
+    ),
+    COALESCE(m.telefone, ''),
+    COALESCE(m.email, ''),
+    COALESCE(m.duracao_consulta, 30),
+    COALESCE(m.valor_consulta, 0),
+    CASE WHEN LOWER(m.status) IN ('ativo', 'active') THEN 'active' ELSE 'inactive' END,
+    COALESCE(m.dias_atendimento, '[]'::jsonb),
+    m.created_at
+  FROM medicos m
+  WHERE NOT EXISTS (
+    SELECT 1 FROM professionals p WHERE p.name = m.nome AND p.clinic_id = (SELECT id FROM clinics LIMIT 1)
+  );
+END $$;
 
 
 -- ── 2.3 pacientes → patients ─────────────────────────────────
@@ -361,26 +380,35 @@ WHERE NOT EXISTS (
 --   data_nascimento, created_at, endereco, observacoes
 -- patients: id UUID (novo), clinic_id, name, cpf, phone, email,
 --   date_of_birth, address, notes, status, created_at
+-- Guarda (Fase 2.5): pula num banco limpo (tabela pacientes ausente).
 
-INSERT INTO patients (
-  clinic_id, name, cpf, phone, email, date_of_birth,
-  address, notes, status, created_at
-)
-SELECT
-  (SELECT id FROM clinics LIMIT 1),
-  p.nome,
-  COALESCE(p.cpf, ''),
-  COALESCE(p.telefone, ''),
-  COALESCE(p.email, ''),
-  p.data_nascimento,
-  COALESCE(p.endereco, ''),
-  COALESCE(p.observacoes, ''),
-  'active',
-  p.created_at
-FROM pacientes p
-WHERE NOT EXISTS (
-  SELECT 1 FROM patients pt WHERE pt.name = p.nome AND pt.clinic_id = (SELECT id FROM clinics LIMIT 1)
-);
+DO $$
+BEGIN
+  IF to_regclass('public.pacientes') IS NULL THEN
+    RAISE NOTICE '2.3 pulada: tabela pacientes nao existe (banco limpo)';
+    RETURN;
+  END IF;
+
+  INSERT INTO patients (
+    clinic_id, name, cpf, phone, email, date_of_birth,
+    address, notes, status, created_at
+  )
+  SELECT
+    (SELECT id FROM clinics LIMIT 1),
+    p.nome,
+    COALESCE(p.cpf, ''),
+    COALESCE(p.telefone, ''),
+    COALESCE(p.email, ''),
+    p.data_nascimento,
+    COALESCE(p.endereco, ''),
+    COALESCE(p.observacoes, ''),
+    'active',
+    p.created_at
+  FROM pacientes p
+  WHERE NOT EXISTS (
+    SELECT 1 FROM patients pt WHERE pt.name = p.nome AND pt.clinic_id = (SELECT id FROM clinics LIMIT 1)
+  );
+END $$;
 
 
 -- ── 2.4 Mapeamento de IDs legado → novos UUIDs ───────────────
@@ -388,6 +416,8 @@ WHERE NOT EXISTS (
 -- para novos UUIDs (patients/professionals) SEM join por nome.
 -- Schema real consultas: id, paciente_id, medico_id, data_hora,
 --   status, observacoes, created_at
+-- Guarda (Fase 2.5): os INSERTs rodam so quando a tabela fonte
+-- existe; a temp table e criada sempre (vazia num banco limpo).
 
 CREATE TEMP TABLE IF NOT EXISTS _id_mapping (
   legacy_table  TEXT NOT NULL,
@@ -395,15 +425,26 @@ CREATE TEMP TABLE IF NOT EXISTS _id_mapping (
   new_id        UUID NOT NULL
 );
 
-INSERT INTO _id_mapping (legacy_table, legacy_id, new_id)
-SELECT 'medicos', m.id, p.id
-FROM medicos m
-JOIN professionals p ON p.name = m.nome AND p.clinic_id = (SELECT id FROM clinics LIMIT 1);
+DO $$
+BEGIN
+  IF to_regclass('public.medicos') IS NOT NULL THEN
+    INSERT INTO _id_mapping (legacy_table, legacy_id, new_id)
+    SELECT 'medicos', m.id, p.id
+    FROM medicos m
+    JOIN professionals p ON p.name = m.nome AND p.clinic_id = (SELECT id FROM clinics LIMIT 1);
+  ELSE
+    RAISE NOTICE '2.4 (medicos) pulada: tabela medicos nao existe (banco limpo)';
+  END IF;
 
-INSERT INTO _id_mapping (legacy_table, legacy_id, new_id)
-SELECT 'pacientes', pa.id, pt.id
-FROM pacientes pa
-JOIN patients pt ON pt.name = pa.nome AND pt.clinic_id = (SELECT id FROM clinics LIMIT 1);
+  IF to_regclass('public.pacientes') IS NOT NULL THEN
+    INSERT INTO _id_mapping (legacy_table, legacy_id, new_id)
+    SELECT 'pacientes', pa.id, pt.id
+    FROM pacientes pa
+    JOIN patients pt ON pt.name = pa.nome AND pt.clinic_id = (SELECT id FROM clinics LIMIT 1);
+  ELSE
+    RAISE NOTICE '2.4 (pacientes) pulada: tabela pacientes nao existe (banco limpo)';
+  END IF;
+END $$;
 
 
 -- ── 2.5 consultas → appointments ─────────────────────────────
@@ -411,40 +452,49 @@ JOIN patients pt ON pt.name = pa.nome AND pt.clinic_id = (SELECT id FROM clinics
 --   data_hora TIMESTAMPTZ, status TEXT, observacoes TEXT, created_at
 -- Schema real appointments: starts_at TEXT, ends_at TEXT
 -- NOTA: starts_at/ends_at sao TEXT — cast ::text necessario.
+-- Guarda (Fase 2.5): pula num banco limpo (tabela consultas ausente).
 
-INSERT INTO appointments (
-  patient_name, patient_phone, specialty_id, doctor_id,
-  starts_at, ends_at, status, reason, source, clinic_id,
-  patient_id, professional_id
-)
-SELECT
-  COALESCE(pt.name, 'Paciente'),
-  COALESCE(pt.phone, ''),
-  COALESCE(pro.specialty_id, (SELECT id FROM specialties LIMIT 1)),
-  NULL,
-  c.data_hora::text,
-  (c.data_hora + (COALESCE(pro.consultation_duration, 30) || ' minutes')::interval)::text,
-  CASE
-    WHEN c.status IN ('realizada', 'completed') THEN 'completed'
-    WHEN c.status IN ('cancelada', 'cancelled') THEN 'cancelled'
-    ELSE 'scheduled'
-  END,
-  COALESCE(c.observacoes, ''),
-  'ia',
-  (SELECT id FROM clinics LIMIT 1),
-  pt.id,
-  pro.id
-FROM consultas c
-LEFT JOIN _id_mapping mp ON mp.legacy_table = 'pacientes' AND mp.legacy_id = c.paciente_id
-LEFT JOIN patients pt ON pt.id = mp.new_id
-LEFT JOIN _id_mapping mpro ON mpro.legacy_table = 'medicos' AND mpro.legacy_id = c.medico_id
-LEFT JOIN professionals pro ON pro.id = mpro.new_id
-WHERE NOT EXISTS (
-  SELECT 1 FROM appointments a
-  WHERE a.patient_id = pt.id
-  AND a.starts_at = c.data_hora::text
-  AND a.clinic_id = (SELECT id FROM clinics LIMIT 1)
-);
+DO $$
+BEGIN
+  IF to_regclass('public.consultas') IS NULL THEN
+    RAISE NOTICE '2.5 pulada: tabela consultas nao existe (banco limpo)';
+    RETURN;
+  END IF;
+
+  INSERT INTO appointments (
+    patient_name, patient_phone, specialty_id, doctor_id,
+    starts_at, ends_at, status, reason, source, clinic_id,
+    patient_id, professional_id
+  )
+  SELECT
+    COALESCE(pt.name, 'Paciente'),
+    COALESCE(pt.phone, ''),
+    COALESCE(pro.specialty_id, (SELECT id FROM specialties LIMIT 1)),
+    NULL,
+    c.data_hora::text,
+    (c.data_hora + (COALESCE(pro.consultation_duration, 30) || ' minutes')::interval)::text,
+    CASE
+      WHEN c.status IN ('realizada', 'completed') THEN 'completed'
+      WHEN c.status IN ('cancelada', 'cancelled') THEN 'cancelled'
+      ELSE 'scheduled'
+    END,
+    COALESCE(c.observacoes, ''),
+    'ia',
+    (SELECT id FROM clinics LIMIT 1),
+    pt.id,
+    pro.id
+  FROM consultas c
+  LEFT JOIN _id_mapping mp ON mp.legacy_table = 'pacientes' AND mp.legacy_id = c.paciente_id
+  LEFT JOIN patients pt ON pt.id = mp.new_id
+  LEFT JOIN _id_mapping mpro ON mpro.legacy_table = 'medicos' AND mpro.legacy_id = c.medico_id
+  LEFT JOIN professionals pro ON pro.id = mpro.new_id
+  WHERE NOT EXISTS (
+    SELECT 1 FROM appointments a
+    WHERE a.patient_id = pt.id
+    AND a.starts_at = c.data_hora::text
+    AND a.clinic_id = (SELECT id FROM clinics LIMIT 1)
+  );
+END $$;
 
 -- Limpar tabela temporaria
 DROP TABLE IF EXISTS _id_mapping;

@@ -1,0 +1,355 @@
+=== clean-db-test (Fase 2.5) — 2026-10-02T20:55:49.808Z ===
+Docker OK (engine 29.6.1)
+Container saudesync-migtest (postgres:16) iniciado
+Postgres pronto
+
+--- Bootstrap ---
+
+--- Migrations (11) ---
+> 20260911000001_schema_base.sql
+psql:<stdin>:345: NOTICE:  policy "clinics_isolation" for relation "clinics" does not exist, skipping
+psql:<stdin>:345: NOTICE:  policy "clinic_alerts_isolation" for relation "clinic_alerts" does not exist, skipping
+psql:<stdin>:345: NOTICE:  policy "billing_events_isolation" for relation "billing_events" does not exist, skipping
+psql:<stdin>:345: NOTICE:  policy "admins_isolation" for relation "admins" does not exist, skipping
+psql:<stdin>:345: NOTICE:  policy "specialties_isolation" for relation "specialties" does not exist, skipping
+psql:<stdin>:345: NOTICE:  policy "doctors_isolation" for relation "doctors" does not exist, skipping
+psql:<stdin>:345: NOTICE:  policy "doctor_schedule_isolation" for relation "doctor_schedule" does not exist, skipping
+psql:<stdin>:345: NOTICE:  policy "conversations_isolation" for relation "conversations" does not exist, skipping
+psql:<stdin>:345: NOTICE:  policy "messages_isolation" for relation "messages" does not exist, skipping
+psql:<stdin>:345: NOTICE:  policy "appointments_isolation" for relation "appointments" does not exist, skipping
+psql:<stdin>:345: NOTICE:  policy "reminders_isolation" for relation "reminders" does not exist, skipping
+psql:<stdin>:345: NOTICE:  policy "notifications_isolation" for relation "notifications" does not exist, skipping
+psql:<stdin>:345: NOTICE:  policy "users_isolation" for relation "users" does not exist, skipping
+psql:<stdin>:345: NOTICE:  policy "subscriptions_isolation" for relation "subscriptions" does not exist, skipping
+psql:<stdin>:345: NOTICE:  policy "clinic_members_isolation" for relation "clinic_members" does not exist, skipping
+psql:<stdin>:345: NOTICE:  policy "clinic_units_isolation" for relation "clinic_units" does not exist, skipping
+psql:<stdin>:345: NOTICE:  policy "usage_isolation" for relation "usage" does not exist, skipping
+psql:<stdin>:345: NOTICE:  Policies de isolamento criadas para todas as tabelas
+psql:<stdin>:356: NOTICE:  Permissoes anon revogadas
+  ok (483ms)
+> 20260911000002_rls_fix.sql
+psql:<stdin>:52: NOTICE:  admins: clinic_id ja existe
+psql:<stdin>:66: NOTICE:  doctors: clinic_id ja existe
+psql:<stdin>:80: NOTICE:  specialties: clinic_id ja existe
+psql:<stdin>:94: NOTICE:  conversations: clinic_id ja existe
+psql:<stdin>:108: NOTICE:  appointments: clinic_id ja existe
+psql:<stdin>:122: NOTICE:  notifications: clinic_id ja existe
+psql:<stdin>:136: NOTICE:  users: clinic_id ja existe
+psql:<stdin>:150: NOTICE:  reminders: clinic_id ja existe
+psql:<stdin>:182: NOTICE:  clinic_id populado com default_id=1
+psql:<stdin>:231: NOTICE:  clinic_members: coluna admin_id nao existe (shape definitivo) - bridge legado pulado
+psql:<stdin>:257: NOTICE:  idx_clinic_members_admin_id pulado: coluna admin_id nao existe (shape definitivo)
+psql:<stdin>:433: NOTICE:  policy "api_access_log_block" for relation "api_access_log" does not exist, skipping
+  ok (316ms)
+> 20260911000003_schema_definitivo.sql
+psql:<stdin>:127: NOTICE:  column "clinic_id" of relation "specialties" already exists, skipping
+psql:<stdin>:155: NOTICE:  column "clinic_id" of relation "doctors" already exists, skipping
+psql:<stdin>:181: NOTICE:  column "clinic_id" of relation "appointments" already exists, skipping
+psql:<stdin>:202: NOTICE:  column "clinic_id" of relation "users" already exists, skipping
+psql:<stdin>:203: NOTICE:  column "phone" of relation "users" already exists, skipping
+psql:<stdin>:216: NOTICE:  column "clinic_id" of relation "conversations" already exists, skipping
+psql:<stdin>:240: NOTICE:  column "clinic_id" of relation "notifications" already exists, skipping
+psql:<stdin>:254: NOTICE:  column "clinic_id" of relation "reminders" already exists, skipping
+psql:<stdin>:288: NOTICE:  column "clinic_id" of relation "admins" already exists, skipping
+psql:<stdin>:332: NOTICE:  2.1 pulada: tabela especialidades nao existe (banco limpo)
+psql:<stdin>:375: NOTICE:  2.2 pulada: tabela medicos nao existe (banco limpo)
+psql:<stdin>:411: NOTICE:  2.3 pulada: tabela pacientes nao existe (banco limpo)
+psql:<stdin>:447: NOTICE:  2.4 (medicos) pulada: tabela medicos nao existe (banco limpo)
+psql:<stdin>:447: NOTICE:  2.4 (pacientes) pulada: tabela pacientes nao existe (banco limpo)
+psql:<stdin>:497: NOTICE:  2.5 pulada: tabela consultas nao existe (banco limpo)
+psql:<stdin>:539: NOTICE:  relation "clinic_members" already exists, skipping
+psql:<stdin>:544: NOTICE:  relation "idx_clinic_members_user_id" already exists, skipping
+psql:<stdin>:545: NOTICE:  relation "idx_clinic_members_clinic_id" already exists, skipping
+psql:<stdin>:571: NOTICE:  relation "subscriptions" already exists, skipping
+psql:<stdin>:573: NOTICE:  relation "idx_subscriptions_clinic_id" already exists, skipping
+psql:<stdin>:574: NOTICE:  relation "idx_subscriptions_status" already exists, skipping
+psql:<stdin>:591: NOTICE:  relation "usage" already exists, skipping
+psql:<stdin>:594: NOTICE:  relation "idx_usage_clinic_period" already exists, skipping
+psql:<stdin>:679: NOTICE:  relation "especialidades" does not exist, skipping
+psql:<stdin>:680: NOTICE:  relation "medicos" does not exist, skipping
+psql:<stdin>:681: NOTICE:  relation "pacientes" does not exist, skipping
+psql:<stdin>:682: NOTICE:  relation "consultas" does not exist, skipping
+  ok (547ms)
+> 20260911000004_grant_permissions.sql
+psql:<stdin>:37: NOTICE:  GRANT pulado (tabela inexistente): doctors
+psql:<stdin>:37: NOTICE:  GRANT pulado (tabela inexistente): especialidades_legacy
+psql:<stdin>:37: NOTICE:  GRANT pulado (tabela inexistente): medicos_legacy
+psql:<stdin>:37: NOTICE:  GRANT pulado (tabela inexistente): pacientes_legacy
+psql:<stdin>:37: NOTICE:  GRANT pulado (tabela inexistente): consultas_legacy
+  ok (133ms)
+> 20260911000005_auth_rls.sql
+  ok (229ms)
+> 20260930000006_professionals_unification.sql
+psql:<stdin>:203: NOTICE:  relation "idx_appointments_starts_at" already exists, skipping
+  ok (215ms)
+> 20260930000007_appointments_clinic_fk.sql
+  ok (149ms)
+> 20260930000008_appointments_patient_fk.sql
+  ok (170ms)
+> 20260930000009_admins_auth_link.sql
+psql:<stdin>:89: NOTICE:  Resultado: 0 vinculados, 0 pendentes (sem auth.users), 0 ja vinculados.
+  ok (119ms)
+> 20261002000001_revoke_anon_grants.sql
+schema | relname | relacl 
+--------+---------+--------
+(0 rows)
+
+ tabela_com_grant_para_anon 
+----------------------------
+(0 rows)
+
+ sequence_com_grant_para_anon 
+------------------------------
+(0 rows)
+  ok (189ms)
+> 20261002000002_drop_dead_policies.sql
+schemaname | tablename | policyname 
+------------+-----------+------------
+(0 rows)
+
+ tablename | policyname | qual 
+-----------+------------+------
+(0 rows)
+
+ tabela_sem_rls 
+----------------
+(0 rows)
+
+    tablename    |        policyname         |  cmd   |  roles   
+-----------------+---------------------------+--------+----------
+ admin_profiles  | admin_profiles_own_insert | INSERT | {public}
+ admin_profiles  | admin_profiles_own_select | SELECT | {public}
+ admin_profiles  | admin_profiles_own_update | UPDATE | {public}
+ admins          | tenant_delete             | DELETE | {public}
+ admins          | tenant_insert             | INSERT | {public}
+ admins          | tenant_select             | SELECT | {public}
+ admins          | tenant_update             | UPDATE | {public}
+ appointments    | tenant_delete             | DELETE | {public}
+ appointments    | tenant_insert             | INSERT | {public}
+ appointments    | tenant_select             | SELECT | {public}
+ appointments    | tenant_update             | UPDATE | {public}
+ billing_events  | tenant_delete             | DELETE | {public}
+ billing_events  | tenant_insert             | INSERT | {public}
+ billing_events  | tenant_select             | SELECT | {public}
+ billing_events  | tenant_update             | UPDATE | {public}
+ clinic_alerts   | tenant_delete             | DELETE | {public}
+ clinic_alerts   | tenant_insert             | INSERT | {public}
+ clinic_alerts   | tenant_select             | SELECT | {public}
+ clinic_alerts   | tenant_update             | UPDATE | {public}
+ clinic_members  | cm_own_insert             | INSERT | {public}
+ clinic_members  | cm_own_select             | SELECT | {public}
+ clinics         | clinics_member_select     | SELECT | {public}
+ conversations   | tenant_delete             | DELETE | {public}
+ conversations   | tenant_insert             | INSERT | {public}
+ conversations   | tenant_select             | SELECT | {public}
+ conversations   | tenant_update             | UPDATE | {public}
+ medical_records | tenant_delete             | DELETE | {public}
+ medical_records | tenant_insert             | INSERT | {public}
+ medical_records | tenant_select             | SELECT | {public}
+ medical_records | tenant_update             | UPDATE | {public}
+ messages        | messages_tenant_insert    | INSERT | {public}
+ messages        | messages_tenant_select    | SELECT | {public}
+ notifications   | tenant_delete             | DELETE | {public}
+ notifications   | tenant_insert             | INSERT | {public}
+ notifications   | tenant_select             | SELECT | {public}
+ notifications   | tenant_update             | UPDATE | {public}
+ patients        | tenant_delete             | DELETE | {public}
+ patients        | tenant_insert             | INSERT | {public}
+ patients        | tenant_select             | SELECT | {public}
+ patients        | tenant_update             | UPDATE | {public}
+ professionals   | tenant_delete             | DELETE | {public}
+ professionals   | tenant_insert             | INSERT | {public}
+ professionals   | tenant_select             | SELECT | {public}
+ professionals   | tenant_update             | UPDATE | {public}
+ profiles        | profiles_own_insert       | INSERT | {public}
+ profiles        | profiles_own_select       | SELECT | {public}
+ profiles        | profiles_own_update       | UPDATE | {public}
+ reminders       | tenant_delete             | DELETE | {public}
+ reminders       | tenant_insert             | INSERT | {public}
+ reminders       | tenant_select             | SELECT | {public}
+ reminders       | tenant_update             | UPDATE | {public}
+ specialties     | tenant_delete             | DELETE | {public}
+ specialties     | tenant_insert             | INSERT | {public}
+ specialties     | tenant_select             | SELECT | {public}
+ specialties     | tenant_update             | UPDATE | {public}
+ subscriptions   | tenant_delete             | DELETE | {public}
+ subscriptions   | tenant_insert             | INSERT | {public}
+ subscriptions   | tenant_select             | SELECT | {public}
+ subscriptions   | tenant_update             | UPDATE | {public}
+ units           | tenant_delete             | DELETE | {public}
+ units           | tenant_insert             | INSERT | {public}
+ units           | tenant_select             | SELECT | {public}
+ units           | tenant_update             | UPDATE | {public}
+ usage           | tenant_delete             | DELETE | {public}
+ usage           | tenant_insert             | INSERT | {public}
+ usage           | tenant_select             | SELECT | {public}
+ usage           | tenant_update             | UPDATE | {public}
+ users           | tenant_delete             | DELETE | {public}
+ users           | tenant_insert             | INSERT | {public}
+ users           | tenant_select             | SELECT | {public}
+ users           | tenant_update             | UPDATE | {public}
+(71 rows)
+
+psql:<stdin>:67: NOTICE:  policy morta removida: clinics.clinics_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: clinic_alerts.clinic_alerts_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: billing_events.billing_events_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: admins.admins_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: specialties.specialties_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: doctors_legacy.doctors_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: doctor_schedule.doctor_schedule_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: conversations.conversations_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: messages.messages_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: appointments.appointments_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: reminders.reminders_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: notifications.notifications_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: users.users_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: subscriptions.subscriptions_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: clinic_members.clinic_members_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: clinic_units.clinic_units_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: usage.usage_isolation
+psql:<stdin>:67: NOTICE:  policy morta removida: api_access_log.api_access_log_block
+psql:<stdin>:67: NOTICE:  policy morta removida: patients.anon_blocked
+psql:<stdin>:67: NOTICE:  policy morta removida: professionals.anon_blocked
+psql:<stdin>:67: NOTICE:  policy morta removida: profiles.anon_blocked
+psql:<stdin>:67: NOTICE:  policy morta removida: admin_profiles.anon_blocked
+psql:<stdin>:67: NOTICE:  policy morta removida: units.anon_blocked
+psql:<stdin>:67: NOTICE:  policy morta removida: medical_records.anon_blocked
+psql:<stdin>:67: NOTICE:  total de policies mortas removidas: 24
+  ok (142ms)
+
+--- Verificacao (clean-db-verify.sql) ---
+item         | valor 
+----------------------+-------
+ tabelas              | 24
+ tabelas_sem_rls      | 0
+ policies_total       | 71
+ policies_using_false | 0
+ clinics_seed         | 1
+(5 rows)
+
+    tablename    |        policyname         |  cmd   
+-----------------+---------------------------+--------
+ admin_profiles  | admin_profiles_own_insert | INSERT
+ admin_profiles  | admin_profiles_own_select | SELECT
+ admin_profiles  | admin_profiles_own_update | UPDATE
+ admins          | tenant_delete             | DELETE
+ admins          | tenant_insert             | INSERT
+ admins          | tenant_select             | SELECT
+ admins          | tenant_update             | UPDATE
+ appointments    | tenant_delete             | DELETE
+ appointments    | tenant_insert             | INSERT
+ appointments    | tenant_select             | SELECT
+ appointments    | tenant_update             | UPDATE
+ billing_events  | tenant_delete             | DELETE
+ billing_events  | tenant_insert             | INSERT
+ billing_events  | tenant_select             | SELECT
+ billing_events  | tenant_update             | UPDATE
+ clinic_alerts   | tenant_delete             | DELETE
+ clinic_alerts   | tenant_insert             | INSERT
+ clinic_alerts   | tenant_select             | SELECT
+ clinic_alerts   | tenant_update             | UPDATE
+ clinic_members  | cm_own_insert             | INSERT
+ clinic_members  | cm_own_select             | SELECT
+ clinics         | clinics_member_select     | SELECT
+ conversations   | tenant_delete             | DELETE
+ conversations   | tenant_insert             | INSERT
+ conversations   | tenant_select             | SELECT
+ conversations   | tenant_update             | UPDATE
+ medical_records | tenant_delete             | DELETE
+ medical_records | tenant_insert             | INSERT
+ medical_records | tenant_select             | SELECT
+ medical_records | tenant_update             | UPDATE
+ messages        | messages_tenant_insert    | INSERT
+ messages        | messages_tenant_select    | SELECT
+ notifications   | tenant_delete             | DELETE
+ notifications   | tenant_insert             | INSERT
+ notifications   | tenant_select             | SELECT
+ notifications   | tenant_update             | UPDATE
+ patients        | tenant_delete             | DELETE
+ patients        | tenant_insert             | INSERT
+ patients        | tenant_select             | SELECT
+ patients        | tenant_update             | UPDATE
+ professionals   | tenant_delete             | DELETE
+ professionals   | tenant_insert             | INSERT
+ professionals   | tenant_select             | SELECT
+ professionals   | tenant_update             | UPDATE
+ profiles        | profiles_own_insert       | INSERT
+ profiles        | profiles_own_select       | SELECT
+ profiles        | profiles_own_update       | UPDATE
+ reminders       | tenant_delete             | DELETE
+ reminders       | tenant_insert             | INSERT
+ reminders       | tenant_select             | SELECT
+ reminders       | tenant_update             | UPDATE
+ specialties     | tenant_delete             | DELETE
+ specialties     | tenant_insert             | INSERT
+ specialties     | tenant_select             | SELECT
+ specialties     | tenant_update             | UPDATE
+ subscriptions   | tenant_delete             | DELETE
+ subscriptions   | tenant_insert             | INSERT
+ subscriptions   | tenant_select             | SELECT
+ subscriptions   | tenant_update             | UPDATE
+ units           | tenant_delete             | DELETE
+ units           | tenant_insert             | INSERT
+ units           | tenant_select             | SELECT
+ units           | tenant_update             | UPDATE
+ usage           | tenant_delete             | DELETE
+ usage           | tenant_insert             | INSERT
+ usage           | tenant_select             | SELECT
+ usage           | tenant_update             | UPDATE
+ users           | tenant_delete             | DELETE
+ users           | tenant_insert             | INSERT
+ users           | tenant_select             | SELECT
+ users           | tenant_update             | UPDATE
+(71 rows)
+
+     tabela      
+-----------------
+ admin_profiles
+ admins
+ api_access_log
+ appointments
+ billing_events
+ clinic_alerts
+ clinic_members
+ clinic_units
+ clinics
+ conversations
+ doctor_schedule
+ doctors_legacy
+ medical_records
+ messages
+ notifications
+ patients
+ professionals
+ profiles
+ reminders
+ specialties
+ subscriptions
+ units
+ usage
+ users
+(24 rows)
+
+psql:<stdin>:18: NOTICE:  CHECK 1 ok: 1 clinica(s) seed
+psql:<stdin>:36: NOTICE:  CHECK 2 ok: todas as tabelas do public com RLS
+psql:<stdin>:51: NOTICE:  CHECK 3 ok: zero policies USING (false)
+psql:<stdin>:65: NOTICE:  CHECK 4 ok: doctor_schedule sem policies (legado, RLS deny-all)
+psql:<stdin>:87: NOTICE:  CHECK 5 ok: anon sem privilegios em tabelas/sequences
+psql:<stdin>:106: NOTICE:  CHECK 6 ok: nenhuma ACL cita anon
+psql:<stdin>:143: NOTICE:  CHECK 7 ok: 12 FKs obrigatorias presentes
+psql:<stdin>:166: NOTICE:  CHECK 8 ok: indices de unicidade presentes
+psql:<stdin>:199: NOTICE:  CHECK 9 ok: shape definitivo de clinic_members/usage/subscriptions
+psql:<stdin>:211: NOTICE:  CHECK 10 ok: doctors -> doctors_legacy
+psql:<stdin>:223: NOTICE:  CHECK 11 ok: funcoes auxiliares presentes
+
+--- Testes de papel ---
+ok: anon NEGADO em clinics (permission denied)
+ok: authenticated = 0 linhas em clinics/patients/admin_profiles (RLS)
+ok: service_role BYPASSRLS (1 clinica seed visivel)
+
+=== RESULTADO: CADEIA INTEGR — banco limpo validado (Fase 2.5) ===
+Migrations executadas: 11
+Tabelas/log acima; ver CHECKs e inventario em clean-db-verify.sql.
+Container saudesync-migtest removido (--rm). Use --keep para manter.
+
+--- Fim: 2026-10-02T20:55:57.198Z (inicio 2026-10-02T20:55:49.808Z) ---

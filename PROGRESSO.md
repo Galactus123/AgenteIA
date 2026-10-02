@@ -5,7 +5,7 @@
 | Item | Valor |
 |---|---|
 | Data da auditoria | 30/09/2026 |
-| Última atualização | 01/10/2026 (sessão 2 — Fase 0 + regressões da conversão) |
+| Última atualização | 02/10/2026 (sessão 3 — Fases 1.6, 2.5 e 2.6: cadeia de migrações validada em banco limpo) |
 | Documento de requisitos | `PRD-SaudeSync.md` v1.1 |
 | Branch / commit base | `main` @ `67d65f0` — *feat(db): migrar persistencia de SQLite para Supabase e zerar lint* (01/10/2026); **sessão 2 está inteira no working tree, não commitada** |
 | Commits totais | 72 (primeiro: `7279797` "iniciar", 15/08/2026) |
@@ -19,9 +19,9 @@
 
 1. **A maior parte da UI e do "ciclo do agente" foi construída.** Landing, login, dashboard, cadastros, chat interno, assinatura, 32 rotas de API e um agente LLM com 7 tools (especialidade → horário → agendar → remarcar → cancelar → transferir) existem e compilam.
 2. ~~**O projeto está dividido em dois bancos de dados que não conversam.**~~ **RESOLVIDO (01/10/2026):** `src/lib/db.ts` e `src/lib/multi-tenant.ts` foram removidos e todos os serviços, rotas, server components, o agente e a LGPD passaram a usar `supabaseAdmin` de forma assíncrona. Persistência única: Supabase.
-3. **As migrações em `supabase/migrations/` avançaram, mas a fonte de verdade executável continua quebrada:** `006`, `007` **aplicadas** (FKs de embedding confirmadas por probe no PostgREST), `008` e `009` **escritas e ainda não aplicadas**; e **continua sem `...000001`** — o schema base (17 tabelas + seed) segue em `supabase-migration.sql`, na raiz. A `005` perdeu a FASE 5 (a que corrompeu `auth.users`), agora extraída para a `009` idempotente.
+3. **A cadeia de migrações está completa e validada do zero:** existe `20260911000001_schema_base.sql` (Fase 1.6 — o schema base saiu de `supabase-migration.sql` na raiz, que foi **removido**); `008`/`009` aplicadas no banco vivo em 01/10/2026; e a **Fase 2.5 (02/10/2026)** provou a cadeia **11/11 migrations em um Postgres 16 limpo** via `scripts/ops/clean-db-test.mjs` (log em `scripts/ops/clean-db-run.log`). A `005` perdeu a FASE 5 (a que corrompeu `auth.users`), agora extraída para a `009` idempotente.
 4. **O MVP não está pronto para produção:** lembretes 24h/2h dependem de um `setInterval` (morre em serverless, não há `vercel.json`/cron), não há fila de reenvio em falha da API de WhatsApp, não há trava de conflito de horário, e a transferência para humano não interrompe a IA.
-5. **Validação atual (01/10/2026, sessão 2):** `tsc` ✅ · `next build` ✅ · `vitest` ✅ (38 testes — os 9 da autenticação legada saíram na Fase 2.2 e 5 de rota/proxy entraram na 2.3) · `eslint` ✅ **0 erros / 0 warnings com regras type-aware novas** (`await-thenable`, `no-floating-promises`, `no-misused-promises`) — estas regras pegaram e foi corrigido um bug de classe da conversão SQLite → Supabase (services viraram `async` e 15 chamadas ficaram sem `await`, serializando `Promise` como `{}`).
+5. **Validação atual (01/10/2026, sessão 2):** `tsc` ✅ · `next build` ✅ · `vitest` ✅ (38 testes — os 9 da autenticação legada saíram na Fase 2.2 e 5 de rota/proxy entraram na 2.3) · `eslint` ✅ **0 erros / 0 warnings com regras type-aware novas** (`await-thenable`, `no-floating-promises`, `no-misused-promises`) — estas regras pegaram e foi corrigido um bug de classe da conversão SQLite → Supabase (services viraram `async` e 15 chamadas ficaram sem `await`, serializando `Promise` como `{}`). **Revalidado em 02/10/2026 (sessão 3):** `eslint` ✅ 0/0 · `tsc` ✅ · `vitest` ✅ 38/38 · `next build` ✅ (45 páginas) — sessão sem alteração em `src/` (só migrações, `scripts/ops/` e este documento).
 
 ---
 
@@ -47,8 +47,9 @@ foram mantidas como estão no Supabase (o contador é vivo).
 
 **Bloqueio atual:** **nenhum bloqueio de banco** — sequência `000002`→`000009` completa no
 Supabase e preflight do `setup-supabase.mjs` saindo com exit 0 (FKs de `006`/`007`/`008`
-presentes). Resta da Fase 1 só a **1.6** (criar o `...000001_schema_base.sql` para um banco
-novo sair do zero).
+presentes). **Fase 1.6 concluída em 02/10/2026:** `...000001_schema_base.sql`
+criada e `supabase-migration.sql` (raiz) removido — a sequência `000001`→`011`
+está completa.
 
 ---
 
@@ -150,25 +151,26 @@ O PRD coloca isto **fora** do MVP, mas já está no código — e consome manute
 
 | Arquivo | Tamanho | Papel |
 |---|---|---|
-| *(falta)* `...000001_*.sql` | — | **Não existe.** O schema base (17 tabelas + seed "Clinica Vida" + RLS `USING(false)`) está em **`supabase-migration.sql` na raiz**, fora de `supabase/migrations/`. Um `supabase db push` limpo **não cria o schema inicial**. |
-| `20260911000002_rls_fix.sql` | 15,8 kB | Adiciona `clinic_id` (com `DEFAULT 1`) em 8 tabelas, popula dados, índices, habilita RLS e cria policies `USING (false)` (bloqueio total de `anon`); documenta que o app ainda usava cookies HMAC + `service_role`. |
-| `20260911000003_schema_definitivo.sql` | 28,3 kB | "v6": cria `patients`/`professionals`, migra dados PT→EN, cria `profiles`, `clinic_members`, `subscriptions`, `usage`, `units`, `medical_records`, `admin_profiles`, renomeia `*_legacy` e `doctors`→`doctors_legacy`. |
-| `20260911000004_grant_permissions.sql` | 2,3 kB | Patch solto (sem cabeçalho de migration): `GRANT ALL ... TO service_role, authenticated, **anon**`. **Contradiz** o bloqueio de `anon` da 002 — RLS ainda mitiga, mas é ruído/perigoso. |
+| `20260911000001_schema_base.sql` | 9,6 kB | ✅ **criada (Fase 1.6, 02/10/2026)** a partir de `supabase-migration.sql` (arquivo da raiz **removido**). 17 tabelas + seed "Clinica Vida" + RLS `USING(false)` + revogação de `anon`. **Desvio documentado no cabeçalho:** `clinic_members`, `subscriptions` e `usage` já nascem no **shape definitivo** da `003` (PK UUID, `user_id` → `auth.users`, `TIMESTAMPTZ`) — se fossem criadas no shape antigo (BIGSERIAL/BIGINT), o `IF NOT EXISTS` da `003` as manteria velhas num banco limpo e o INSERT de signup (`user_id` UUID) quebraria. |
+| `20260911000002_rls_fix.sql` | 15,8 kB | Adiciona `clinic_id` (com `DEFAULT 1`) em 8 tabelas, popula dados, índices, habilita RLS e cria policies `USING (false)` (bloqueio total de `anon`); documenta que o app ainda usava cookies HMAC + `service_role`. **Guardas da Fase 2.5 (02/10/2026):** FASE 3 (bridge `clinic_members.admin_id`) e FASE 4 (índice em `admin_id`) agora checam a coluna antes — no shape definitivo ela não existe e os blocos são pulados com NOTICE. |
+| `20260911000003_schema_definitivo.sql` | 28,3 kB | "v6": cria `patients`/`professionals`, migra dados PT→EN, cria `profiles`, `clinic_members`, `subscriptions`, `usage`, `units`, `medical_records`, `admin_profiles`, renomeia `*_legacy` e `doctors`→`doctors_legacy`. **Guarda da Fase 2.5 (02/10/2026):** toda a FASE 2 (DML PT→EN, seções 2.1–2.5) agora roda dentro de `DO` com `to_regclass` na tabela fonte — em banco limpo não existem `especialidades`/`medicos`/`pacientes`/`consultas` e cada seção é pulada com NOTICE. |
+| `20260911000004_grant_permissions.sql` | 3,4 kB | **Editada (Fase 2.4):** `GRANT ALL ... TO service_role, authenticated` (sem `anon`). **Guarda da Fase 2.5 (02/10/2026):** os 27 grants viraram um loop com `to_regclass` — em banco limpo `doctors` (renomeada pela `003`) e as 4 `*_legacy` portuguesas não existem e o grant é pulado com NOTICE em vez de abortar. |
 | `20260911000005_auth_rls.sql` | 10,4 kB | Habilita RLS em 21 tabelas, cria `get_user_clinic_ids()`, policies `tenant_*` por clínica. **A FASE 5 (linhas 229-324), que fazia `INSERT` direto em `auth.users` e corrompeu o schema auth, foi REMOVIDA em 01/10/2026** e extraída para a `...000009` (evidência do incidente: cabeçalhos de `scripts/ops/diagnose-auth-schema.sql` e `scripts/ops/fix-auth-schema.sql`: *"Causa: Migration 005 fez INSERT direto em auth.users com colunas que podem nao existir ou triggers quebrados"*). |
 | `20260930000006_professionals_unification.sql` | 9,7 kB | ✅ **aplicada.** Unifica `doctors`/`doctor_schedule` → `professionals` (com `schedule` estruturado), cria as FKs de `professionals→specialties`, `appointments→professionals` e `notifications→professionals`. |
 | `20260930000007_appointments_clinic_fk.sql` | 1,9 kB | ✅ **aplicada.** FK `appointments→clinics` + `specialties→clinics` (habilita o embed `clinics(name, address)`). |
 | `20260930000008_appointments_patient_fk.sql` | 1,8 kB | ✅ **aplicada (01/10/2026).** FK `appointments.patient_id → patients`; probe `appointments?select=id,patients(name)` → OK. Idempotente; zera `patient_id` órfão antes de criar a FK. |
 | `20260930000009_admins_auth_link.sql` | 2,7 kB | ✅ **aplicada (01/10/2026).** Versão idempotente da FASE 5 da `005`: **não escreve em `auth.users`**, só vincula admins legados que já têm usuário no GoTrue. Verificado: `admin_profiles.user_id` `f9264de1-…` presente no GoTrue (**1/1 vinculado**). |
-| `20260911000002_rls_fix.backup.sql` | 15,8 kB | Cópia de segurança (ignorada pelo git). |
+| `20261002000002_drop_dead_policies.sql` | 4,4 kB | ✅ **criada e validada em banco limpo (Fase 2.6, 02/10/2026).** Descarta dinamicamente toda policy `USING (false)` (17 `*_isolation` + `anon_blocked` × 6 + `api_access_log_block` = **24 removidas**), remove as `ds_tenant_*` de `doctor_schedule` (apontavam para `doctors_legacy`; reapontar para `professionals` é impossível — `doctor_id` BIGINT × `id` UUID — e o app não lê a tabela) e habilita RLS + revoga `anon`/`authenticated` nas 4 `*_legacy` portuguesas (ausentes em banco limpo). Inclui consultas de verificação. |
+| `20260911000002_rls_fix.backup.sql` | 15,8 kB | Cópia de segurança — **movida de `supabase/migrations/` para `data/`** em 02/10/2026 (fica fora do caminho do `supabase db push`). |
 
 **Problemas estruturais das migrações:**
 
-1. **Sequência incompleta** — sem `000001`; dependência de um SQL solto na raiz.
-2. **Ordem/Idempotência frágil** — `003` assume que `002` já rodou e renomeia tabelas; reaplicar gera erro ou recria `*_legacy`.
-3. ~~**`005` não é seguro para executar em banco vivo (FASE 5)**~~ — **resolvido 01/10/2026:** FASE 5 removida da `005` e reescrita como `...000009` (idempotente, não toca em `auth.users`). A `005` **ainda não remove** as policies `USING(false)` antigas — as policies novas somam por OR, o que funciona, mas deixa regras mortas para trás.
-4. **`doctor_schedule` policies apontam para `doctors_legacy`** (`005:176-210`), enquanto a tabela de negócio passou a ser `professionals` (migração `006`) — a política não corresponde a nenhuma tabela usada pela aplicação.
-5. **Faltam constraints de negócio que o PRD exige:** `UNIQUE (doctor_id, starts_at)` em `appointments`; `UNIQUE (appointment_id, type)` em `reminders`; `UNIQUE`/índice em `conversations.phone`; índice em `appointments(starts_at)`.
-6. **Estado real do banco não é verificável a partir do repositório** — não há log de aplicação, nem `supabase/config.toml`, nem script `migrate`. Os scripts em `scripts/` e `data/` (`audit_migration.js`, `check_supabase_tables.js`, `inspect_schemas.js`) são inspeção manual de 11/09.
+1. ~~**Sequência incompleta** — sem `000001`; dependência de um SQL solto na raiz.~~ — **resolvido (Fase 1.6, 02/10/2026):** `20260911000001_schema_base.sql` criada; `supabase-migration.sql` removido da raiz.
+2. **Ordem/Idempotência frágil** — `003` assume que `002` já rodou e renomeia tabelas; reaplicar gera erro ou recria `*_legacy`. (Em **banco limpo** a cadeia agora roda limpa — Fase 2.5; em **banco vivo** não se reexecuta `002`/`003`/`005`, que não são idempotentes.)
+3. ~~**`005` não é seguro para executar em banco vivo (FASE 5)**~~ — **resolvido 01/10/2026:** FASE 5 removida da `005` e reescrita como `...000009` (idempotente, não toca em `auth.users`). ~~A `005` ainda não remove as policies `USING(false)` antigas~~ — **resolvido (Fase 2.6, 02/10/2026)** pela `20261002000002_drop_dead_policies.sql`.
+4. ~~**`doctor_schedule` policies apontam para `doctors_legacy`**~~ — **resolvido (Fase 2.6, 02/10/2026):** `ds_tenant_*` removidas (tabela legada, RLS deny-all; o app usa `professionals.schedule`).
+5. ~~**Faltam constraints de negócio que o PRD exige**~~ — **resolvido pela `006` (01/10/2026):** `uq_appointments_professional_start`, `uq_reminders_appointment_type`, `uq_conversations_phone` + `idx_appointments_starts_at`.
+6. ~~**Estado real do banco não é verificável a partir do repositório**~~ — **parcialmente resolvido (Fase 2.5, 02/10/2026):** `scripts/ops/clean-db-test.mjs` sobe um Postgres 16 limpo (Docker), aplica bootstrap + 11 migrations com `ON_ERROR_STOP=1` e roda 11 CHECKs + 3 testes de papel; log completo em `scripts/ops/clean-db-run.log`. A aplicação **no banco vivo** continua manual (SQL Editor) — não há `supabase/config.toml` nem CI de banco.
 
 ### 1.9 ⚠️ Achado crítico: banco dividido (SQLite × Supabase) — **RESOLVIDO em 01/10/2026**
 
@@ -265,7 +267,7 @@ Evidências do estado em que ficou (27/09) e do que a sessão 2 fez:
 | Profissionais (Fase 2.1) | `GET/POST/PATCH/DELETE /api/professionals` (com sessão) | ✅ **401** sem sessão → **200** (10 itens) → **201** (criado) → **200** (patch) → **200** `{ok:true}` (delete); registro de teste removido (0 restantes) |
 | Portaria das páginas (Fase 2.2) | `/chat`, `/dashboard` sem sessão vs. com sessão | ✅ sem sessão → **307** para `/login`; com sessão → **200** (`/chat`, `/dashboard`, `/medicos`, `/perfil`) |
 | CI (`.github/workflows/ci.yml`) | lint → typecheck → test → build | ⚠️ **depende do Node** — `scripts/setup-supabase.mjs` e `scripts/ops/*.mjs` exigem Node ≥ 22; o job usa 20 |
-| Migrações | — | ✅ **`002→009` no banco** (`008`/`009` aplicadas em 01/10/2026; preflight exit 0). Ainda falta o `...000001_schema_base.sql` (Fase 1.6) para banco limpo |
+| Migrações | — | ✅ **`001→011` completas e validadas em banco limpo (Fase 2.5, 02/10/2026)** — cadeia 11/11 no Postgres 16 Docker, 11 CHECKs e 3 testes de papel OK (`scripts/ops/clean-db-run.log`). No banco vivo: `002→009` + `20261002000001` + **`20261002000002` (Fase 2.6) aplicada no SQL Editor em 02/10/2026** |
 | E2E / smoke em produção | — | ❌ não realizado |
 
 **Como as 33 ocorrências da sessão 2 foram zeradas (01/10/2026):**
@@ -294,7 +296,8 @@ Evidências do estado em que ficou (27/09) e do que a sessão 2 fez:
 
 ### 2.5 O que permanece **não validado**
 
-- Reaplicação das migrações `002`→`005` **num banco limpo** para provar o caminho do zero (Fase 2.5) — as `008`/`009` foram aplicadas e verificadas em 01/10/2026.
+- ~~Reaplicação das migrações `002`→`005` **num banco limpo** para provar o caminho do zero (Fase 2.5)~~ — **resolvido em 02/10/2026** (ver log abaixo).
+- ~~**Aplicação da `20261002000002` (Fase 2.6) no banco vivo**~~ — **aplicada no SQL Editor em 02/10/2026.**
 - Jornada completa no navegador (formulários do painel, não só chamadas de API).
 - Envio/recebimento real via KOMUNIKA (HMAC, eventos, numeração).
 - Disparo dos lembretes fora de `npm run dev`.
@@ -314,24 +317,23 @@ Evidências do estado em que ficou (27/09) e do que a sessão 2 fez:
 - [x] **0.4** Decidir o destino dos `scripts/*.mjs` de reparo: mover para `scripts/ops/`, **remover a senha fixa do repositório** e documentar o procedimento. — **feito**: 6 arquivos movidos, senhas saem de `OPS_ADMIN_*`, `scripts/ops/README.md` criado.
 - [x] **0.5** Corrigir o que motivou a migração de emergência: a FASE 5 da migração `005` não pode ser re-executada — extraí-la para um script idempotente e versionado. — **feito**: FASE 5 removida da `005` (com comentário apontando para a nova) e reescrita em `...000009`, que **não escreve em `auth.users`**.
 
-### Fase 1 — Unificar a persistência (P0) — *questão estrutural nº 1* — ⏳ 7 de 8 concluídas
+### Fase 1 — Unificar a persistência (P0) — *questão estrutural nº 1* — ✅ 8 de 8 concluídas
 
 - [x] **1.1** **Decisão de arquitetura** — **decidido: Supabase como banco único** (01/10/2026).
 - [x] **1.2** Reescrever `src/lib/db.ts` + `src/lib/services/*` sobre `supabaseAdmin` — **feito**: `db.ts` e `multi-tenant.ts` removidos; serviços, auth, lgpd, agente, rotas API, server components e `instrumentation` convertidos para `supabaseAdmin` async.
 - [x] **1.3** Eliminar a dependência de `/tmp` — **feito**: o runtime não abre mais `data/saudesync.db` (SQLite só é lido por `scripts/setup-supabase.mjs`).
 - [x] **1.4** Definir **uma** fonte para médicos e especialidades — **feito**: tudo lê `professionals` / `specialties` no Supabase.
 - [x] **1.5** Remover um dos CRUDs duplicados: alinhar `/api/appointments` × `/api/consultas` (manter um; atualizar `/consultas`). — **feito (01/10/2026):** mantido `/api/appointments` (GET/POST + `[id]` GET/PATCH/PUT/DELETE com janela de 4h, limite de 1 remarcação e `isSlotAvailable`); removidos `src/app/api/consultas/route.ts` e `src/app/api/consultas/[id]/route.ts`. A página `/consultas` já usava `listAppointments()` (server component) e não foi afetada. Consequência: nenhum SELECT do app embute mais `patients` → a `008` deixou de ser bloqueio.
-- [ ] **1.6** Criar migração **`20260911000001_schema_base.sql`** a partir de `supabase-migration.sql` (ou mover o arquivo para `supabase/migrations/`), para que `supabase db push` funcione do zero.
+- [x] **1.6** Criar migração **`20260911000001_schema_base.sql`** a partir de `supabase-migration.sql` (ou mover o arquivo para `supabase/migrations/`), para que `supabase db push` funcione do zero. — **feito (02/10/2026):** migration criada (17 tabelas + seed + RLS + revogação de `anon`), `supabase-migration.sql` **removido da raiz**, `20260911000002_rls_fix.backup.sql` movida de `supabase/migrations/` para `data/` e comentários da `003`/`PROGRESSO` apontando para a nova migration. `clinic_members`/`subscriptions`/`usage` já nascem no shape definitivo da `003` (ver linha da tabela 1.8).
 - [x] **1.7** `POST /api/pacientes` sem `clinic_id` (coluna `NOT NULL` sem default) e `GET ?phone=` mascarando erro de `single()` como 404. — **feito (01/10/2026):** `clinic_id` resolvido via `getDefaultClinicId()` (ou vindo do corpo) e lookup com `maybeSingle()` — 201/200/404 validados em dev, registro de teste removido.
 - [x] **1.8** **Dados do SQLite → Supabase** — **feito (01/10/2026)**: `006`, `007`, `008` e `009` aplicadas, `node scripts/setup-supabase.mjs --apply` executado (161 inseridos / 5 atualizados; reexecução = 0). Preflight com exit 0 e smoke pós-migração: `/dashboard`, `/consultas`, `/api/auth/me`, `/api/appointments`, `/api/stats`, `/api/pacientes`, `/api/clinica`, `/api/especialidades` → **todos 200**.
 
-> **Próximo passo (é onde paramos agora):** Fase 1 está **7/8** (resta a `1.6` —
-> `...000001_schema_base.sql` para banco limpo) e a Fase 2 está em **4 de 6**
-> (2.1, 2.2, 2.3 e 2.4 ✅ — incluindo a revogação dos grants de `anon` já
-> aplicada no banco). Seguir para a **2.5** (migrations 002→005 num banco limpo)
-> e **2.6** (policies mortas `USING (false)`).
+> **Próximo passo (é onde paramos agora):** Fase 1 está **8/8 ✅** e a Fase 2 está
+> **6/6 ✅** (2.6 aplicada no SQL Editor em 02/10/2026). Seguir para a **Fase 3**
+> (P0: `vercel.json`/cron de lembretes, idempotência e trava de concorrência de
+> horário, fila da KOMUNIKA).
 
-### Fase 2 — Auth, tenant e RLS (P0/P1) — ⏳ 4 de 6 concluídas
+### Fase 2 — Auth, tenant e RLS (P0/P1) — ✅ 6 de 6 concluídas
 
 - [x] **2.1** Trocar `src/lib/supabase.ts` (client anônimo sem sessão) por `createBrowserClient` de `@supabase/ssr` em **`src/app/(app)/medicos/page.tsx`** — hoje a página quase certamente lê vazio e não consegue gravar por causa do RLS. — **feito (01/10/2026), em vez do caminho literal:** diagnóstico primeiro mostrou que a **leitura** funcionava com a sessão (anon key + JWT → `clinic_id: 1`, `get_user_clinic_ids()` = `[1]`), mas o **INSERT devolvia `42501`** porque a página não envia `clinic_id` (coluna sem default) e o `WITH CHECK` do `tenant_insert` rejeita. Decisão do produto: seguir pelo caminho dos demais cadastros — criadas `GET/POST /api/professionals` e `PATCH/PUT/DELETE /api/professionals/[id]` sobre `services/doctors.ts` (`supabaseAdmin` + `getDefaultClinicId()`), página reescrita para `fetch`, `email` adicionado a `Doctor`/`DoctorView`/`createDoctor`/`updateDoctor` e o export `supabase` (anon) removido de `src/lib/supabase.ts` (agora só existe `supabaseAdmin`, e nenhum componente de cliente importa Supabase direto). **E2E:** sem sessão → 401; GET → 200 (10 profissionais, com `specialty_name` e agenda); POST → 201; PATCH → 200; DELETE → 200; página `/medicos` → 200.
 - [x] **2.2** Aposentar o auth legado: `chat/layout.tsx:5,8` lê o cookie HMAC antigo → **`/chat` está inacessível em produção**. Migrar para `supabase.auth.getUser()` + checagem de papel. — **feito (01/10/2026):** `chat/layout.tsx` agora usa `createClient()` (server) + `getUser()` + papel de `admin_profiles` (RLS de próprio registro) e **liberou para qualquer papel de admin** (decisão de produto: `admin` é o papel real do usuário; antes o gate `super_admin`/`saas_admin` + bypass de dev escondia o problema). `sidebar.tsx` perdeu `superAdminOnly`, `canAccessItem` e o bypass `NODE_ENV===development`; `(app)/layout.tsx` parou de buscar `admin_profiles` só para a sidebar. **`src/lib/auth.ts` e `src/lib/__tests__/auth.test.ts` apagados** (zero consumidores; os testes reimplementavam a lógica em vez de importar o módulo). **E2E:** sem sessão → 307 `/login`; com sessão → `/chat` 200, `/dashboard` 200, `/medicos` 200, `/perfil` 200.
@@ -343,8 +345,38 @@ Evidências do estado em que ficou (27/09) e do que a sessão 2 fez:
   - **`src/utils/supabase/client.ts` removido** (`createBrowserClient` sem nenhum consumidor; com anon sem grant de tabela ele não teria uso). O navegador passa a consultar **só via API**.
   - **1ª tentativa no SQL Editor (02/10/2026) falhou na verificação, não no `REVOKE`:** `ERROR: 42809: "objects_bucket_id_name_version_key" is not a sequence`. Causa: o planner reordena os `WHERE` e passou um **índice do schema `storage`** para `has_sequence_privilege()`. Corrigido envolvendo as `has_*` em `CASE WHEN c.relkind = ...`, mais uma 1ª verificação sem risco (`relacl::text LIKE '%anon%'`). `REVOKE` e `ALTER DEFAULT PRIVILEGES` são idempotentes — basta rodar o arquivo de novo.
   - **Executado no SQL Editor (02/10/2026) com sucesso** e **E2E pós-revogação:** consulta `anon` ao PostgREST → **401 `42501 permission denied`** em `patients`, `specialties`, `appointments` e `conversations` (antes `200` + `[]`); login via GoTrue com a anon key → **OK**; app logado → **9/9 páginas 200** e 8 APIs 200 com conteúdo real (`/api/stats`, `/api/especialidades`, `/api/pacientes`, `/api/appointments`, `/api/clinica`, `/api/conversations`, `/api/subscription/limits`, `/api/auth/me`). Nada quebrou: `authenticated` e `service_role` seguem íntegros.
-- [ ] **2.5** Aplicar/verificar as migrações 002→005 **num banco limpo** e registrar o resultado (log anexado a este documento).
-- [ ] **2.6** Remover as policies mortas `USING (false)` e corrigir as policies de `doctor_schedule` (apontam para `doctors_legacy`).
+- [x] **2.5** Aplicar/verificar as migrações 002→005 **num banco limpo** e registrar o resultado (log anexado a este documento). — **feito (02/10/2026):** ver "Log da validação em banco limpo" abaixo.
+- [x] **2.6** Remover as policies mortas `USING (false)` e corrigir as policies de `doctor_schedule` (apontam para `doctors_legacy`). — **feito (02/10/2026):** nova `supabase/migrations/20261002000002_drop_dead_policies.sql` (idempotente), validada na cadeia limpa: **24 policies mortas removidas**, `ds_tenant_*` de `doctor_schedule` removidas (reapontar para `professionals` é impossível: `doctor_id` BIGINT × `id` UUID; tabela é legada e não é lida pelo app), `*_legacy` portuguesas com RLS habilitado e grants de `anon`/`authenticated` revogados. **Aplicada no SQL Editor do banco vivo em 02/10/2026.**
+
+### Log — validação em banco limpo (Fase 2.5, 02/10/2026)
+
+**Como rodar:** `node scripts/ops/clean-db-test.mjs` (opcional `--keep` para manter o container). Requisitos: Docker rodando + imagem `postgres:16`. **Log completo: `scripts/ops/clean-db-run.log`.**
+
+**O que o script faz:** sobe um Postgres 16 descartável → aplica `scripts/ops/clean-db-bootstrap.sql` (roles `anon`/`authenticated`/`service_role` NOLOGIN, `service_role` **BYPASSRLS**, schema `auth` com `auth.users` vazio + `auth.uid()`, e `ALTER DEFAULT PRIVILEGES` iguais aos do Supabase — é o que a `010` precisa revogar) → roda as **11 migrations** de `supabase/migrations/` em ordem com `ON_ERROR_STOP=1` → `scripts/ops/clean-db-verify.sql` (**11 CHECKs**) → **3 testes de papel**.
+
+**RESULTADO: CADEIA ÍNTEGRA — 11/11 migrations · 11/11 CHECKs · 3/3 testes de papel · exit 0 (7,4 s).**
+
+| Etapa | Resultado |
+|---|---|
+| `001 schema_base` (nova) | ok — 17 tabelas, seed 1 clínica, policies de isolamento, `anon` revogado |
+| `002 rls_fix` | ok — `clinic_id` "já existe" ×8; bridge `clinic_members.admin_id` **pulado**; índice `admin_id` **pulado** (guards da 2.5) |
+| `003 schema_definitivo` | ok — DML PT→EN (seções 2.1–2.5) **pulado** com NOTICE (tabelas fonte inexistentes); `clinic_members`/`subscriptions`/`usage` já no shape definitivo (`IF NOT EXISTS` no-op); `doctors`→`doctors_legacy` |
+| `004 grant_permissions` | ok — 5 grants pulados com NOTICE (`doctors` já renomeada + 4 `*_legacy`) |
+| `005 auth_rls` | ok — `get_user_clinic_ids()`, `tenant_*`, `cm_own_*`, `*_own_*`, `messages_tenant_*` |
+| `006`–`009` | ok — FKs de embedding; `009` sem admins legados (0 vinculados / 0 pendentes) |
+| `010 revoke_anon` | ok — as 3 consultas de verificação voltaram **vazias** |
+| `20261002000002` (2.6) | ok — **24 policies mortas removidas** (17 `*_isolation` + 6 `anon_blocked` + `api_access_log_block`); inventário final **71 policies** |
+| Verificação (11 CHECKs) | seed; RLS em **24/24** tabelas; **0** policies `USING (false)`; **0** policies em `doctor_schedule`; `anon` sem privilégio algum; nenhuma ACL cita `anon`; **12 FKs** obrigatórias; **5** índices únicos; shape definitivo (`clinic_members.user_id` uuid sem `admin_id`; `usage`/`subscriptions` PK uuid; `subscriptions.cancelled_at`); `doctors_legacy` existe e `doctors` não; funções `get_user_clinic_ids()`/`update_updated_at_column()` |
+| Testes de papel | `anon` → **permission denied** em `clinics`; `authenticated` → **0 linhas** em `clinics`/`patients`/`admin_profiles` (RLS); `service_role` → **1 clínica** (BYPASSRLS) |
+
+**Achados e decisões registrados:**
+
+1. **Três bloqueios do caminho limpo foram corrigidos com guards** (sem efeito no banco vivo, que já passou por essas migrations): `002` FASE 3/4 (coluna `admin_id` só existe no shape antigo), `003` FASE 2 inteira (DML lê tabelas Portuguese que nunca existiram num banco novo) e `004` (grants em tabelas renomeadas/inexistentes). Todos pulam com `RAISE NOTICE` em vez de abortar.
+2. **Banco vivo não expõe `clinic_units` nem `api_access_log`** (probe PostgREST da sessão anterior, `PGRST205`); em banco limpo ambas existem (criadas por `001`/`002`) e ficam deny-all. Inofensivo: nenhum código do app as lê.
+3. **`idx_usage_clinic_period` sai não-única** — a `002` cria o índice comum antes de a `003` tentar o `CREATE UNIQUE INDEX IF NOT EXISTS` de mesmo nome. É o mesmo estado provável do banco vivo. Unicidade de `(clinic_id, period)` vira item de backlog se o upsert de uso precisar dela.
+4. **Idempotência por migration:** `002` e `004` ficaram reexecutáveis (guards); `003`, `005` e as policies da `001`/`002` **continuam não idempotentes** (`ADD CONSTRAINT`/`CREATE POLICY` sem guarda) — em banco vivo não se reexecuta; caminho de banco novo é a cadeia limpa.
+
+---
 
 ### Fase 3 — Confiabilidade do agente e regras de negócio (P0/P1)
 

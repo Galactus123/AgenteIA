@@ -9,38 +9,32 @@
 -- antiga deste arquivo ja havia concedido no banco vivo.
 -- ============================================================
 
--- Conceder acesso total as tabelas criadas pela migration
-GRANT ALL ON patients TO service_role, authenticated;
-GRANT ALL ON professionals TO service_role, authenticated;
-GRANT ALL ON profiles TO service_role, authenticated;
-GRANT ALL ON clinic_members TO service_role, authenticated;
-GRANT ALL ON subscriptions TO service_role, authenticated;
-GRANT ALL ON usage TO service_role, authenticated;
-GRANT ALL ON units TO service_role, authenticated;
-GRANT ALL ON medical_records TO service_role, authenticated;
-GRANT ALL ON admin_profiles TO service_role, authenticated;
-
--- Conceder acesso as tabelas existentes que podem ter perdido permissao
-GRANT ALL ON clinics TO service_role, authenticated;
-GRANT ALL ON specialties TO service_role, authenticated;
-GRANT ALL ON doctors TO service_role, authenticated;
-GRANT ALL ON doctor_schedule TO service_role, authenticated;
-GRANT ALL ON appointments TO service_role, authenticated;
-GRANT ALL ON users TO service_role, authenticated;
-GRANT ALL ON conversations TO service_role, authenticated;
-GRANT ALL ON messages TO service_role, authenticated;
-GRANT ALL ON notifications TO service_role, authenticated;
-GRANT ALL ON reminders TO service_role, authenticated;
-GRANT ALL ON clinic_alerts TO service_role, authenticated;
-GRANT ALL ON billing_events TO service_role, authenticated;
-GRANT ALL ON admins TO service_role, authenticated;
-
--- Conceder acesso as tabelas legacy
-GRANT ALL ON especialidades_legacy TO service_role, authenticated;
-GRANT ALL ON medicos_legacy TO service_role, authenticated;
-GRANT ALL ON pacientes_legacy TO service_role, authenticated;
-GRANT ALL ON consultas_legacy TO service_role, authenticated;
-GRANT ALL ON doctors_legacy TO service_role, authenticated;
+-- Conceder acesso total as tabelas criadas pela migration.
+-- Guarda (Fase 2.5): num banco limpo nao existem as tabelas
+-- Portuguese (especialidades_legacy etc.) nem `doctors` (renomeada
+-- para doctors_legacy pela 003 antes desta migration rodar) — o
+-- grant e pulado com NOTICE em vez de abortar o script.
+DO $$
+DECLARE
+  t text;
+  tables_to_grant text[] := ARRAY[
+    'patients', 'professionals', 'profiles', 'clinic_members',
+    'subscriptions', 'usage', 'units', 'medical_records', 'admin_profiles',
+    'clinics', 'specialties', 'doctors', 'doctor_schedule', 'appointments',
+    'users', 'conversations', 'messages', 'notifications', 'reminders',
+    'clinic_alerts', 'billing_events', 'admins',
+    'especialidades_legacy', 'medicos_legacy', 'pacientes_legacy',
+    'consultas_legacy', 'doctors_legacy'
+  ];
+BEGIN
+  FOREACH t IN ARRAY tables_to_grant LOOP
+    IF to_regclass(format('public.%I', t)) IS NOT NULL THEN
+      EXECUTE format('GRANT ALL ON %I TO service_role, authenticated', t);
+    ELSE
+      RAISE NOTICE 'GRANT pulado (tabela inexistente): %', t;
+    END IF;
+  END LOOP;
+END $$;
 
 -- Conceder acesso sequences (para INSERT com BIGSERIAL)
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO service_role, authenticated;

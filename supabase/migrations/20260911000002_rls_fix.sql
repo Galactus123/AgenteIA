@@ -188,12 +188,28 @@ END $$;
 -- A tabela clinic_members e usada pelo webhook LOJOU para
 -- resolver qual clinica pertence a um admin.
 -- Sem esse registro, o lookup sempre falha.
+--
+-- Guarda (Fase 2.5): no shape definitivo (migration 003/001) a
+-- clinic_members NAO tem coluna admin_id — so user_id UUID. Este
+-- bridge existe apenas para o schema antigo (BIGSERIAL/BIGINT);
+-- num banco limpo a coluna nao existe e o bloco inteiro e pulado.
 
 DO $$
 DECLARE
   admin_id_var BIGINT;
   clinic_id_var BIGINT;
 BEGIN
+  IF to_regclass('public.clinic_members') IS NULL
+     OR NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'clinic_members'
+         AND column_name = 'admin_id'
+     ) THEN
+    RAISE NOTICE 'clinic_members: coluna admin_id nao existe (shape definitivo) - bridge legado pulado';
+    RETURN;
+  END IF;
+
   SELECT id INTO admin_id_var FROM admins WHERE username = 'admin' LIMIT 1;
   SELECT id INTO clinic_id_var FROM clinics LIMIT 1;
 
@@ -224,8 +240,21 @@ CREATE INDEX IF NOT EXISTS idx_usage_clinic_period
   ON usage(clinic_id, period);
 
 -- Indices para clinic_members (lookup por admin_id e user_id)
-CREATE INDEX IF NOT EXISTS idx_clinic_members_admin_id
-  ON clinic_members(admin_id);
+-- Guarda (Fase 2.5): so existe no schema antigo com admin_id.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'clinic_members'
+      AND column_name = 'admin_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_clinic_members_admin_id
+      ON clinic_members(admin_id);
+  ELSE
+    RAISE NOTICE 'idx_clinic_members_admin_id pulado: coluna admin_id nao existe (shape definitivo)';
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_clinic_members_user_id
   ON clinic_members(user_id);
 

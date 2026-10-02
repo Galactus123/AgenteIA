@@ -1,9 +1,37 @@
 -- ============================================================
--- SaudeSync — Migracao SQLite -> Supabase (PostgreSQL)
--- Execute este SQL no Supabase Dashboard > SQL Editor
+-- SaudeSync — Migration 001: Schema Base (SQLite -> Supabase)
+-- Versao: 20260911000001
+-- Descricao: 17 tabelas base, seed "Clinica Vida", RLS e grants
+--            de partida. Fase 1.6 — criada a partir do arquivo
+--            supabase-migration.sql (que ficava na raiz do repo).
+-- ============================================================
+--
+-- PROVENIENCIA E DESVIOS RELACIONADOS AO ARQUIVO ORIGINAL:
+--   * clinic_members, subscriptions e usage sao criadas AQUI JA NO
+--     SHAPE DEFINITIVO da migration 003 (PK UUID, user_id UUID ->
+--     auth.users, TIMESTAMPTZ, CHECKs). O arquivo original criava
+--     essas tres com BIGSERIAL/BIGINT; como a 003 usa CREATE TABLE
+--     IF NOT EXISTS, num banco limpo o shape antigo seria
+--     preservado e o INSERT de signup (user_id UUID) quebraria —
+--     e ja divergiria do banco vivo.
+--   * As demais 14 tabelas, os indices, o seed e as policies de
+--     isolamento (USING (false)) sao fielmente reproduzidos do
+--     arquivo original.
+--   * As policies USING (false) criadas aqui sao recriadas pela
+--     20260911000002 e removidas definitivamente pela
+--     20261002000002_drop_dead_policies.sql (Fase 2.6).
+--   * Requer o schema auth (Supabase Auth): clinic_members.user_id
+--     tem FK para auth.users aqui; profiles/admin_profiles vao na 003.
+--   * Aplicavel em banco novo via `supabase db push` ou no SQL
+--     Editor. Idempotente (IF NOT EXISTS + guardas).
 -- ============================================================
 
--- 1. clinics
+
+-- ============================================================
+-- 1. TABELAS BASE (14)
+-- ============================================================
+
+-- 1.1 clinics
 CREATE TABLE IF NOT EXISTS clinics (
   id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL,
@@ -23,7 +51,7 @@ CREATE TABLE IF NOT EXISTS clinics (
   last_reset_at TEXT
 );
 
--- 2. clinic_alerts
+-- 1.2 clinic_alerts
 CREATE TABLE IF NOT EXISTS clinic_alerts (
   id BIGSERIAL PRIMARY KEY,
   clinic_id BIGINT NOT NULL REFERENCES clinics(id),
@@ -32,7 +60,7 @@ CREATE TABLE IF NOT EXISTS clinic_alerts (
   created_at TEXT NOT NULL
 );
 
--- 3. billing_events
+-- 1.3 billing_events
 CREATE TABLE IF NOT EXISTS billing_events (
   id BIGSERIAL PRIMARY KEY,
   clinic_id BIGINT NOT NULL REFERENCES clinics(id),
@@ -44,7 +72,7 @@ CREATE TABLE IF NOT EXISTS billing_events (
   created_at TEXT NOT NULL
 );
 
--- 4. admins
+-- 1.4 admins
 CREATE TABLE IF NOT EXISTS admins (
   id BIGSERIAL PRIMARY KEY,
   username TEXT NOT NULL UNIQUE,
@@ -54,7 +82,7 @@ CREATE TABLE IF NOT EXISTS admins (
   clinic_id BIGINT REFERENCES clinics(id) DEFAULT 1
 );
 
--- 5. specialties
+-- 1.5 specialties
 CREATE TABLE IF NOT EXISTS specialties (
   id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
@@ -63,7 +91,7 @@ CREATE TABLE IF NOT EXISTS specialties (
   clinic_id BIGINT REFERENCES clinics(id) DEFAULT 1
 );
 
--- 6. doctors
+-- 1.6 doctors (renomeada para doctors_legacy na 003)
 CREATE TABLE IF NOT EXISTS doctors (
   id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL,
@@ -75,7 +103,7 @@ CREATE TABLE IF NOT EXISTS doctors (
   clinic_id BIGINT REFERENCES clinics(id) DEFAULT 1
 );
 
--- 7. doctor_schedule
+-- 1.7 doctor_schedule (legado — o app usa professionals.schedule JSONB)
 CREATE TABLE IF NOT EXISTS doctor_schedule (
   id BIGSERIAL PRIMARY KEY,
   doctor_id BIGINT NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
@@ -84,7 +112,7 @@ CREATE TABLE IF NOT EXISTS doctor_schedule (
   end_time TEXT NOT NULL
 );
 
--- 8. conversations
+-- 1.8 conversations
 CREATE TABLE IF NOT EXISTS conversations (
   id BIGSERIAL PRIMARY KEY,
   phone TEXT NOT NULL,
@@ -95,7 +123,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   clinic_id BIGINT REFERENCES clinics(id) DEFAULT 1
 );
 
--- 9. messages
+-- 1.9 messages
 CREATE TABLE IF NOT EXISTS messages (
   id BIGSERIAL PRIMARY KEY,
   conversation_id BIGINT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
@@ -104,7 +132,7 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at TEXT NOT NULL
 );
 
--- 10. appointments
+-- 1.10 appointments
 CREATE TABLE IF NOT EXISTS appointments (
   id BIGSERIAL PRIMARY KEY,
   patient_name TEXT NOT NULL,
@@ -125,7 +153,7 @@ CREATE TABLE IF NOT EXISTS appointments (
   clinic_id BIGINT REFERENCES clinics(id) DEFAULT 1
 );
 
--- 11. reminders
+-- 1.11 reminders
 CREATE TABLE IF NOT EXISTS reminders (
   id BIGSERIAL PRIMARY KEY,
   appointment_id BIGINT NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
@@ -134,7 +162,7 @@ CREATE TABLE IF NOT EXISTS reminders (
   clinic_id BIGINT REFERENCES clinics(id) DEFAULT 1
 );
 
--- 12. notifications
+-- 1.12 notifications
 CREATE TABLE IF NOT EXISTS notifications (
   id BIGSERIAL PRIMARY KEY,
   type TEXT NOT NULL,
@@ -148,7 +176,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   clinic_id BIGINT REFERENCES clinics(id) DEFAULT 1
 );
 
--- 13. users
+-- 1.13 users
 CREATE TABLE IF NOT EXISTS users (
   id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL,
@@ -162,34 +190,7 @@ CREATE TABLE IF NOT EXISTS users (
   clinic_id BIGINT REFERENCES clinics(id) DEFAULT 1
 );
 
--- 14. subscriptions
-CREATE TABLE IF NOT EXISTS subscriptions (
-  id BIGSERIAL PRIMARY KEY,
-  clinic_id BIGINT NOT NULL REFERENCES clinics(id),
-  plan_id TEXT NOT NULL DEFAULT 'start',
-  status TEXT NOT NULL DEFAULT 'none',
-  lojou_customer_id TEXT DEFAULT '',
-  lojou_subscription_id TEXT DEFAULT '',
-  current_period_start TEXT NOT NULL,
-  current_period_end TEXT NOT NULL,
-  cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-
--- 15. clinic_members
-CREATE TABLE IF NOT EXISTS clinic_members (
-  id BIGSERIAL PRIMARY KEY,
-  clinic_id BIGINT NOT NULL REFERENCES clinics(id),
-  user_id BIGINT,
-  admin_id BIGINT REFERENCES admins(id),
-  role TEXT NOT NULL DEFAULT 'admin',
-  professional_id BIGINT,
-  active INTEGER NOT NULL DEFAULT 1,
-  created_at TEXT NOT NULL
-);
-
--- 16. clinic_units
+-- 1.14 clinic_units (legado — substituida por units na 003)
 CREATE TABLE IF NOT EXISTS clinic_units (
   id BIGSERIAL PRIMARY KEY,
   clinic_id BIGINT NOT NULL REFERENCES clinics(id),
@@ -200,18 +201,65 @@ CREATE TABLE IF NOT EXISTS clinic_units (
   created_at TEXT NOT NULL
 );
 
--- 17. usage
-CREATE TABLE IF NOT EXISTS usage (
-  id BIGSERIAL PRIMARY KEY,
-  clinic_id BIGINT NOT NULL REFERENCES clinics(id),
-  period TEXT NOT NULL,
-  whatsapp_conversations INTEGER NOT NULL DEFAULT 0,
-  ai_interactions INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+
+-- ============================================================
+-- 2. TABELAS SAAS (3) — SHAPE DEFINITIVO (paridade com a 003)
+-- ============================================================
+-- Por que aqui e nao so na 003: a 003 usa CREATE TABLE IF NOT EXISTS;
+-- se a 001 criasse a versao antiga (BIGSERIAL/BIGINT), a 003 manteria
+-- o shape antigo num banco limpo. Shape identico ao do banco vivo.
+-- ============================================================
+
+-- 2.1 subscriptions
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id           BIGINT NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
+
+  plan_id             TEXT NOT NULL DEFAULT 'start'
+                      CHECK (plan_id IN ('start','pro','business','enterprise')),
+  status              TEXT NOT NULL DEFAULT 'none'
+                      CHECK (status IN ('none','trialing','active','past_due','cancelled','expired')),
+
+  lojou_customer_id       TEXT DEFAULT '',
+  lojou_subscription_id   TEXT DEFAULT '',
+  lojou_price_id          TEXT DEFAULT '',
+
+  current_period_start    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  current_period_end      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  cancel_at_period_end    BOOLEAN NOT NULL DEFAULT false,
+  cancelled_at            TIMESTAMPTZ,
+
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Indices para performance
+-- 2.2 clinic_members
+CREATE TABLE IF NOT EXISTS clinic_members (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id           BIGINT NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
+  user_id             UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  role                TEXT NOT NULL DEFAULT 'member'
+                      CHECK (role IN ('owner','admin','manager','receptionist','professional','finance','member')),
+  active              BOOLEAN NOT NULL DEFAULT true,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 2.3 usage
+CREATE TABLE IF NOT EXISTS usage (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  clinic_id           BIGINT NOT NULL REFERENCES clinics(id) ON DELETE CASCADE,
+  period              TEXT NOT NULL,
+  whatsapp_conversations INTEGER NOT NULL DEFAULT 0,
+  ai_interactions     INTEGER NOT NULL DEFAULT 0,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+
+-- ============================================================
+-- 3. INDICES PARA PERFORMANCE
+-- ============================================================
+
 CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
 CREATE INDEX IF NOT EXISTS idx_appointments_starts_at ON appointments(starts_at);
 CREATE INDEX IF NOT EXISTS idx_appointments_doctor_id ON appointments(doctor_id);
@@ -229,7 +277,11 @@ CREATE INDEX IF NOT EXISTS idx_clinic_units_clinic_id ON clinic_units(clinic_id)
 CREATE INDEX IF NOT EXISTS idx_usage_clinic_id ON usage(clinic_id);
 CREATE INDEX IF NOT EXISTS idx_usage_period ON usage(period);
 
--- Seed: clinica padrao
+
+-- ============================================================
+-- 4. SEED: clinica padrao
+-- ============================================================
+
 INSERT INTO clinics (name, address, phone, whatsapp, opening_hours, location, social_media, token_limit, base_token_limit)
 SELECT 'Clinica Vida', 'Av. Julius Nyerere 1234, Maputo', '+258 21 300 000', '+258 84 000 0000',
        'Segunda a Sexta: 08h as 18h | Sabado: 08h as 13h', 'Maputo, Mocambique',
@@ -238,11 +290,13 @@ WHERE NOT EXISTS (SELECT 1 FROM clinics WHERE name = 'Clinica Vida');
 
 
 -- ============================================================
--- RLS: Row Level Security
+-- 5. RLS: Row Level Security
 -- ============================================================
 -- A aplicacao usa supabaseAdmin (service_role) para acessar
--- o banco. service_role BYPARASSA RLS automaticamente.
+-- o banco. service_role BYPASSA RLS automaticamente.
 -- A anon key e bloqueada por todas as policies.
+-- (Estas policies USING (false) sao removidas pela Fase 2.6 —
+-- 20261002000002_drop_dead_policies.sql.)
 -- ============================================================
 
 -- Habilitar RLS em todas as tabelas
