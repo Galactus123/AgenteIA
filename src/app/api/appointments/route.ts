@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api-auth";
+import { auditRequest } from "@/lib/services/audit";
 import {
   listAppointmentsFiltered,
   createAppointment,
@@ -96,6 +97,12 @@ export async function POST(request: NextRequest) {
       starts_at: startsAt,
       reason,
       source: body.source ?? "api",
+    });
+    await auditRequest(request, {
+      action: "appointment.create",
+      entity: "appointments",
+      entityId: appointment.id,
+      meta: { professional_id: professionalId, starts_at: startsAt },
     });
     return NextResponse.json({ ok: true, appointment }, { status: 201 });
   } catch (err) {

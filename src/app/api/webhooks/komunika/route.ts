@@ -10,6 +10,7 @@ import type { KomunikaInboundMessage } from "@/lib/services/komunika";
 import { isValidPayloadSize } from "@/lib/agent/security";
 import { HUMAN_TRANSFER_NOTICE } from "@/lib/services/transfers";
 import { enqueueOutboxMessage, processOutboxInBackground } from "@/lib/services/outbox";
+import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +40,10 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
+  // Anti-DoS/forca bruta de assinatura: janela por IP antes de ler o corpo.
+  const limited = rateLimit(`webhook:komunika:${clientIp(request)}`, 60, 60_000);
+  if (!limited.ok) return tooManyRequests(limited.retryAfterSec);
+
   try {
     const rawBody = await request.text().catch(() => "");
     console.log("[webhook] Payload recebido, tamanho:", rawBody.length);
@@ -60,8 +65,10 @@ export async function POST(request: NextRequest) {
     let body: Record<string, unknown>;
     try {
       body = JSON.parse(rawBody);
-    } catch (err) {
-      console.error("[webhook] Body inválido — JSON parse falhou:", err);
+    } catch {
+      // Sem logar o erro bruto: a mensagem do V8 cita um trecho do JSON
+      // (conteudo da conversa = PII).
+      console.error("[webhook] Body inválido — JSON parse falhou", "tamanho:", rawBody.length);
       return NextResponse.json({ error: "Body inválido." }, { status: 400 });
     }
 

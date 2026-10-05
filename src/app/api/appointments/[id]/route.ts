@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api-auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { auditRequest } from "@/lib/services/audit";
 import {
   getAppointment,
   getAppointmentView,
@@ -66,6 +67,12 @@ export async function PATCH(
         return NextResponse.json({ error: check.reason }, { status: 400 });
       }
       await cancelAppointment(Number(id));
+      await auditRequest(request, {
+        action: "appointment.cancel",
+        entity: "appointments",
+        entityId: id,
+        meta: { by: "panel" },
+      });
       return NextResponse.json({
         ok: true,
         appointment: await getAppointmentView(Number(id)),
@@ -76,6 +83,11 @@ export async function PATCH(
       // Fase 3.6: marcar no-show libera o horario na agenda.
       try {
         const view = await markNoShow(Number(id));
+        await auditRequest(request, {
+          action: "appointment.no_show",
+          entity: "appointments",
+          entityId: id,
+        });
         return NextResponse.json({ ok: true, appointment: view });
       } catch (err) {
         return NextResponse.json(
@@ -100,6 +112,11 @@ export async function PATCH(
           { status: 500 }
         );
       }
+      await auditRequest(request, {
+        action: "appointment.completed",
+        entity: "appointments",
+        entityId: id,
+      });
       return NextResponse.json({
         ok: true,
         appointment: await getAppointmentView(Number(id)),
@@ -146,6 +163,12 @@ export async function PUT(
 
   try {
     const updated = await rescheduleAppointment(Number(id), String(body.new_starts_at));
+    await auditRequest(request, {
+      action: "appointment.reschedule",
+      entity: "appointments",
+      entityId: id,
+      meta: { new_starts_at: String(body.new_starts_at) },
+    });
     return NextResponse.json({ ok: true, appointment: updated });
   } catch (err) {
     // Novo horario ocupado por corrida (indice unico) — 409 amigavel.
@@ -185,5 +208,11 @@ export async function DELETE(
   }
 
   await cancelAppointment(Number(id));
+  await auditRequest(request, {
+    action: "appointment.cancel",
+    entity: "appointments",
+    entityId: id,
+    meta: { by: "panel", method: "delete" },
+  });
   return NextResponse.json({ ok: true, appointment: await getAppointmentView(Number(id)) });
 }

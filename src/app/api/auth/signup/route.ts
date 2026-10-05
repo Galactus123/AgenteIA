@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { supabaseAdmin } from "@/lib/supabase";
+import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { recordAudit } from "@/lib/services/audit";
+import { maskEmail } from "@/lib/lgpd";
 
 // Cria o usuario e, na mesma requisicao, o tenant minimo que o RLS exige:
 //   profiles -> admin_profiles -> clinics -> clinic_members
@@ -39,6 +42,10 @@ export async function POST(request: NextRequest) {
   const password = String(body?.password ?? "");
   const name = String(body?.name ?? body?.username ?? "").trim();
   const clinicName = String(body?.clinicName ?? "").trim() || name;
+
+  // Anti-abuse: nao deixa uma origem criar contas em rajada.
+  const byIp = rateLimit(`signup:ip:${clientIp(request)}`, 10, 60 * 60_000);
+  if (!byIp.ok) return tooManyRequests(byIp.retryAfterSec);
 
   if (!email || !password || !name) {
     return NextResponse.json(
@@ -121,6 +128,17 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+
+  await recordAudit({
+    actorId: userId,
+    actorLabel: maskEmail(email),
+    action: "auth.signup",
+    entity: "users",
+    entityId: userId,
+    clinicId: clinicId ?? undefined,
+    meta: { clinic: clinicName },
+    ip: clientIp(request),
+  });
 
   const response = NextResponse.json(
     { ok: true, userId, clinicId },

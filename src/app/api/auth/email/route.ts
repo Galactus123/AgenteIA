@@ -67,7 +67,8 @@ export async function PUT(request: NextRequest) {
   });
 
   if (verifyError) {
-    console.error("[auth/email] verify error:", JSON.stringify(verifyError, null, 2));
+    // So codigo/mensagem: o objeto completo do GoTrue pode carregar e-mail (PII).
+    console.error("[auth/email] verify error:", verifyError.code ?? verifyError.status, verifyError.message);
     return NextResponse.json({ error: "Senha atual incorreta." }, { status: 403 });
   }
 
@@ -78,7 +79,7 @@ export async function PUT(request: NextRequest) {
   );
 
   if (updateError) {
-    console.error("[auth/email] update error:", JSON.stringify(updateError, null, 2));
+    console.error("[auth/email] update error:", updateError.code ?? updateError.status, updateError.message);
     return NextResponse.json({ error: updateError.message }, { status: 400 });
   }
 

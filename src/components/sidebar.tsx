@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   Activity,
   CreditCard,
+  ShieldCheck,
 } from "lucide-react";
 
 interface NavItem {
@@ -194,6 +195,14 @@ function SidebarInner() {
             isDark={isDark}
           />
           <SidebarLink
+            href="/configuracoes/auditoria"
+            icon={<ShieldCheck size={18} strokeWidth={1.75} />}
+            label="Auditoria"
+            active={pathname === "/configuracoes/auditoria"}
+            collapsed={collapsed}
+            isDark={isDark}
+          />
+          <SidebarLink
             href="/perfil"
             icon={<Settings size={18} strokeWidth={1.75} />}
             label="Perfil"
@@ -293,6 +302,15 @@ function SidebarInner() {
             icon={<CreditCard size={18} strokeWidth={1.75} />}
             label="Assinatura"
             active={pathname === "/configuracoes/assinatura"}
+            collapsed={false}
+            onClick={closeMobile}
+            isDark={isDark}
+          />
+          <SidebarLink
+            href="/configuracoes/auditoria"
+            icon={<ShieldCheck size={18} strokeWidth={1.75} />}
+            label="Auditoria"
+            active={pathname === "/configuracoes/auditoria"}
             collapsed={false}
             onClick={closeMobile}
             isDark={isDark}

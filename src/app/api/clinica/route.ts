@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api-auth";
 import { getClinic, updateClinic } from "@/lib/services/clinics";
+import { auditRequest } from "@/lib/services/audit";
 
 export async function GET(request: NextRequest) {
   const authError = await requireAuth(request);
@@ -21,6 +22,17 @@ export async function PUT(request: NextRequest) {
     opening_hours: body.opening_hours,
     location: body.location,
     social_media: body.social_media ? JSON.stringify(body.social_media) : undefined,
+  });
+  // Somente as chaves alteradas: telefone/endereco (PII) ficam fora da trilha.
+  await auditRequest(request, {
+    action: "clinic.update",
+    entity: "clinics",
+    entityId: clinic?.id ?? null,
+    meta: {
+      fields: Object.keys(body).filter(
+        (k) => body[k] !== undefined && body[k] !== null && body[k] !== ""
+      ),
+    },
   });
   return NextResponse.json(clinic);
 }

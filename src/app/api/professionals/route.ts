@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api-auth";
 import { listDoctors, createDoctor } from "@/lib/services/doctors";
 import type { ScheduleInput } from "@/lib/services/doctors";
+import { auditRequest } from "@/lib/services/audit";
 
 function message(err: unknown, fallback: string): string {
   return err instanceof Error && err.message ? err.message : fallback;
@@ -40,6 +41,12 @@ export async function POST(request: NextRequest) {
       status: body.status ? String(body.status) : "active",
       phone: body.phone !== undefined ? String(body.phone) : "",
       schedule: (Array.isArray(body.schedule) ? body.schedule : []) as ScheduleInput,
+    });
+    await auditRequest(request, {
+      action: "professional.create",
+      entity: "professionals",
+      entityId: doctor.id,
+      meta: { specialty_id: Number(body.specialty_id) },
     });
     return NextResponse.json(doctor, { status: 201 });
   } catch (err) {

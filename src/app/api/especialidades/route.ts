@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api-auth";
 import { listSpecialties, createSpecialty } from "@/lib/services/specialties";
+import { auditRequest } from "@/lib/services/audit";
 
 export async function GET(request: NextRequest) {
   const authError = await requireAuth(request);
@@ -18,6 +19,11 @@ export async function POST(request: NextRequest) {
       name: String(body.name),
       description: body.description ? String(body.description) : "",
       keywords: Array.isArray(body.keywords) ? body.keywords.map(String) : [],
+    });
+    await auditRequest(request, {
+      action: "specialty.create",
+      entity: "specialties",
+      entityId: (specialty as { id?: number | string }).id ?? null,
     });
     return NextResponse.json(specialty, { status: 201 });
   } catch {

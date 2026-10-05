@@ -11,6 +11,8 @@ import {
   updateSubscription,
   getActiveSubscription,
 } from "@/lib/services/plan-limits";
+import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { maskEmail } from "@/lib/lgpd";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -144,6 +146,10 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
+  // Janela por IP antes de consumir corpo/CPU (forca bruta do secret da query).
+  const limited = rateLimit(`webhook:lojou:${clientIp(request)}`, 60, 60_000);
+  if (!limited.ok) return tooManyRequests(limited.retryAfterSec);
+
   try {
     // 0. Validar tamanho do payload (anti-DoS)
     const rawBody = await request.clone().text().catch(() => "");
@@ -387,7 +393,7 @@ async function handleSubscriptionEvent(params: {
       return;
     }
     if (!admins?.length) {
-      console.log("[lojou-webhook] Admin não encontrado para assinatura:", email);
+      console.log("[lojou-webhook] Admin não encontrado para assinatura:", maskEmail(email ?? ""));
       return;
     }
 

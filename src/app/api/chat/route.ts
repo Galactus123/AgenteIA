@@ -42,7 +42,8 @@ export async function POST(request: NextRequest) {
       conversationId: result.conversationId,
     });
   } catch (err) {
-    console.error("[api/chat] Erro ao processar mensagem:", err);
+    // Mensagem do erro, nunca o objeto cru (pode ecoar conteudo da conversa).
+    console.error("[api/chat] Erro ao processar mensagem:", err instanceof Error ? err.message : "erro desconhecido");
     return NextResponse.json(
       { error: "Falha ao comunicar com o agente de IA." },
       { status: 500 }

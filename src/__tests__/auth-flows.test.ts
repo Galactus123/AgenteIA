@@ -250,7 +250,9 @@ describe("POST /api/auth/signup (Fase 5.3)", () => {
     const body = await res.json();
     expect(body).toMatchObject({ ok: true, userId: "u1", clinicId: 42 });
 
-    const inserts = db.ops.filter((o) => o.op === "insert");
+    // audit_logs (Fase 6.3) tambem insere; a ordem das tabelas do tenant
+    // e o que este teste garante.
+    const inserts = db.ops.filter((o) => o.op === "insert" && o.table !== "audit_logs");
     expect(inserts.map((o) => o.table)).toEqual(["profiles", "admin_profiles", "clinics", "clinic_members"]);
     expect(inserts[2].values).toMatchObject({ name: "Clínica Central" });
     expect(inserts[3].values).toMatchObject({ clinic_id: 42, user_id: "u1", role: "owner", active: true });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api-auth";
 import { getDoctor, updateDoctor, deleteDoctor } from "@/lib/services/doctors";
 import type { ScheduleInput } from "@/lib/services/doctors";
+import { auditRequest } from "@/lib/services/audit";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -34,6 +35,13 @@ async function handleUpdate(request: NextRequest, ctx: RouteContext) {
 
   try {
     const doctor = await updateDoctor(id, patch);
+    // Apenas os campos alterados: valores (nome/e-mail/telefone) nao vao para a trilha.
+    await auditRequest(request, {
+      action: "professional.update",
+      entity: "professionals",
+      entityId: id,
+      meta: { fields: Object.keys(patch) },
+    });
     return NextResponse.json(doctor);
   } catch (err) {
     return NextResponse.json({ error: message(err, "Erro ao atualizar profissional.") }, { status: 500 });
@@ -58,6 +66,11 @@ export async function DELETE(request: NextRequest, ctx: RouteContext) {
 
   try {
     await deleteDoctor(id);
+    await auditRequest(request, {
+      action: "professional.delete",
+      entity: "professionals",
+      entityId: id,
+    });
     return NextResponse.json({ ok: true });
   } catch (err) {
     return NextResponse.json({ error: message(err, "Erro ao excluir profissional.") }, { status: 500 });

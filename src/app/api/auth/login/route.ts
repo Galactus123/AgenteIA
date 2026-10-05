@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
+import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { recordAudit } from "@/lib/services/audit";
+import { maskEmail } from "@/lib/lgpd";
 
 // Papéis que podem operar sem clinic_members (plataforma, não tenant).
 const PLATFORM_ROLES = new Set(["super_admin", "saas_admin"]);
@@ -45,6 +48,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Email e senha são obrigatórios." }, { status: 400 });
   }
 
+  // Anti forca bruta: teto por IP (varredura) e por e-mail (ataque focado).
+  const byIp = rateLimit(`login:ip:${clientIp(request)}`, 30, 5 * 60_000);
+  if (!byIp.ok) return tooManyRequests(byIp.retryAfterSec);
+  const byEmail = rateLimit(`login:email:${email}`, 10, 5 * 60_000);
+  if (!byEmail.ok) return tooManyRequests(byEmail.retryAfterSec);
+
   // signInWithPassword precisa do client anon + cookies: usar service_role
   // aqui dispara "Database error querying schema" no GoTrue.
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -55,6 +64,13 @@ export async function POST(request: NextRequest) {
   if (error) {
     // Sem e-mail/ID nos logs (PII); o código do GoTrue já orienta a causa.
     console.error("[auth/login] signInWithPassword:", error.code ?? error.status, error.message);
+    // Trilha de auditoria guarda o e-mail mascarado, nunca o cru.
+    await recordAudit({
+      action: "auth.login_failed",
+      actorLabel: maskEmail(email),
+      meta: { code: error.code ?? String(error.status ?? "") },
+      ip: clientIp(request),
+    });
     return NextResponse.json(
       { error: error.message, code: error.code, status: error.status },
       { status: 401 }
@@ -84,6 +100,13 @@ export async function POST(request: NextRequest) {
   // Sem perfil não há papel: hoje isso virava fallback silencioso ("admin").
   if (!adminProfile) {
     console.error("[auth/login] admin_profiles ausente para user_id:", userId);
+    await recordAudit({
+      action: "auth.login_blocked",
+      actorId: userId,
+      actorLabel: maskEmail(email),
+      meta: { code: "PROFILE_MISSING" },
+      ip: clientIp(request),
+    });
     return NextResponse.json(
       {
         error: "Perfil administrativo não encontrado para este usuário. Contate o suporte.",
@@ -113,6 +136,13 @@ export async function POST(request: NextRequest) {
   // aqui é melhor do que entregar um painel em branco.
   if (clinicIds.length === 0 && !PLATFORM_ROLES.has(adminProfile.role)) {
     console.error("[auth/login] clinic_members vazio para user_id:", userId);
+    await recordAudit({
+      action: "auth.login_blocked",
+      actorId: userId,
+      actorLabel: maskEmail(email),
+      meta: { code: "CLINIC_MISSING", role: adminProfile.role },
+      ip: clientIp(request),
+    });
     return NextResponse.json(
       {
         error: "Este usuário não está vinculado a nenhuma clínica. Contate o suporte.",
@@ -121,6 +151,17 @@ export async function POST(request: NextRequest) {
       { status: 403 }
     );
   }
+
+  await recordAudit({
+    actorId: userId,
+    actorLabel: maskEmail(email),
+    action: "auth.login",
+    entity: "users",
+    entityId: userId,
+    clinicId: clinicIds[0] ? Number(clinicIds[0]) : undefined,
+    meta: { role: adminProfile.role, clinics: clinicIds.length },
+    ip: clientIp(request),
+  });
 
   const response = NextResponse.json({
     ok: true,

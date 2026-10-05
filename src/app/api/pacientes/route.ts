@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getDefaultClinicId } from "@/lib/services/clinics";
+import { auditRequest } from "@/lib/services/audit";
 
 export async function GET(request: NextRequest) {
   const authError = await requireAuth(request);
@@ -81,6 +82,13 @@ export async function POST(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  await auditRequest(request, {
+    action: "patient.create",
+    entity: "patients",
+    entityId: data.id,
+    clinicId: clinicId,
+  });
 
   return NextResponse.json(data, { status: 201 });
 }

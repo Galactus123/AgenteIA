@@ -67,11 +67,16 @@ export async function requireInternalAuth(request: NextRequest): Promise<NextRes
   );
 
   if (accepted.length === 0) {
-    if (process.env.VERCEL) {
-      console.error("[auth] INTERNAL_API_TOKEN/CRON_SECRET nao configurado — requisicao interna rejeitada em producao");
-      return NextResponse.json({ error: "Token interno nao configurado." }, { status: 500 });
-    }
-    return null;
+    // Sem token configurado a rota interna fica FECHADA tambem em dev:
+    // bypass silencioso aqui virava porta de prod no ambiente errado.
+    console.error(
+      "[auth] CRON_SECRET/INTERNAL_API_TOKEN nao configurado — requisicao interna rejeitada" +
+        (process.env.VERCEL ? " (producao)" : " (dev)")
+    );
+    return NextResponse.json(
+      { error: "Token interno nao configurado. Defina CRON_SECRET ou INTERNAL_API_TOKEN." },
+      { status: 500 }
+    );
   }
 
   if (!token || !accepted.includes(token)) {
