@@ -5,12 +5,12 @@
 | Item | Valor |
 |---|---|
 | Data da auditoria | 30/09/2026 |
-| Última atualização | 05/10/2026 (sessão 6 — Fase 4 concluída: 4.1–4.4; métricas corrigidas, "aguardando atendimento" real, erros visíveis e órfãos/rotas com destino) |
+| Última atualização | 05/10/2026 (sessão 7 — Fase 5 concluída: 5.2–5.4; CI em Node 22, +24 testes de agente/scheduler/auth (103 no total) e cobertura como status check) |
 | Documento de requisitos | `PRD-SaudeSync.md` v1.1 |
-| Branch / commit base | `main` @ `747ca86` — *feat(dashboard): metricas corrigidas, aguardando atendimento real e erros visiveis (Fase 4.1-4.4)* (05/10/2026); sincronizado com `origin/main` |
-| Commits totais | 89 (primeiro: `7279797` "iniciar", 15/08/2026; último: `747ca86` Fase 4, 05/10/2026) |
+| Branch / commit base | `main` sincronizado com `origin/main` — última entrega: **Fase 5** (05/10/2026) |
+| Commits totais | 91 (primeiro: `7279797` "iniciar", 15/08/2026) |
 | Código | `src/` — 146 arquivos, ~14.000 linhas (`.ts`/`.tsx`) |
-| Árvore de trabalho | **limpa** — Fase 4 commitada em `747ca86` (05/10/2026, sessão 6); `AgenteIA/` (cópia integral do working tree) e `data/**` ficam fora do `tsconfig` e do `eslint` |
+| Árvore de trabalho | limpa após o commit da Fase 5; `AgenteIA/` (cópia do working tree) e `data/**` ficam fora do `tsconfig` e do `eslint` |
 | Stack | Next.js 16.2.12 (App Router + `proxy.ts`), React 19.2.4, Supabase (Postgres + Auth) — **persistência única** (o `node:sqlite` em runtime foi removido; `data/saudesync.db` só é lido por `scripts/setup-supabase.mjs`), Vitest 5, Vercel |
 
 ---
@@ -21,7 +21,7 @@
 2. ~~**O projeto está dividido em dois bancos de dados que não conversam.**~~ **RESOLVIDO (01/10/2026):** `src/lib/db.ts` e `src/lib/multi-tenant.ts` foram removidos e todos os serviços, rotas, server components, o agente e a LGPD passaram a usar `supabaseAdmin` de forma assíncrona. Persistência única: Supabase.
 3. **A cadeia de migrações está completa e validada do zero:** existe `20260911000001_schema_base.sql` (Fase 1.6 — o schema base saiu de `supabase-migration.sql` na raiz, que foi **removido**); `008`/`009` aplicadas no banco vivo em 01/10/2026; e a **Fase 2.5 (02/10/2026)** provou a cadeia **11/11 migrations em um Postgres 16 limpo** via `scripts/ops/clean-db-test.mjs` (log em `scripts/ops/clean-db-run.log`). A `005` perdeu a FASE 5 (a que corrompeu `auth.users`), agora extraída para a `009` idempotente.
 4. ~~**O MVP não está pronto para produção:** lembretes 24h/2h dependem de um `setInterval` (morre em serverless, não há `vercel.json`/cron), não há fila de reenvio em falha da API de WhatsApp, não há trava de conflito de horário, e a transferência para humano não interrompe a IA.~~ **RESOLVIDO (02/10/2026, sessão 4 — Fase 3.1–3.5):** cron real via **pg_cron + pg_net no Supabase** (a Vercel Hobby só aceita cron diário) + `vercel.json` de segurança; `setInterval` virou fallback só-dev; lembretes idempotentes via `ON CONFLICT DO NOTHING`; trava de horário com `SlotTakenError` (23505 → 409 amigável no serviço, na API e no agente); fila **`outbox`** com backoff e webhook devolvendo `5xx` em erro fatal; transferência real (IA para em `transferred`, não continua o loop, recepção é notificada com o histórico). **Pendência operacional:** aplicar `20261002000003`/`20261002000004` no SQL Editor e configurar os segredos do Vault + `CRON_SECRET` (ver log da Fase 3).
-5. **Validação atual (01/10/2026, sessão 2):** `tsc` ✅ · `next build` ✅ · `vitest` ✅ (38 testes — os 9 da autenticação legada saíram na Fase 2.2 e 5 de rota/proxy entraram na 2.3) · `eslint` ✅ **0 erros / 0 warnings com regras type-aware novas** (`await-thenable`, `no-floating-promises`, `no-misused-promises`) — estas regras pegaram e foi corrigido um bug de classe da conversão SQLite → Supabase (services viraram `async` e 15 chamadas ficaram sem `await`, serializando `Promise` como `{}`). **Revalidado em 02/10/2026 (sessão 3):** `eslint` ✅ 0/0 · `tsc` ✅ · `vitest` ✅ 38/38 · `next build` ✅ (45 páginas) — sessão sem alteração em `src/` (só migrações, `scripts/ops/` e este documento). **Revalidado em 02/10/2026 (sessão 4, Fase 3.1–3.5):** `eslint` ✅ 0/0 · `tsc` ✅ · `vitest` ✅ **50/50** (12 novos em `src/lib/__tests__/fase3.test.ts`) · `next build` ✅ · cadeia limpa **13/13 migrations · 11/11 CHECKs · 3/3 testes de papel · exit 0** — inclui `outbox` (25ª tabela, RLS deny-all, `anon` revogado) e o caminho de agendamento do cron validado com stubs. **Revalidado em 05/10/2026 (sessão 6, Fase 4):** `eslint` ✅ 0/0 · `tsc` ✅ · `vitest` ✅ **79/79** (6 arquivos, +3 novos em `src/lib/__tests__/stats.test.ts`) · `next build` ✅ exit 0.
+5. **Validação atual (01/10/2026, sessão 2):** `tsc` ✅ · `next build` ✅ · `vitest` ✅ (38 testes — os 9 da autenticação legada saíram na Fase 2.2 e 5 de rota/proxy entraram na 2.3) · `eslint` ✅ **0 erros / 0 warnings com regras type-aware novas** (`await-thenable`, `no-floating-promises`, `no-misused-promises`) — estas regras pegaram e foi corrigido um bug de classe da conversão SQLite → Supabase (services viraram `async` e 15 chamadas ficaram sem `await`, serializando `Promise` como `{}`). **Revalidado em 02/10/2026 (sessão 3):** `eslint` ✅ 0/0 · `tsc` ✅ · `vitest` ✅ 38/38 · `next build` ✅ (45 páginas) — sessão sem alteração em `src/` (só migrações, `scripts/ops/` e este documento). **Revalidado em 02/10/2026 (sessão 4, Fase 3.1–3.5):** `eslint` ✅ 0/0 · `tsc` ✅ · `vitest` ✅ **50/50** (12 novos em `src/lib/__tests__/fase3.test.ts`) · `next build` ✅ · cadeia limpa **13/13 migrations · 11/11 CHECKs · 3/3 testes de papel · exit 0** — inclui `outbox` (25ª tabela, RLS deny-all, `anon` revogado) e o caminho de agendamento do cron validado com stubs. **Revalidado em 05/10/2026 (sessão 6, Fase 4):** `eslint` ✅ 0/0 · `tsc` ✅ · `vitest` ✅ **79/79** (6 arquivos, +3 novos em `src/lib/__tests__/stats.test.ts`) · `next build` ✅ exit 0. **Revalidado em 05/10/2026 (sessão 7, Fase 5):** `eslint` ✅ 0/0 · `tsc` ✅ · `vitest` ✅ **103/103** (9 arquivos, +24 novos) · `test:coverage` ✅ exit 0 com thresholds · `next build` ✅ exit 0.
 
 ---
 
@@ -197,9 +197,9 @@ O PRD coloca isto **fora** do MVP, mas já está no código — e consome manute
 - ~~**`src/utils/supabase/client.ts`** (helper `createBrowserClient`) não é usado por nenhum componente~~ → **removido na Fase 2.4 (02/10/2026)** — com `anon` sem GRANT de tabela ele não teria uso; o navegador consulta só via API.
 - **Rotas sem consumidor na UI:** `/api/appointments`, `/api/stats`, `/api/conversations`, `/api/pacientes/[id]`, `/api/subscription/{limits,usage,checkout}` — ~~algumas são legítimas para uso externo/cron~~ → **destino definido na Fase 4.4 (05/10/2026):** nenhuma removida, cada uma classificada como CRUD público/leitura para integração/superfície de cobrança congelada/setup manual/monitoramento/webhook/cron (ver 4.4). `/api/chat/history`, `/api/notifications/[id]`, `/api/especialidades/[id]` **não** são órfãos — são consumidos pela UI.
 - ~~**Debug remanescente:** `console.log` extensivo em `api/auth/login/route.ts`.~~ → **removido (Fase 0.3).** Restam `console.log` por request em `webhooks/komunika/route.ts` (sem PII, só status/ids).
-- **Testes (38, todos verdes)** cobrem: sanitização anti prompt-injection (`security.test.ts`), HMAC/filtro de eventos do webhook (`webhook.test.ts`) e a lista de rotas protegidas × `config.matcher` do `proxy.ts` (`src/__tests__/proxy.test.ts`, Fase 2.3). ~~Os 9 de **autenticação legada** (`auth.test.ts`) foram apagados na Fase 2.2 — testavam uma reimplementação dentro do próprio arquivo, não `src/lib/auth.ts`.~~ **Zero testes** para: agente, tools, `appointments` (regras de 4h/1 remarcação), lembretes, RLS, multi-tenant, login/signup reais (ver Fase 5.3).
-- **README desatualizado:** ainda documenta `admin/admin123` e "o MVP usa `node:sqlite`" como se fosse definitivo.
-- **`.github/workflows/ci.yml` usa Node 20**, enquanto `package.json` exige `>=22` e `.node-version` = 22 (local: v24.18.0). Com a remoção de `db.ts` o `node:sqlite` saiu de `src/`, então o **build** do CI deve passar; ainda assim o `engines` diverge e os `scripts/*.mjs` que usam `node:sqlite` (`setup-supabase.mjs`) exigem Node ≥ 22 — ver Fase 5.2.
+- **Testes (103, todos verdes)** cobrem: sanitização anti prompt-injection (`security.test.ts`), HMAC/filtro de eventos do webhook (`webhook.test.ts`), rotas protegidas × `config.matcher` (`proxy.test.ts`), regras de `appointments` (`fase3-regras.test.ts`), outbox/cron/transferência (`fase3.test.ts`), métricas (`stats.test.ts`), **agente: loop/transferência/quota (`agent.test.ts`, Fase 5.3)**, **scheduler de lembretes (`scheduler.test.ts`, Fase 5.3)** e **login/signup reais (`auth-flows.test.ts`, Fase 5.3)**. ~~Os 9 de **autenticação legada** (`auth.test.ts`) foram apagados na Fase 2.2 — testavam uma reimplementação dentro do próprio arquivo, não `src/lib/auth.ts`.~~ Ainda **sem teste direto**: `tools.ts` (exercitada via agente), RLS, multi-tenant, webhooks de cobrança e integração GoTrue (Fase 7.2).
+- **README desatualizado:** ~~documenta "o MVP usa `node:sqlite`" como se fosse definitivo~~ → **corrigido na Fase 5.2 (05/10/2026)**. Resta: ainda documenta `admin/admin123` (Fase 6.2/7.6).
+- ~~**`.github/workflows/ci.yml` usa Node 20**, enquanto `package.json` exige `>=22` e `.node-version` = 22~~ → **corrigido na Fase 5.2 (05/10/2026):** os dois jobs usam Node 22 e o job de teste roda `npm run test:coverage` com thresholds (Fase 5.4).
 
 ---
 
@@ -330,13 +330,14 @@ Evidências do estado em que ficou (27/09) e do que a sessão 2 fez:
 - [x] **1.8** **Dados do SQLite → Supabase** — **feito (01/10/2026)**: `006`, `007`, `008` e `009` aplicadas, `node scripts/setup-supabase.mjs --apply` executado (161 inseridos / 5 atualizados; reexecução = 0). Preflight com exit 0 e smoke pós-migração: `/dashboard`, `/consultas`, `/api/auth/me`, `/api/appointments`, `/api/stats`, `/api/pacientes`, `/api/clinica`, `/api/especialidades` → **todos 200**.
 
 > **Próximo passo (é onde paramos agora):** Fase 1 está **8/8 ✅**, Fase 2 está
-> **6/6 ✅**, a **Fase 3 está 7/7 ✅** (3.1–3.5 em 02/10/2026, sessão 4; 3.6–3.7 em
-> 05/10/2026, sessão 5) e a **Fase 4 está 4/4 ✅** (05/10/2026, sessão 6 — painel
-> com métricas corretas, estado real de "aguardando humano" e destino definido
-> para órfãos/rotas; ver log abaixo). A configuração operacional do agendador
-> (Vault/`CRON_SECRET`) foi entregue em 05/10/2026 via `scripts/ops/setup-cron-secrets.sql`
-> + env `CRON_SECRET` (confirmar no banco: `SELECT jobname FROM cron.job;`).
-> **Próxima fase: Fase 5 — Qualidade e CI (5.1 já está feito; 5.2–5.4).**
+> **6/6 ✅**, a **Fase 3 está 7/7 ✅**, a **Fase 4 está 4/4 ✅** e a **Fase 5 está
+> 4/4 ✅** (5.1 em 01/10/2026; 5.2–5.4 em 05/10/2026, sessão 7 — CI em Node 22,
+> 103 testes e cobertura como status check; ver logs abaixo). A configuração
+> operacional do agendador (Vault/`CRON_SECRET`) foi entregue em 05/10/2026 via
+> `scripts/ops/setup-cron-secrets.sql` + env `CRON_SECRET` (confirmar no banco:
+> `SELECT jobname FROM cron.job;`). **Restam 15 tarefas:** Fase 6 (6) e Fase 7 (6)
+> + 3 pendências manuais (branch protection, rotação de chaves, decisões de produto).
+> **Próxima fase: Fase 6 — Segurança e operação (6.1–6.6).**
 
 ### Fase 2 — Auth, tenant e RLS (P0/P1) — ✅ 6 de 6 concluídas
 
@@ -453,12 +454,26 @@ SELECT jobname, schedule FROM cron.job ORDER BY jobname;
 
 **Limitações registradas (backlog):** (1) ainda **não existe UI para responder** a conversa transferida — o card mostra o pendente e o telefone, mas a caixa de entrada humana (provavelmente sobre `/api/conversations` + `/chat` com papel de atendente, hoje `/chat` envia como *paciente* pelo agente) não foi construída; (2) contagens do dia dependem de `starts_at` em texto `YYYY-MM-DD HH:MM` (mesmo formato já usado pela Agenda) — se a coluna virar `timestamptz` puro, revisar a janela; (3) `errors` cobre falha de leitura por escopo, não "nenhum dado" (lista vazia ≠ erro); (4) os 2 componentes de assinatura congelados continuam órfãos até a decisão de produto nº 4; (5) `/api/stats` devolve o mesmo `getStats()` — se um integrante externo passar a consumi-lo, o payload agora inclui `errors`.
 
-### Fase 5 — Qualidade e CI (P0 para merge)
+### Fase 5 — Qualidade e CI (P0 para merge) — ✅ 4 de 4 concluídas
 
 - [x] **5.1** Zerar os **36 erros** de ESLint (20 `set-state-in-effect`, 8 `error-boundaries`, 8 `no-require-imports`) — **feito em 01/10/2026** (`eslint` agora 0 erros / 0 warnings).
-- [ ] **5.2** CI: trocar Node 20 → 22/24 (hoje o job de build quebraria por `node:sqlite`) e alinhar `README` ("Node 20.9+"), `.node-version` e `engines`.
-- [ ] **5.3** Alçar cobertura: testes de regras de negócio (`appointments`: 4h/1 remarcação/2h), do agente (loop, transferência, quota), do scheduler de lembretes **e do fluxo real de login/signup** (a Fase 2.2 apagou os 9 do auth legado). Hoje 33 testes cobrem apenas sanitização e HMAC de webhook.
-- [ ] **5.4** Ligar `test:coverage`/status check obrigatório no GitHub.
+- [x] **5.2** CI: trocar Node 20 → 22/24 (hoje o job de build quebraria por `node:sqlite`) e alinhar `README` ("Node 20.9+"), `.node-version` e `engines`. — **feito (05/10/2026, sessão 7):** `ci.yml` passou de `node-version: "20"` → **`"22"`** nos dois jobs (`quality` e `build`); `README.md` agora diz **"Node.js 22+ (testado com Node 24; `engines`, `.node-version` e CI usam 22)"** e as seções `Estrutura`/`Banco de dados` — que ainda afirmavam "o MVP usa `node:sqlite`" e `data/saudesync.db` — foram corrigidas para **Supabase (Postgres + Auth)**. `.node-version` (22) e `engines` (`>=22`) já estavam corretos; nenhuma alteração.
+- [x] **5.3** Alçar cobertura: testes de regras de negócio (`appointments`: 4h/1 remarcação/2h), do agente (loop, transferência, quota), do scheduler de lembretes **e do fluxo real de login/signup** (a Fase 2.2 apagou os 9 do auth legado). Hoje 33 testes cobrem apenas sanitização e HMAC de webhook. — **feito (05/10/2026, sessão 7):** as **regras de `appointments`** já estavam cobertas pela Fase 3 (`fase3-regras.test.ts`: 4h, limite de 1 remarcação, slots por duração, no-show — auditado aqui); entraram **3 arquivos novos, +24 testes**:
+  - `src/lib/__tests__/agent.test.ts` (**9**) — resposta direta + consumo de tokens, tool call → resposta na iteração seguinte, **limite de 8 iterações com fallback** (sem loop infinito), `transfer_to_human` encerra o loop e notifica a recepção, **cota esgotada bloqueia antes do LLM** e marca `WAITING_HUMAN_INTERVENTION`, conversa `transferred` roda **sem chamar o LLM**, retomada quando a cota volta, erro do LLM vira mensagem (não exceção) e ausência de `OPENAI_API_KEY`.
+  - `src/lib/__tests__/scheduler.test.ts` (**4**) — tick imediato com as 4 tarefas + `setInterval` de 60s em dev, idempotência (não duplica), **produção/Vercel não agenda nada** (deixa o pg_cron no comando) e falha de tarefa reportada sem derrubar o tick.
+  - `src/__tests__/auth-flows.test.ts` (**11**) — login: 400 (campos), 401 (GoTrue), 403 `PROFILE_MISSING`, 403 `CLINIC_MISSING`, **200 sem clínica para papel de plataforma**, 200 feliz normalizando o e-mail (`"  Admin@Clinica.COM "` → `admin@clinica.com`); signup: 400 (campos), 400 (senha < 8), 409 (e-mail existente), **201 com a ordem exata `profiles → admin_profiles → clinics → clinic_members`** e **rollback em ordem inversa + `deleteUser`** quando `clinic_members` falha.
+  - **Total: 103 testes / 9 arquivos** (era 76/6; +27 na sessão).
+- [x] **5.4** Ligar `test:coverage`/status check obrigatório no GitHub. — **feito (05/10/2026, sessão 7):** o job `quality` do CI roda **`npm run test:coverage`** (era `vitest run --reporter=verbose`), então cobertura e thresholds viram **status check de todo push/PR**; `vitest.config.ts` ganhou `coverage.thresholds` no baseline medido (18.8/9.1/19.6/20.1 stmt/branch/func/lines → gates **17/8/18/19**, com ~1pt de folga para a variação do v8 entre Node 22 e 24) e o reporter `lcov`; `coverage/` já era gitignored e entrou no `globalIgnores` do ESLint. **Pendência manual:** exigir o check na branch protection (`Settings → Branches → main → Require status checks` — job `quality`) — não há `gh`/token nesta sessão para fazer via API.
+
+### Log - Fase 5 (sessão 7, 05/10/2026)
+
+**Arquivos alterados/criados:** `.github/workflows/ci.yml` (Node 22 + `npm run test:coverage`), `README.md` (Node 22+, seções de estrutura/banco corrigidas para Supabase), `vitest.config.ts` (thresholds + reporter `lcov`), `eslint.config.mjs` (`coverage/**` ignorado), **novos** `src/lib/__tests__/agent.test.ts`, `src/lib/__tests__/scheduler.test.ts` e `src/__tests__/auth-flows.test.ts`.
+
+**Validação executada:** `eslint` 0/0 · `tsc --noEmit` ✅ · `vitest` **103/103** (9 arquivos) · `test:coverage` ✅ **exit 0** com thresholds · `next build` ✅ (exit 0).
+
+**Cobertura global hoje (v8, `src/lib/**`):** statements 18.8% · branches 9.1% · functions 19.6% · lines 20.1% — gates da CI em 17/8/18/19.
+
+**Limitações registradas (backlog):** (1) **exigir o status check na branch protection continua manual** (sem `gh`/token nesta sessão); (2) a cobertura global é baixa porque os services de banco (`reminders`, `conversations`, `plan-limits`, `komunika`, `subscriptions`) seguem sem teste direto — os gates são globais e foram calibrados no baseline, então só sobem; (3) `tools.ts` (22%) só é exercitada indiretamente pelo `agent.test.ts` e `llm.ts`/`prompts.ts` ficam **mockados** (nenhuma chamada real de rede em teste); (4) login/signup testam a **lógica da rota** com Supabase mockado — a integração real com GoTrue/RLS continua para o E2E da Fase 7.2.
 
 ### Fase 6 — Segurança e operação (P0/P1)
 

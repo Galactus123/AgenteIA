@@ -44,11 +44,13 @@ const eslintConfig = defineConfig([
   },
   // Override default ignores of eslint-config-next.
   globalIgnores([
-    // Default ignores of eslint-config-next:
+    // Default ignores de eslint-config-next.
     ".next/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Relatorio de cobertura gerado por `npm run test:coverage`.
+    "coverage/**",
     // Backup copy of the working tree, not part of the app.
     "AgenteIA/**",
     // Gitignored scratch/inspection scripts.

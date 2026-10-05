@@ -6,7 +6,7 @@ SaaS com Inteligência Artificial que automatiza o atendimento inicial de clíni
 
 ## Requisitos
 
-- Node.js 20.9+ (testado com Node 24)
+- Node.js 22+ (testado com Node 24; `engines`, `.node-version` e CI usam 22)
 - npm
 
 ## Instalação
@@ -48,13 +48,13 @@ Acesse http://localhost:3000
 ## Estrutura
 
 - `src/app/` — páginas e API routes
-- `src/lib/` — banco de dados (`node:sqlite`), serviços e agente de IA
+- `src/lib/` — serviços, regras de negócio, agente de IA e integrações (persistência no Supabase)
 - `src/lib/agent/` — cliente LLM, tools e orquestrador da conversa
-- `data/` — banco SQLite local (criado na primeira execução, com dados de exemplo)
+- `data/` — scripts de auditoria e o backup legado do SQLite (fora do `tsconfig` e do `eslint`)
 
 ## Banco de dados
 
-O MVP usa `node:sqlite`, módulo nativo do Node.js — sem dependências extras. O banco fica em `data/saudesync.db` e é criado/seedado automaticamente na primeira execução com uma clínica, especialidades e médicos de exemplo.
+O sistema usa **Supabase (Postgres + Auth)** como fonte única desde a Fase 1: `supabaseAdmin` (`service_role`) é a única porta de escrita, o `anon` não tem GRANT de tabela e o schema nasce de `supabase/migrations/`. Seed e verificação: `node scripts/setup-supabase.mjs` (exige Node 22+). `data/saudesync.db` é apenas o SQLite legado, lido por esse script.
 
 ## Observação
 
