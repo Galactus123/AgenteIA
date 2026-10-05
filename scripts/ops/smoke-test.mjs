@@ -3,7 +3,8 @@
 // Fase 7.1 - smoke test (somente leitura + 1 login invalido)
 // ============================================================
 // Confere que a aplicacao BUILDADA responde o essencial:
-//   * /api/health 200
+//   * /api/health 200 com ping real do banco (Fase 8.2: checks.database=ok)
+//     (sem ping = 503 {status:"degraded"} → aqui vira FAIL)
 //   * paginas publicas 200 (/login, /precos, /privacidade, /)
 //   * /dashboard sem sessao -> redirect 307/308 para /login (proxy)
 //   * APIs protegidas sem sessao -> 401 (nunca redirect)
@@ -47,11 +48,15 @@ const status = async (path, init) => {
 
 console.log(`=== smoke test (Fase 7.1) — ${BASE} ===\n`);
 
-// 1. Health
-await check("GET /api/health = 200 e status ok", async () => {
+// 1. Health (Fase 8.2: 200 so vale com o ping do banco ok)
+await check("GET /api/health = 200 {status:ok, checks.database:ok}", async () => {
   const res = await status("/api/health");
   const body = await res.json().catch(() => ({}));
-  return { ok: res.status === 200 && body.status === "ok", detail: `HTTP ${res.status}` };
+  const db = body.checks?.database;
+  return {
+    ok: res.status === 200 && body.status === "ok" && db === "ok",
+    detail: `HTTP ${res.status}, db=${db ?? "(sem checks)"}`,
+  };
 });
 
 // 2. Paginas publicas

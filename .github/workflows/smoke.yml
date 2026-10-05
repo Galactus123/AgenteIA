@@ -1,0 +1,34 @@
+# Fase 8.1 - smoke diario de producao (somente leitura + login invalido).
+# Roda o mesmo scripts/ops/smoke-test.mjs do go-live; falha = job vermelho
+# no Actions (notificacao gratuita por e-mail do GitHub), sem servico externo.
+name: Smoke diário (produção)
+
+on:
+  schedule:
+    - cron: "23 5 * * *" # 05:23 UTC — fora da janela dos crons da Vercel (01:51/03:17/03:41)
+  workflow_dispatch: # execucao manual
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-producao
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Smoke contra produção
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Smoke test
+        run: node scripts/ops/smoke-test.mjs --url "${{ vars.SMOKE_URL || 'https://syncbot-123.vercel.app' }}"

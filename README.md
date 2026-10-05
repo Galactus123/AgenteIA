@@ -59,10 +59,11 @@ O sistema usa **Supabase (Postgres + Auth)** como fonte única desde a Fase 1: `
 
 ## Verificação (smoke, concorrência, CI)
 
-- **Smoke test do deploy** (somente leitura): `node scripts/ops/smoke-test.mjs` usa `PUBLIC_URL` do `.env` (ou `--url http://localhost:3000`); confere `/api/health`, páginas públicas, redirect de páginas protegidas para `/login`, APIs com 401 direto (nunca redirect) e login inválido com 401.
+- **Smoke test do deploy** (somente leitura): `node scripts/ops/smoke-test.mjs` usa `PUBLIC_URL` do `.env` (ou `--url http://localhost:3000`); confere `/api/health` (agora com **ping real no banco**: `200 {status:"ok"}` só se o PostgREST responde, senão `503 {status:"degraded"}`), páginas públicas, redirect de páginas protegidas para `/login`, APIs com 401 direto (nunca redirect) e login inválido com 401.
+- **Smoke diário de produção:** `.github/workflows/smoke.yml` roda o mesmo script todo dia às **05:23 UTC** (e sob demanda via *Run workflow*) contra a URL da produção — job vermelho no Actions vira alerta por e-mail do GitHub, sem serviço externo. A URL é configurável pela variável de repositório `SMOKE_URL`.
 - **Concorrência de slot** (requer Docker): `node scripts/ops/slot-concurrency-test.mjs` sobe um Postgres 16 descartável, aplica a cadeia inteira de migrations e dispara 2 e 5 inserções simultâneas no mesmo `(professional_id, starts_at)` — só pode vencer 1, e o índice parcial `uq_appointments_professional_start` rejeita as demais com `23505`.
-- **Schema em banco limpo** (requer Docker): `node scripts/ops/clean-db-test.mjs` valida as 14 migrations do zero e gera `scripts/ops/clean-db-run.log`.
-- **CI:** workflow em `.github/workflows/ci.yml` (Node 22) roda lint, `tsc`, `npm test` e cobertura com gates em `vitest.config.ts`; o status check **`quality`** deve ser exigido na branch protection (configuração manual no GitHub).
+- **Schema em banco limpo** (requer Docker): `node scripts/ops/clean-db-test.mjs` valida as 15 migrations do zero e gera `scripts/ops/clean-db-run.log`.
+- **CI:** workflow em `.github/workflows/ci.yml` (Node 22) roda lint, `tsc`, `npm test` e cobertura com gates em `vitest.config.ts` (**46 / 35 / 45 / 47** — baseline 49.58 / 38.72 / 49.31 / 51.4 da Fase 8); o status check **`quality`** deve ser exigido na branch protection (configuração manual no GitHub).
 - **Crons (Vercel):** `vercel.json` agenda `/api/reminders/run` (03:17 UTC), `/api/outbox/run` (03:41) e `/api/subscription/cycle/run` (01:51); todas exigem o token interno. Estado do agendador: `SELECT jobname FROM cron.job;` no SQL Editor.
 
 ## Backup e restauração
