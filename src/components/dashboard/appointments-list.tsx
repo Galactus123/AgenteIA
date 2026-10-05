@@ -21,6 +21,7 @@ function StatusBadge({ status }: { status: string }) {
     scheduled: { label: "Marcada", className: "neon-badge-success" },
     cancelled: { label: "Cancelada", className: "neon-badge-danger" },
     completed: { label: "Concluída", className: "neon-badge" },
+    no_show: { label: "Não compareceu", className: "neon-badge-warning" },
   };
   const s = map[status] ?? { label: status, className: "neon-badge" };
   return (

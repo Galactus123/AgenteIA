@@ -6,7 +6,11 @@ import {
   findUpcomingAppointmentByPhone,
   rescheduleAppointment,
   cancelAppointment,
+  getAppointment,
+  canCancel,
+  canReschedule,
   SlotTakenError,
+  OutsideHoursError,
 } from "@/lib/services/appointments";
 import type { AppointmentView, AvailableSlot } from "@/lib/types";
 
@@ -76,12 +80,17 @@ export const toolDefinitions: LlmToolDefinition[] = [
     function: {
       name: "reschedule_appointment",
       description:
-        "Remarca uma consulta existente para um novo horário. Só chamar após o paciente confirmar o novo horário.",
+        "Remarca uma consulta existente. Duas etapas: 1) chame SEM confirm para validar as regras; 2) depois de o paciente confirmar explicitamente o novo horário, chame de novo com confirm=true.",
       parameters: {
         type: "object",
         properties: {
           appointment_id: { type: "number" },
           new_starts_at: { type: "string", description: "Nova data e hora no formato YYYY-MM-DD HH:MM" },
+          confirm: {
+            type: "boolean",
+            description:
+              "true SOMENTE após o paciente confirmar explicitamente a remarcação. Sem isso a tool não executa.",
+          },
         },
         required: ["appointment_id", "new_starts_at"],
       },
@@ -92,11 +101,16 @@ export const toolDefinitions: LlmToolDefinition[] = [
     function: {
       name: "cancel_appointment",
       description:
-        "Cancela uma consulta existente. Só chamar após o paciente confirmar explicitamente o cancelamento.",
+        "Cancela uma consulta existente. Duas etapas: 1) chame SEM confirm para validar as regras; 2) depois de o paciente confirmar explicitamente o cancelamento, chame de novo com confirm=true.",
       parameters: {
         type: "object",
         properties: {
           appointment_id: { type: "number" },
+          confirm: {
+            type: "boolean",
+            description:
+              "true SOMENTE após o paciente confirmar explicitamente o cancelamento. Sem isso a tool não executa.",
+          },
         },
         required: ["appointment_id"],
       },
@@ -139,13 +153,14 @@ async function slotExists(
   return slots.some((s) => s.professional_id === professionalId && s.starts_at === startsAt);
 }
 
-// Resposta de "horario ocupado por corrida" com alternativas reais
-// para o LLM apresentar (Fase 3.3).
-async function slotTakenWithAlternatives(
+// Resposta de "horario indisponivel" (corrida de slot ou fora do
+// expediente — Fases 3.3/3.6) com alternativas reais para o LLM.
+async function slotUnavailableResult(
   specialtyId: number,
   professionalId: string,
   startsAt: string,
-  error: SlotTakenError
+  message: string,
+  hint: string
 ): Promise<ToolResult> {
   let alternatives: AvailableSlot[] = [];
   try {
@@ -159,7 +174,7 @@ async function slotTakenWithAlternatives(
   return {
     output: JSON.stringify({
       ok: false,
-      error: error.message,
+      error: message,
       alternatives: alternatives.map((s) => ({
         professional_id: s.professional_id,
         doctor_name: s.doctor_name,
@@ -167,7 +182,36 @@ async function slotTakenWithAlternatives(
         ends_at: s.ends_at,
         price: s.price,
       })),
-      hint: "Informe o paciente que o horario acabou de ser ocupado e apresente as alternativas.",
+      hint,
+    }),
+  };
+}
+
+// Fase 3.7 — etapa 1 das duas etapas: regras validadas, falta a
+// confirmacao explicita do paciente. A tool NAO executa sem confirm=true.
+function confirmationPending(
+  action: "cancelamento" | "remarcação",
+  summary: Record<string, unknown>
+): ToolResult {
+  return {
+    output: JSON.stringify({
+      ok: false,
+      needs_confirmation: true,
+      summary,
+      message: `Regras validadas para ${action}. Pergunte ao paciente de forma explícita ("Confirma o ${action} da consulta de ${summary.date_time ?? ""}?", sim/não) e só após a resposta positiva chame esta tool novamente com confirm=true.`,
+    }),
+  };
+}
+
+// Fase 3.6 — janela de 4h / limite de remarcações: só a recepção
+// humana pode concluir a operação, o agente deve transferir.
+function humanOnly(reason: string): ToolResult {
+  return {
+    output: JSON.stringify({
+      ok: false,
+      requires_human: true,
+      reason,
+      hint: "Regra de negócio da clínica: esta operação só pode ser feita pela recepção. Explique com empatia e chame transfer_to_human.",
     }),
   };
 }
@@ -262,7 +306,23 @@ async function dispatchTool(
       } catch (error) {
         if (error instanceof SlotTakenError) {
           // Outra conversa ocupou o horario entre a checagem e o insert.
-          return slotTakenWithAlternatives(specialtyId, professionalId, startsAt, error);
+          return slotUnavailableResult(
+            specialtyId,
+            professionalId,
+            startsAt,
+            error.message,
+            "Informe o paciente que o horario acabou de ser ocupado e apresente as alternativas."
+          );
+        }
+        if (error instanceof OutsideHoursError) {
+          // Fase 3.6: fora do expediente ou horario no passado.
+          return slotUnavailableResult(
+            specialtyId,
+            professionalId,
+            startsAt,
+            error.message,
+            "Apresente um dos horários livres retornados, que já respeitam o expediente do profissional."
+          );
         }
         throw error;
       }
@@ -300,11 +360,36 @@ async function dispatchTool(
     }
 
     case "reschedule_appointment": {
+      const appointmentId = Number(args.appointment_id);
+      const newStartsAt = String(args.new_starts_at);
+
+      const current = await getAppointment(appointmentId);
+      if (!current) {
+        return { output: JSON.stringify({ ok: false, error: "Consulta não encontrada." }) };
+      }
+
+      // Etapa 0 — regras de negocio (Fase 3.6): dentro da janela de 4h
+      // ou ja remarcada 1x, so a recepcao humana resolve.
+      const rule = canReschedule(current);
+      if (!rule.ok) {
+        return rule.requiresHuman
+          ? humanOnly(rule.reason ?? "")
+          : { output: JSON.stringify({ ok: false, error: rule.reason }) };
+      }
+
+      // Etapa 1 — confirmacao explicita em duas etapas (Fase 3.7).
+      if (args.confirm !== true) {
+        return confirmationPending("remarcação", {
+          appointment_id: current.id,
+          patient: current.patient_name,
+          date_time: current.starts_at,
+          new_starts_at: newStartsAt,
+        });
+      }
+
+      // Etapa 2 — executa.
       try {
-        const appointment = await rescheduleAppointment(
-          Number(args.appointment_id),
-          String(args.new_starts_at)
-        );
+        const appointment = await rescheduleAppointment(appointmentId, newStartsAt);
         return {
           output: JSON.stringify({
             ok: true,
@@ -323,6 +408,15 @@ async function dispatchTool(
             }),
           };
         }
+        if (error instanceof OutsideHoursError) {
+          return {
+            output: JSON.stringify({
+              ok: false,
+              error: error.message,
+              hint: "Chame get_availability e apresente um horário dentro do expediente do profissional.",
+            }),
+          };
+        }
         return {
           output: `Erro ao remarcar: ${error instanceof Error ? error.message : "erro desconhecido"}`,
         };
@@ -330,9 +424,34 @@ async function dispatchTool(
     }
 
     case "cancel_appointment": {
+      const appointmentId = Number(args.appointment_id);
+
+      const current = await getAppointment(appointmentId);
+      if (!current) {
+        return { output: JSON.stringify({ ok: false, error: "Consulta não encontrada." }) };
+      }
+
+      // Etapa 0 — regra das 4h (Fase 3.6): fora da janela, so humano.
+      const rule = canCancel(current);
+      if (!rule.ok) {
+        return rule.requiresHuman
+          ? humanOnly(rule.reason ?? "")
+          : { output: JSON.stringify({ ok: false, error: rule.reason }) };
+      }
+
+      // Etapa 1 — confirmacao explicita em duas etapas (Fase 3.7).
+      if (args.confirm !== true) {
+        return confirmationPending("cancelamento", {
+          appointment_id: current.id,
+          patient: current.patient_name,
+          date_time: current.starts_at,
+        });
+      }
+
+      // Etapa 2 — executa.
       try {
-        await cancelAppointment(Number(args.appointment_id));
-        return { output: JSON.stringify({ ok: true, appointment_id: Number(args.appointment_id) }) };
+        await cancelAppointment(appointmentId);
+        return { output: JSON.stringify({ ok: true, appointment_id: appointmentId }) };
       } catch (error) {
         return {
           output: `Erro ao cancelar: ${error instanceof Error ? error.message : "erro desconhecido"}`,

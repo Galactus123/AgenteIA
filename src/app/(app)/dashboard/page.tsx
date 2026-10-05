@@ -198,10 +198,10 @@ async function DashboardContent() {
                   </div>
                   <span
                     className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${
-                      a.status === "scheduled" ? "neon-badge-success" : a.status === "cancelled" ? "neon-badge-danger" : "neon-badge"
+                      a.status === "scheduled" ? "neon-badge-success" : a.status === "cancelled" ? "neon-badge-danger" : a.status === "no_show" ? "neon-badge-warning" : "neon-badge"
                     }`}
                   >
-                    {a.status === "scheduled" ? "Marcada" : a.status === "cancelled" ? "Cancelada" : a.status}
+                    {a.status === "scheduled" ? "Marcada" : a.status === "cancelled" ? "Cancelada" : a.status === "no_show" ? "Não compareceu" : a.status}
                   </span>
                 </div>
               ))}

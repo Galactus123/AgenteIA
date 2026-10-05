@@ -16,10 +16,15 @@ import {
   notifyDoctorRescheduled,
 } from "@/lib/services/notifications";
 import { getDefaultClinicId } from "@/lib/services/clinics";
-import { normalizeSchedule } from "@/lib/services/doctors";
+import { getDoctorSchedule, normalizeSchedule } from "@/lib/services/doctors";
+import type { DoctorSchedule } from "@/lib/types";
 
 const CANCEL_WINDOW_HOURS = 4;
 const MAX_RESCHEDULES = 1;
+
+// No-show (Fase 3.6): a partir de quantos minutos do inicio a consulta
+// deixa de valer como "scheduled" e passa a liberar a agenda.
+export const NO_SHOW_GRACE_MINUTES = 30;
 
 // Concorrencia de horario (Fase 3.3): o indice unico
 // uq_appointments_professional_start e a ultima barreira quando duas
@@ -38,6 +43,51 @@ export class SlotTakenError extends Error {
 function isUniqueViolation(error: { code?: string; message?: string } | null): boolean {
   if (!error) return false;
   return error.code === "23505" || (error.message ?? "").includes("duplicate key value");
+}
+
+// Horario de funcionamento (Fase 3.6): o agendamento/remarcacao fora da
+// agenda cadastrada do profissional — tipicamente no agendamento do mesmo
+// dia, em que o LLM pode sugerir um horario que a listagem nunca mostrou.
+export class OutsideHoursError extends Error {
+  readonly code = "OUTSIDE_HOURS";
+
+  constructor(message = "Este horário está fora do horário de funcionamento do profissional.") {
+    super(message);
+    this.name = "OutsideHoursError";
+  }
+}
+
+// Regra pura: o intervalo [startsAt, endsAt] cabe em alguma janela de
+// trabalho do dia? Agenda vazia = sem restrição cadastrada (valida nada).
+export function checkWithinWorkingHours(
+  schedule: DoctorSchedule[],
+  startsAt: Date,
+  endsAt: Date
+): { ok: boolean; reason?: string } {
+  const weekday = startsAt.getDay();
+  const windows = schedule.filter((entry) => entry.weekday === weekday);
+  if (windows.length === 0) {
+    return {
+      ok: false,
+      reason: "O profissional não atende neste dia da semana.",
+    };
+  }
+
+  const startStr = `${pad2(startsAt.getHours())}:${pad2(startsAt.getMinutes())}`;
+  const endStr = `${pad2(endsAt.getHours())}:${pad2(endsAt.getMinutes())}`;
+
+  const fits = windows.find((w) => w.start_time <= startStr && endStr <= w.end_time);
+  if (fits) return { ok: true };
+
+  const label = windows.map((w) => `${w.start_time}-${w.end_time}`).join(" ou ");
+  return {
+    ok: false,
+    reason: `Este horário está fora do expediente do profissional (atende ${label}).`,
+  };
+}
+
+function pad2(n: number): string {
+  return n.toString().padStart(2, "0");
 }
 
 // Embedding via FK: specialties(name), professionals(...), clinics(name, address).
@@ -184,6 +234,25 @@ async function getProfessionalDuration(professionalId: string): Promise<number |
   return data ? ((data as { consultation_duration?: number }).consultation_duration ?? 30) : null;
 }
 
+// Guarda de agendamento (Fase 3.6): horario no passado ou fora da agenda
+// cadastrada do profissional. Agenda vazia = profissional sem expediente
+// configurado (nao ha o que validar — comportamento manual preservado).
+async function assertWithinWorkingHours(
+  professionalId: string,
+  startsAt: Date,
+  endsAt: Date
+): Promise<void> {
+  if (startsAt.getTime() <= Date.now()) {
+    throw new OutsideHoursError("Este horário já passou. Escolha um horário futuro.");
+  }
+
+  const schedule = await getDoctorSchedule(professionalId);
+  if (schedule.length === 0) return;
+
+  const check = checkWithinWorkingHours(schedule, startsAt, endsAt);
+  if (!check.ok) throw new OutsideHoursError(check.reason);
+}
+
 async function hasConflict(
   professionalId: string,
   startsAt: Date,
@@ -220,6 +289,74 @@ interface BusyWindow {
   end: number;
 }
 
+export interface SlotEnumerationInput {
+  specialtyId: number;
+  specialtyName: string;
+  professionalId: string;
+  doctorName: string;
+  price: number;
+  schedule: DoctorSchedule[];
+  durationMinutes: number;
+  weekday: number;
+  dayStart: Date;
+  minStart: Date;
+  busy: BusyWindow[];
+}
+
+// Enumera os slots livres de um profissional num dia (regra pura).
+// Fase 3.6: o passo entre slots e a duracao da consulta
+// (consultation_duration do profissional), nunca um fixo de 30 min —
+// com agenda de 60 min os slots sao 08:00, 09:00... e nao 08:00, 08:30.
+export function enumerateSlots(input: SlotEnumerationInput): AvailableSlot[] {
+  const { durationMinutes, weekday, dayStart, minStart, busy, schedule } = input;
+  const slots: AvailableSlot[] = [];
+
+  for (const entry of schedule) {
+    if (entry.weekday !== weekday) continue;
+
+    const [sh, sm] = entry.start_time.split(":").map(Number);
+    const [eh, em] = entry.end_time.split(":").map(Number);
+    if (!Number.isFinite(sh) || !Number.isFinite(eh)) continue;
+
+    const start = new Date(
+      dayStart.getFullYear(),
+      dayStart.getMonth(),
+      dayStart.getDate(),
+      sh,
+      sm || 0
+    );
+    const end = new Date(
+      dayStart.getFullYear(),
+      dayStart.getMonth(),
+      dayStart.getDate(),
+      eh,
+      em || 0
+    );
+
+    let cursor = start;
+    while (addMinutes(cursor, durationMinutes).getTime() <= end.getTime()) {
+      const slotStart = new Date(cursor);
+      const slotEnd = addMinutes(slotStart, durationMinutes);
+      const free = !busy.some((w) => w.start < slotEnd.getTime() && w.end > slotStart.getTime());
+
+      if (slotStart.getTime() >= minStart.getTime() && free) {
+        slots.push({
+          professional_id: input.professionalId,
+          doctor_name: input.doctorName,
+          specialty_id: input.specialtyId,
+          specialty_name: input.specialtyName,
+          starts_at: formatDateTime(slotStart),
+          ends_at: formatDateTime(slotEnd),
+          price: input.price,
+        });
+      }
+      cursor = addMinutes(cursor, durationMinutes);
+    }
+  }
+
+  return slots;
+}
+
 export async function getAvailableSlots(
   specialtyId: number,
   dateStr: string
@@ -249,53 +386,22 @@ export async function getAvailableSlots(
   const slots: AvailableSlot[] = [];
 
   for (const professional of (professionals ?? []) as Record<string, unknown>[]) {
-    const duration = Number(professional.consultation_duration ?? 30);
     const professionalId = professional.id as string;
-    const ownBusy = busy.filter((w) => w.professional_id === professionalId);
-    const schedule = normalizeSchedule(professional.schedule);
-
-    for (const entry of schedule) {
-      if (entry.weekday !== weekday) continue;
-
-      const [sh, sm] = entry.start_time.split(":").map(Number);
-      const [eh, em] = entry.end_time.split(":").map(Number);
-      if (!Number.isFinite(sh) || !Number.isFinite(eh)) continue;
-
-      const start = new Date(
-        dayStart.getFullYear(),
-        dayStart.getMonth(),
-        dayStart.getDate(),
-        sh,
-        sm || 0
-      );
-      const end = new Date(
-        dayStart.getFullYear(),
-        dayStart.getMonth(),
-        dayStart.getDate(),
-        eh,
-        em || 0
-      );
-
-      let cursor = start;
-      while (addMinutes(cursor, duration).getTime() <= end.getTime()) {
-        const slotStart = new Date(cursor);
-        const slotEnd = addMinutes(slotStart, duration);
-        const free = !ownBusy.some((w) => w.start < slotEnd.getTime() && w.end > slotStart.getTime());
-
-        if (slotStart.getTime() >= minStart.getTime() && free) {
-          slots.push({
-            professional_id: professionalId,
-            doctor_name: professional.name as string,
-            specialty_id: specialtyId,
-            specialty_name: specialtyName,
-            starts_at: formatDateTime(slotStart),
-            ends_at: formatDateTime(slotEnd),
-            price: Number(professional.price ?? 0),
-          });
-        }
-        cursor = addMinutes(cursor, 30);
-      }
-    }
+    slots.push(
+      ...enumerateSlots({
+        specialtyId,
+        specialtyName,
+        professionalId,
+        doctorName: professional.name as string,
+        price: Number(professional.price ?? 0),
+        schedule: normalizeSchedule(professional.schedule),
+        durationMinutes: Number(professional.consultation_duration ?? 30),
+        weekday,
+        dayStart,
+        minStart,
+        busy: busy.filter((w) => w.professional_id === professionalId),
+      })
+    );
   }
 
   return slots.sort((a, b) => a.starts_at.localeCompare(b.starts_at));
@@ -345,6 +451,7 @@ export async function createAppointment(data: {
 
   const startsAt = parseDatetime(data.starts_at);
   const endsAt = addMinutes(startsAt, duration);
+  await assertWithinWorkingHours(data.professional_id, startsAt, endsAt);
   const clinicId = await getDefaultClinicId();
   const now = nowStr();
 
@@ -409,7 +516,15 @@ async function triggerNewAppointmentNotification(appointment: AppointmentView): 
   }
 }
 
-export function canCancel(appointment: Appointment): { ok: boolean; reason?: string } {
+// Regra de janela (Fase 3.6): dentro da janela de 4h ou ja remarcada
+// 1x, so a recepcao humana pode agir — o agente deve transferir.
+export interface RuleCheck {
+  ok: boolean;
+  reason?: string;
+  requiresHuman?: boolean;
+}
+
+export function canCancel(appointment: Appointment): RuleCheck {
   if (appointment.status !== "scheduled") {
     return { ok: false, reason: "Esta consulta já não está ativa." };
   }
@@ -418,6 +533,7 @@ export function canCancel(appointment: Appointment): { ok: boolean; reason?: str
   if (hours < CANCEL_WINDOW_HOURS) {
     return {
       ok: false,
+      requiresHuman: true,
       reason: "O cancelamento deve ser feito com pelo menos 4 horas de antecedência. Contacte a recepção.",
     };
   }
@@ -462,13 +578,68 @@ export async function cancelAppointment(id: number): Promise<AppointmentView> {
   return view;
 }
 
-export function canReschedule(appointment: Appointment): { ok: boolean; reason?: string } {
+// ── No-show (Fase 3.6) ────────────────────────────────────────
+// A consulta que comecou ha mais de NO_SHOW_GRACE_MINUTES deixa de ser
+// "scheduled": a agenda (busy windows, conflitos e listagens) ja conta
+// apenas status=scheduled, entao marcar no_show LIBERA o horario.
+
+export function isNoShowDue(
+  startsAtStr: string,
+  now: Date = new Date(),
+  graceMinutes: number = NO_SHOW_GRACE_MINUTES
+): boolean {
+  const startsAt = parseDatetime(startsAtStr);
+  if (!Number.isFinite(startsAt.getTime())) return false;
+  return startsAt.getTime() + graceMinutes * 60_000 < now.getTime();
+}
+
+// Marcacao manual (recepcao via API/PATCH).
+export async function markNoShow(id: number): Promise<AppointmentView> {
+  const appointment = await getAppointment(id);
+  if (!appointment) fail("Consulta não encontrada.");
+  if (appointment.status !== "scheduled") {
+    fail("Esta consulta já não está ativa.");
+  }
+
+  const now = nowStr();
+  const { error } = await supabaseAdmin
+    .from("appointments")
+    .update({ status: "no_show", updated_at: now })
+    .eq("id", id)
+    .eq("status", "scheduled");
+
+  if (error) fail(`[appointments] Falha ao registrar no-show: ${error.message}`);
+
+  const view = await getAppointmentView(id);
+  if (!view) fail("Consulta não encontrada.");
+  return view;
+}
+
+// Varredura automatica (cron de 5 min): devolve a contagem convertida.
+export async function releaseNoShowAppointments(now: Date = new Date()): Promise<number> {
+  const cutoff = formatDateTime(addMinutes(now, -NO_SHOW_GRACE_MINUTES));
+  const { data, error } = await supabaseAdmin
+    .from("appointments")
+    .update({ status: "no_show", updated_at: formatDateTime(now) })
+    .eq("status", "scheduled")
+    .lt("starts_at", cutoff)
+    .select("id");
+
+  if (error) {
+    console.error("[appointments] Falha ao liberar no-shows:", error.message);
+    return 0;
+  }
+  return data?.length ?? 0;
+}
+
+export function canReschedule(appointment: Appointment): RuleCheck {
   if (appointment.status !== "scheduled") {
     return { ok: false, reason: "Esta consulta já não está ativa." };
   }
   if (appointment.reschedule_count >= MAX_RESCHEDULES) {
     return {
       ok: false,
+      requiresHuman: true,
       reason: "Esta consulta já foi remarcada uma vez. Contacte a recepção para novos ajustes.",
     };
   }
@@ -477,6 +648,7 @@ export function canReschedule(appointment: Appointment): { ok: boolean; reason?:
   if (hours < CANCEL_WINDOW_HOURS) {
     return {
       ok: false,
+      requiresHuman: true,
       reason: "A remarcação deve ser feita com pelo menos 4 horas de antecedência. Contacte a recepção.",
     };
   }
@@ -502,6 +674,8 @@ export async function rescheduleAppointment(
 
   const startsAt = parseDatetime(newStartsAt);
   const endsAt = addMinutes(startsAt, duration);
+
+  await assertWithinWorkingHours(appointment.professional_id, startsAt, endsAt);
 
   if (await hasConflict(appointment.professional_id, startsAt, duration, id)) {
     throw new SlotTakenError("Este horário já não está disponível. Escolha outro horário.");

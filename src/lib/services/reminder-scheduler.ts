@@ -1,6 +1,7 @@
 import { runReminderCheck } from "@/lib/services/reminders";
 import { runSubscriptionCycleCheck } from "@/lib/services/subscriptions";
 import { processOutbox } from "@/lib/services/outbox";
+import { releaseNoShowAppointments } from "@/lib/services/appointments";
 
 const globalForScheduler = globalThis as unknown as { saudesyncScheduler?: NodeJS.Timeout };
 
@@ -22,6 +23,7 @@ function tick(): void {
   safe(runReminderCheck, "runReminderCheck");
   safe(runSubscriptionCycleCheck, "runSubscriptionCycleCheck");
   safe(processOutbox, "processOutbox");
+  safe(releaseNoShowAppointments, "releaseNoShowAppointments");
 }
 
 export function startReminderScheduler(): void {

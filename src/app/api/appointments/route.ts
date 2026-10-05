@@ -5,6 +5,7 @@ import {
   createAppointment,
   isSlotAvailable,
   SlotTakenError,
+  OutsideHoursError,
 } from "@/lib/services/appointments";
 import { MAX_PATIENT_NAME_LENGTH } from "@/lib/agent/security";
 
@@ -102,6 +103,10 @@ export async function POST(request: NextRequest) {
     // verificacao e o insert (indice unico) — devolve 409 amigavel.
     if (err instanceof SlotTakenError) {
       return NextResponse.json({ error: err.message, code: err.code }, { status: 409 });
+    }
+    // Fora do expediente do profissional / horario no passado (Fase 3.6).
+    if (err instanceof OutsideHoursError) {
+      return NextResponse.json({ error: err.message, code: err.code }, { status: 400 });
     }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Erro ao criar agendamento." },

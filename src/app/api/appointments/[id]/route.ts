@@ -6,9 +6,11 @@ import {
   getAppointmentView,
   cancelAppointment,
   rescheduleAppointment,
+  markNoShow,
   canCancel,
   canReschedule,
   SlotTakenError,
+  OutsideHoursError,
 } from "@/lib/services/appointments";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -68,6 +70,19 @@ export async function PATCH(
         ok: true,
         appointment: await getAppointmentView(Number(id)),
       });
+    }
+
+    if (status === "no_show") {
+      // Fase 3.6: marcar no-show libera o horario na agenda.
+      try {
+        const view = await markNoShow(Number(id));
+        return NextResponse.json({ ok: true, appointment: view });
+      } catch (err) {
+        return NextResponse.json(
+          { error: err instanceof Error ? err.message : "Falha ao registar no-show." },
+          { status: 400 }
+        );
+      }
     }
 
     if (status === "completed") {
@@ -136,6 +151,10 @@ export async function PUT(
     // Novo horario ocupado por corrida (indice unico) — 409 amigavel.
     if (err instanceof SlotTakenError) {
       return NextResponse.json({ error: err.message, code: err.code }, { status: 409 });
+    }
+    // Fora do expediente / horario no passado (Fase 3.6).
+    if (err instanceof OutsideHoursError) {
+      return NextResponse.json({ error: err.message, code: err.code }, { status: 400 });
     }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Erro ao remarcar." },

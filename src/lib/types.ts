@@ -1,4 +1,8 @@
-export type AppointmentStatus = "scheduled" | "cancelled" | "completed";
+export type AppointmentStatus =
+  | "scheduled"
+  | "cancelled"
+  | "completed"
+  | "no_show";
 
 export interface Clinic {
   id: number;

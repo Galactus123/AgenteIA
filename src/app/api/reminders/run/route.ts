@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runReminderCheck } from "@/lib/services/reminders";
+import { releaseNoShowAppointments } from "@/lib/services/appointments";
 import { requireInternalAuth } from "@/lib/api-auth";
 
 export const runtime = "nodejs";
@@ -11,7 +12,10 @@ async function handle(request: NextRequest) {
   const authError = await requireInternalAuth(request);
   if (authError) return authError;
   const sent = await runReminderCheck();
-  return NextResponse.json({ sent, at: new Date().toISOString() });
+  // Fase 3.6: mesma varredura de 5 min tambem libera os horarios de
+  // quem nao compareceu (scheduled vencido -> no_show).
+  const released = await releaseNoShowAppointments();
+  return NextResponse.json({ sent, released, at: new Date().toISOString() });
 }
 
 export async function GET(request: NextRequest) {

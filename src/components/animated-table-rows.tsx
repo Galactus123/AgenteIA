@@ -48,6 +48,7 @@ function StatusBadge({ status }: { status: string }) {
     scheduled: { label: "Marcada", className: "bg-emerald-50 text-emerald-700" },
     cancelled: { label: "Cancelada", className: "bg-red-50 text-red-600" },
     completed: { label: "Concluída", className: "bg-slate-100 text-slate-600" },
+    no_show: { label: "Não compareceu", className: "bg-orange-50 text-orange-700" },
   };
   const s = map[status] ?? { label: status, className: "bg-slate-100 text-slate-600" };
   return (
