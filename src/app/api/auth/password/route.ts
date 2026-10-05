@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
+import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 export async function PUT(request: NextRequest) {
+  // Troca de senha confirma a senha atual a cada tentativa: limita por IP
+  // para não virar adivinhação de senha com sessão em mãos.
+  const byIp = rateLimit(`password:ip:${clientIp(request)}`, 15, 5 * 60_000);
+  if (!byIp.ok) return tooManyRequests(byIp.retryAfterSec);
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

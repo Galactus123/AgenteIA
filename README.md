@@ -86,6 +86,25 @@ O sistema usa **Supabase (Postgres + Auth)** como fonte única desde a Fase 1: `
 
 Políticas de retenção rodam uma vez no startup (`src/instrumentation.ts` → `src/lib/lgpd.ts`): mensagens com mais de 90 dias são apagadas, conversas inativas há 365 dias são anonimizadas (`Paciente-<pseudônimo>`) e usuários inativos há 30 dias são removidos. Relatório somente-leitura do que seria aplicado: `node scripts/ops/lgpd-retention-report.mjs` (usa `SUPABASE_SERVICE_ROLE_KEY`, não escreve nada).
 
+## Segurança operacional
+
+### Rotação das 5 chaves do lembrete de segurança
+
+```bash
+node scripts/ops/rotation-checklist.mjs
+```
+
+O script diz **onde** rotacionar cada chave (`OPENAI_API_KEY`, `KOMUNIKA_API_TOKEN`, `KOMUNIKA_WEBHOOK_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `LOJOU_WEBHOOK_SECRET`) e confere se o valor atual do `.env`/`.env.local` ainda aparece no histórico do Git (`git log --all -S`). Não imprime valores — só status. Fluxo: rode → rotacione no painel indicado → atualize `.env` **e** as variáveis da Vercel → rode de novo até `5/5 ok`. As variáveis da Vercel mudam em **Settings → Environment Variables** (troca exige novo deploy).
+
+### Branch protection (exigir o check `quality` em `main`)
+
+1. No GitHub: **Settings → Branches → Add branch protection rule**.
+2. Pattern: `main`.
+3. Marcar: **Require a pull request before merging** (1 review se quiser) e **Require status checks to pass** → buscar e adicionar o job `quality` (roda lint + tsc + testes + coverage + build). Recomendado: **Include administrators**.
+4. **Create branch protection rule**.
+
+Sem isso, qualquer push direto em `main` vai para produção (deploy automático) sem passar pelos gates.
+
 ## Observação
 
 O atendimento por IA requer a chave configurada. Sem ela, o resto do sistema funciona normalmente.

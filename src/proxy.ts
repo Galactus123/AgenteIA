@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 
 // Páginas autenticadas: tudo que fica sob o grupo `(app)`.
 // Precisa bater com `config.matcher` — `src/__tests__/proxy.test.ts` falha se
@@ -40,6 +41,15 @@ function hasSessionCookie(request: NextRequest): boolean {
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
   const pathname = request.nextUrl.pathname;
+
+  // ── Rate-limit global por IP na API inteira (9.3) ──────────────────────
+  // Teto geral que cobre qualquer rota nova sem limite próprio. Os limites
+  // finos por rota (login 30/5min por IP, signup 10/h, webhooks 60/min...)
+  // seguem valendo por cima. Preflight de CORS fica de fora.
+  if (pathname.startsWith("/api/") && request.method !== "OPTIONS") {
+    const global = rateLimit(`proxy:api:${clientIp(request)}`, 300, 60_000);
+    if (!global.ok) return tooManyRequests(global.retryAfterSec);
+  }
 
   if (!isProtectedRoute(pathname) && !pathname.startsWith("/api/")) {
     return supabaseResponse;

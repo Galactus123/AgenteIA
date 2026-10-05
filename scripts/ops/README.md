@@ -53,4 +53,11 @@ OPS_ADMIN_PASSWORD=senha-forte-aqui
 A senha antiga do admin ficou exposta no histórico do Git e **precisa ser
 rotacionada** no painel do Supabase (Authentication → Users → Reset password)
 e as variáveis atualizadas na Vercel. O mesmo vale para as chaves listadas
-no lembrete de segurança do `PROGRESSO.md`.
+no lembrete de segurança do `PROGRESSO.md`:
+
+```bash
+node scripts/ops/rotation-checklist.mjs
+```
+
+Mostra onde rotacionar cada uma das 5 chaves e se o valor atual ainda
+aparece no histórico do Git (sem imprimir os valores). Exit 0 = tudo ok.
