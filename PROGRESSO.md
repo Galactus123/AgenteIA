@@ -5,12 +5,12 @@
 | Item | Valor |
 |---|---|
 | Data da auditoria | 30/09/2026 |
-| Última atualização | 05/10/2026 (sessão 9 — Fase 7 parcial: **7.1/7.4/7.5/7.6 concluídas**; smoke 15/15 em produção, concorrência 1-vencedor em banco real, a11y com +50 aria-label/+25 aria-hidden/skip link, README verificação/CI; **7.2 e 7.3 com roteiro manual**) |
+| Última atualização | 05/10/2026 (sessão 9 — Fase 7 parcial: **7.1/7.4/7.5/7.6 concluídas** e commitadas (`ca57a46`); smoke 15/15 em produção, concorrência 1-vencedor em banco real, a11y com +50 aria-label/+25 aria-hidden/skip link, README verificação/CI; **7.2 e 7.3 com roteiro manual**; `SUPABASE_SERVICE_ROLE_KEY` do `.env` local trocada e validada contra o PostgREST) |
 | Documento de requisitos | `PRD-SaudeSync.md` v1.1 |
-| Branch / commit base | `main` sincronizado com `origin/main` — última entrega: **Fase 6** (`85a6d86`, 05/10/2026) |
-| Commits totais | 92 (primeiro: `7279797` "iniciar", 15/08/2026) |
+| Branch / commit base | `main` sincronizado com `origin/main` — última entrega: **Fase 7** (`ca57a46`, 05/10/2026) |
+| Commits totais | 93 (primeiro: `7279797` "iniciar", 15/08/2026) |
 | Código | `src/` — 146 arquivos, ~14.000 linhas (`.ts`/`.tsx`) |
-| Árvore de trabalho | **ALTERADA** (arquivos da Fase 7 ainda não commitados: 8 páginas + layout/shell com a11y, `README.md`, `PROGRESSO.md`, scripts `smoke-test.mjs`/`slot-concurrency-test.mjs`); `data/**` fica fora do `tsconfig`/`eslint` |
+| Árvore de trabalho | **limpa** após o commit da Fase 7 (`ca57a46`); `data/**` fica fora do `tsconfig`/`eslint` |
 | Stack | Next.js 16.2.12 (App Router + `proxy.ts`), React 19.2.4, Supabase (Postgres + Auth) — **persistência única** (o `node:sqlite` em runtime foi removido; `data/saudesync.db` só é lido por `scripts/setup-supabase.mjs`), Vitest 5, Vercel |
 
 ---
@@ -503,7 +503,7 @@ SELECT jobname, schedule FROM cron.job ORDER BY jobname;
 - **7.4 (concorrência):** `slot-concurrency-test.mjs` exit 0 — 2→1 vencedor, 5→1 vencedor, canceladas não disputam, sempre `count=1`.
 - **7.5 (a11y):** codemod revisável (`aria-label` + `aria-hidden`) aplicado em 8 arquivos; tsc/lint/test/build verdes em seguida.
 - **7.6:** README + este documento.
-- **Achados:** chaves Supabase do `.env` local **não são mais aceitas** pelo projeto (`Unregistered API key`) — atualizar/rotacionar junto com a rotação obrigatória; `git status` com 10 arquivos alterados/criados **não commitados** (nada commitado nesta sessão até decisão do usuário).
+- **Achados:** as chaves Supabase do `.env` local estavam **vencidas** (`Unregistered API key` no PostgREST) — **`SUPABASE_SERVICE_ROLE_KEY` trocada em 05/10/2026 e validada** (REST 200, `reminders` = `[]`); as demais 5 chaves expostas seguem pendentes de rotação nos painéis + Vercel. Tudo commitado e pushado: **`ca57a46`** (16 arquivos, +497/−39).
 - **Validação sessão 9:** `npx tsc --noEmit` exit 0 · `npm run lint` exit 0 · `npm test` 121/121 · `npm run test:coverage` exit 0 (21.97% stmt / 13.77% branch / 23.19% func / 23.38% lines) · `npm run build` exit 0.
 
 ### Critérios de aceite do PRD que ainda estão abertos
