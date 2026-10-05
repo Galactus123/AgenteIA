@@ -7,10 +7,10 @@
 | Data da auditoria | 30/09/2026 |
 | Última atualização | 05/10/2026 (sessão 6 — Fase 4 concluída: 4.1–4.4; métricas corrigidas, "aguardando atendimento" real, erros visíveis e órfãos/rotas com destino) |
 | Documento de requisitos | `PRD-SaudeSync.md` v1.1 |
-| Branch / commit base | `main` @ `67d65f0` — *feat(db): migrar persistencia de SQLite para Supabase e zerar lint* (01/10/2026); **sessão 2 está inteira no working tree, não commitada** |
-| Commits totais | 72 (primeiro: `7279797` "iniciar", 15/08/2026) |
+| Branch / commit base | `main` @ `747ca86` — *feat(dashboard): metricas corrigidas, aguardando atendimento real e erros visiveis (Fase 4.1-4.4)* (05/10/2026); sincronizado com `origin/main` |
+| Commits totais | 89 (primeiro: `7279797` "iniciar", 15/08/2026; último: `747ca86` Fase 4, 05/10/2026) |
 | Código | `src/` — 146 arquivos, ~14.000 linhas (`.ts`/`.tsx`) |
-| Árvore de trabalho | **Fase 4 alterada e não commitada** (`stats.ts`, `dashboard/page.tsx`, `stats.test.ts`, 6 componentes removidos, este documento); `AgenteIA/` (cópia integral do working tree) e `data/**` ficam fora do `tsconfig` e do `eslint` |
+| Árvore de trabalho | **limpa** — Fase 4 commitada em `747ca86` (05/10/2026, sessão 6); `AgenteIA/` (cópia integral do working tree) e `data/**` ficam fora do `tsconfig` e do `eslint` |
 | Stack | Next.js 16.2.12 (App Router + `proxy.ts`), React 19.2.4, Supabase (Postgres + Auth) — **persistência única** (o `node:sqlite` em runtime foi removido; `data/saudesync.db` só é lido por `scripts/setup-supabase.mjs`), Vitest 5, Vercel |
 
 ---
