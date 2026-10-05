@@ -7,10 +7,10 @@
 | Data da auditoria | 30/09/2026 |
 | Última atualização | 05/10/2026 (sessão 10 — Fase 7 **5/6**: **7.3 comprovado** (disparo real do cron → 200 `{sent:0,released:0}`), **achado P0**: `audit_logs`/`outbox` sem grant para `service_role` (42501) corrigido pela migration `20261005000002`, inventário de produção mapeado; **7.2 manual** (token Komunika 401) |
 | Documento de requisitos | `PRD-SaudeSync.md` v1.1 |
-| Branch / commit base | `main` sincronizado com `origin/main` — última entrega: **Fase 7** (`06d6549`, 05/10/2026) |
-| Commits totais | 93 (primeiro: `7279797` "iniciar", 15/08/2026) |
+| Branch / commit base | `main` sincronizado com `origin/main` — última entrega: **Fase 7** (`08c75e3`, 05/10/2026) |
+| Commits totais | 94 (primeiro: `7279797` "iniciar", 15/08/2026) |
 | Código | `src/` — 146 arquivos, ~14.000 linhas (`.ts`/`.tsx`) |
-| Árvore de trabalho | **ALTERADA** (sessão 10 não commitada: migration `20261005000002_grants_audit_outbox.sql`, checklist do `smoke-test.mjs` e este documento) |
+| Árvore de trabalho | **limpa** após o commit da sessão 10 (`08c75e3`) |
 | Stack | Next.js 16.2.12 (App Router + `proxy.ts`), React 19.2.4, Supabase (Postgres + Auth) — **persistência única** (o `node:sqlite` em runtime foi removido; `data/saudesync.db` só é lido por `scripts/setup-supabase.mjs`), Vitest 5, Vercel |
 
 ---
@@ -512,7 +512,7 @@ SELECT jobname, schedule FROM cron.job ORDER BY jobname;
 - **Achado P0 corrigido:** varredura das **28 tabelas expostas no PostgREST** → **26 leem ok, 2 bloqueadas com 42501** (`audit_logs` e `outbox`: `service_role` sem GRANT — o `default privileges` deste projeto não cobre as tabelas novas). Efeito: **audit log gravando nada em silêncio** (`recordAudit` best-effort) e **cron do outbox quebrado** em produção. Criada a migration idempotente **`supabase/migrations/20261005000002_grants_audit_outbox.sql`** (`GRANT SELECT/INSERT/UPDATE/DELETE` + `USAGE/SELECT` nas sequences para `service_role`, com `DO`/`has_table_privilege` que derruba a migration se o grant não pegar). **Validada:** `clean-db-test.mjs` reexecutado com **15/15 migrations, 11/11 CHECKs, exit 0** (NOTICE `grants: service_role com SELECT/INSERT em audit_logs e outbox`). **Pendência manual:** aplicar no SQL Editor junto com a `000001` (a leitura REST de `audit_logs`/`outbox` continua 403 até lá).
 - **7.3 executado:** disparo autorizado → **200 `{sent:0, released:0}`** (0 consultas em produção) às 21:34 UTC — `CRON_SECRET` local idêntico ao da Vercel.
 - **7.2 bloqueada:** token Komunika local (`kmnk_...`) responde **401** em `POST /messages/check-number` com Bearer, `X-Api-Key`, `X-Auth-Token`, token cru e `Bearer + X-Instance-Id`; `/instances` também 401. Usuário optou por manter a jornada E2E **manual**; roteiro de 8 passos atualizado no item 7.2 com o bloqueio documentado.
-- **Arquivos alterados nesta sessão:** migration nova `000002`, checklist do `smoke-test.mjs` (15 migrations), este documento. *(sem commit até decisão do usuário)*
+- **Arquivos alterados nesta sessão:** migration nova `000002`, checklist do `smoke-test.mjs` (15 migrations), este documento — commitados em **`08c75e3`** e pushados.
 
 ### Critérios de aceite do PRD que ainda estão abertos
 
