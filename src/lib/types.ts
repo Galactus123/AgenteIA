@@ -123,7 +123,7 @@ export interface AvailableSlot {
   price: number;
 }
 
-export type NotificationType = "scheduled" | "cancelled" | "rescheduled" | "reminder";
+export type NotificationType = "scheduled" | "cancelled" | "rescheduled" | "reminder" | "transfer";
 export type NotificationChannelStatus = "pending" | "sent" | "failed";
 
 export interface Notification {

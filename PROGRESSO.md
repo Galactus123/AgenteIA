@@ -5,7 +5,7 @@
 | Item | Valor |
 |---|---|
 | Data da auditoria | 30/09/2026 |
-| Última atualização | 02/10/2026 (sessão 3 — Fases 1.6, 2.5 e 2.6: cadeia de migrações validada em banco limpo) |
+| Última atualização | 02/10/2026 (sessão 4 — Fase 3 parcial: 3.1–3.5 concluídas; cron Supabase, outbox, idempotência, trava de horário e transferência real) |
 | Documento de requisitos | `PRD-SaudeSync.md` v1.1 |
 | Branch / commit base | `main` @ `67d65f0` — *feat(db): migrar persistencia de SQLite para Supabase e zerar lint* (01/10/2026); **sessão 2 está inteira no working tree, não commitada** |
 | Commits totais | 72 (primeiro: `7279797` "iniciar", 15/08/2026) |
@@ -20,8 +20,8 @@
 1. **A maior parte da UI e do "ciclo do agente" foi construída.** Landing, login, dashboard, cadastros, chat interno, assinatura, 32 rotas de API e um agente LLM com 7 tools (especialidade → horário → agendar → remarcar → cancelar → transferir) existem e compilam.
 2. ~~**O projeto está dividido em dois bancos de dados que não conversam.**~~ **RESOLVIDO (01/10/2026):** `src/lib/db.ts` e `src/lib/multi-tenant.ts` foram removidos e todos os serviços, rotas, server components, o agente e a LGPD passaram a usar `supabaseAdmin` de forma assíncrona. Persistência única: Supabase.
 3. **A cadeia de migrações está completa e validada do zero:** existe `20260911000001_schema_base.sql` (Fase 1.6 — o schema base saiu de `supabase-migration.sql` na raiz, que foi **removido**); `008`/`009` aplicadas no banco vivo em 01/10/2026; e a **Fase 2.5 (02/10/2026)** provou a cadeia **11/11 migrations em um Postgres 16 limpo** via `scripts/ops/clean-db-test.mjs` (log em `scripts/ops/clean-db-run.log`). A `005` perdeu a FASE 5 (a que corrompeu `auth.users`), agora extraída para a `009` idempotente.
-4. **O MVP não está pronto para produção:** lembretes 24h/2h dependem de um `setInterval` (morre em serverless, não há `vercel.json`/cron), não há fila de reenvio em falha da API de WhatsApp, não há trava de conflito de horário, e a transferência para humano não interrompe a IA.
-5. **Validação atual (01/10/2026, sessão 2):** `tsc` ✅ · `next build` ✅ · `vitest` ✅ (38 testes — os 9 da autenticação legada saíram na Fase 2.2 e 5 de rota/proxy entraram na 2.3) · `eslint` ✅ **0 erros / 0 warnings com regras type-aware novas** (`await-thenable`, `no-floating-promises`, `no-misused-promises`) — estas regras pegaram e foi corrigido um bug de classe da conversão SQLite → Supabase (services viraram `async` e 15 chamadas ficaram sem `await`, serializando `Promise` como `{}`). **Revalidado em 02/10/2026 (sessão 3):** `eslint` ✅ 0/0 · `tsc` ✅ · `vitest` ✅ 38/38 · `next build` ✅ (45 páginas) — sessão sem alteração em `src/` (só migrações, `scripts/ops/` e este documento).
+4. ~~**O MVP não está pronto para produção:** lembretes 24h/2h dependem de um `setInterval` (morre em serverless, não há `vercel.json`/cron), não há fila de reenvio em falha da API de WhatsApp, não há trava de conflito de horário, e a transferência para humano não interrompe a IA.~~ **RESOLVIDO (02/10/2026, sessão 4 — Fase 3.1–3.5):** cron real via **pg_cron + pg_net no Supabase** (a Vercel Hobby só aceita cron diário) + `vercel.json` de segurança; `setInterval` virou fallback só-dev; lembretes idempotentes via `ON CONFLICT DO NOTHING`; trava de horário com `SlotTakenError` (23505 → 409 amigável no serviço, na API e no agente); fila **`outbox`** com backoff e webhook devolvendo `5xx` em erro fatal; transferência real (IA para em `transferred`, não continua o loop, recepção é notificada com o histórico). **Pendência operacional:** aplicar `20261002000003`/`20261002000004` no SQL Editor e configurar os segredos do Vault + `CRON_SECRET` (ver log da Fase 3).
+5. **Validação atual (01/10/2026, sessão 2):** `tsc` ✅ · `next build` ✅ · `vitest` ✅ (38 testes — os 9 da autenticação legada saíram na Fase 2.2 e 5 de rota/proxy entraram na 2.3) · `eslint` ✅ **0 erros / 0 warnings com regras type-aware novas** (`await-thenable`, `no-floating-promises`, `no-misused-promises`) — estas regras pegaram e foi corrigido um bug de classe da conversão SQLite → Supabase (services viraram `async` e 15 chamadas ficaram sem `await`, serializando `Promise` como `{}`). **Revalidado em 02/10/2026 (sessão 3):** `eslint` ✅ 0/0 · `tsc` ✅ · `vitest` ✅ 38/38 · `next build` ✅ (45 páginas) — sessão sem alteração em `src/` (só migrações, `scripts/ops/` e este documento). **Revalidado em 02/10/2026 (sessão 4, Fase 3.1–3.5):** `eslint` ✅ 0/0 · `tsc` ✅ · `vitest` ✅ **50/50** (12 novos em `src/lib/__tests__/fase3.test.ts`) · `next build` ✅ · cadeia limpa **13/13 migrations · 11/11 CHECKs · 3/3 testes de papel · exit 0** — inclui `outbox` (25ª tabela, RLS deny-all, `anon` revogado) e o caminho de agendamento do cron validado com stubs.
 
 ---
 
@@ -61,15 +61,15 @@ está completa.
 
 | # | Requisito do PRD | Status | Onde está | Ressalva |
 |---|---|---|---|---|
-| 1 | Agente de IA conversando pelo WhatsApp | 🟡 | `src/app/api/webhooks/komunika/route.ts`, `src/lib/agent/agent.ts`, `src/lib/services/komunika.ts` | Webhook com HMAC, filtro de eventos e `waitUntil` ok. **Sem fila/DLQ**: falha de envio só gera `console.error` (`route.ts:137-141`) e o `catch` externo devolve `200` mesmo em erro fatal (`route.ts:100-103`), então a KOMUNIKA **não** fará retry. |
+| 1 | Agente de IA conversando pelo WhatsApp | ✅ | `src/app/api/webhooks/komunika/route.ts`, `src/lib/agent/agent.ts`, `src/lib/services/komunika.ts`, fila `src/lib/services/outbox.ts` | Webhook com HMAC, filtro de eventos e `waitUntil` ok. **Fase 3.4 (02/10/2026):** mensagens de saída passam pela fila `outbox` (backoff até 5 tentativas); erro fatal agora devolve **5xx** para a KOMUNIKA reenviar (antes o `catch` externo devolvia `200`). |
 | 2 | Entendimento do motivo / sugestão de especialidade | ✅ | `src/lib/agent/prompts.ts`, tool `list_specialties` (`tools.ts:9-14`) | LLM configurável (`OPENAI_BASE_URL`/`OPENAI_MODEL`). Sanitização anti prompt-injection em `agent/security.ts` (testada). |
-| 3 | Consulta de disponibilidade e agendamento automático | ✅ | tools `get_availability`/`book_appointment` (`tools.ts:18-50`), `services/appointments.ts` | Revalida slot antes de gravar (`tools.ts:123-128,202`), mas a gravação é um INSERT cego — **sem UNIQUE/lock** no Postgres nem no SQLite (ver 1.6). |
+| 3 | Consulta de disponibilidade e agendamento automático | ✅ | tools `get_availability`/`book_appointment` (`tools.ts:18-50`), `services/appointments.ts` | Revalida slot antes de gravar (`tools.ts:123-128,202`) e, desde a Fase 3.3, a gravação tem trava no Postgres: `UNIQUE (doctor_id, starts_at)` + `SlotTakenError` → 409/alternativas. |
 | 4 | Confirmação enviada ao paciente | ✅ | retorno de `book_appointment` → mensagem do bot (`agent.ts:144-148`) | Inclui médico, especialidade, data/hora, clínica e preço. |
-| 5 | Lembretes automáticos 24h e 2h | 🟡 | `src/lib/services/reminders.ts:67-80`, `reminder-scheduler.ts`, `instrumentation.ts:8-9`, `POST /api/reminders/run` | Lógica de janela (23,5–24,5h / 1,5–2,5h) correta e idempotente por `SELECT` prévio. **Porém:** dispara por `setInterval(60s)` dentro de `instrumentation.ts` — em serverless o intervalo não sobrevive; **não existe `vercel.json` nem cron** para chamar `/api/reminders/run`. Idempotência é só aplicacional (sem `UNIQUE(appointment_id, type)`). |
+| 5 | Lembretes automáticos 24h e 2h | ✅ | `src/lib/services/reminders.ts`, `reminder-scheduler.ts` (dev), pg_cron (migração `20261002000004`), `GET\|POST /api/reminders/run`, `vercel.json` | **Fase 3.1/3.2 (02/10/2026):** gatilho em produção via pg_cron do Supabase a cada 5 min (+ `vercel.json` diário de segurança); `setInterval` só em dev; idempotência real com `UNIQUE (appointment_id, type)` + `ON CONFLICT DO NOTHING`. **Pendência:** aplicar `000004` e criar os segredos do Vault. |
 | 6 | Remarcação automática | ✅ | tool `reschedule_appointment` + `appointments.ts` (`MAX_RESCHEDULES=1`) | Janela de 4h e limite de 1 remarcação conferidos. |
 | 7 | Cancelamento automático + liberação do horário | ✅ | tool `cancel_appointment` + `appointments.ts` (`CANCEL_WINDOW_HOURS=4`) | Cancelamento não tem confirmação em duas etapas no código (depende do prompt/LLM). |
-| 8 | Transferência para atendente humano | 🟡 | tool `transfer_to_human` (`tools.ts:280-285`), `agent.ts:130-134`, aviso em `webhooks/komunika/route.ts:144-159` | **A IA não para.** `conversation.status = "transferred"` é gravada, mas `handlePatientMessage` nunca lê esse status — a próxima mensagem continua sendo processada pelo LLM, e após a tool o loop faz `continue` (`agent.ts:141`) e pode gerar mais uma resposta junto com o aviso. Não há notificação estruturada da recepção (só o texto no WhatsApp). |
-| 9 | Tratamento de erros e concorrência | 🟡/❌ | `tools.ts:136-145` (erros viram texto para o LLM), `slotExists` | **Horário disputado não é resolvido:** nenhuma `UNIQUE` em `appointments(starts_at, doctor_id)` (nem no SQLite `db.ts:118-136`, nem no Postgres) → TOCTOU entre "verificar" e "inserir". **"IA sem certeza":** parcial, via prompt/fallback (`agent.ts:180-195`). **Falha de API WhatsApp com fila: ❌ não existe.** |
+| 8 | Transferência para atendente humano | ✅ | tool `transfer_to_human` (`tools.ts`), `agent.ts` (guardas de status + `break` no loop), `services/transfers.ts`, notificação `type:"transfer"` | **Fase 3.5 (02/10/2026):** `handlePatientMessage` lê `conversation.status` — `transferred` responde `TRANSFER_WAITING_REPLY` sem chamar a LLM; no loop, após a tool, atualiza a conversa, notifica a recepção com o histórico (notification de tipo "transferência") e **quebra** antes de gerar mais resposta; pós-loop devolve `HUMAN_TRANSFER_NOTICE`. `WAITING_HUMAN_INTERVENTION` retoma se há cota de IA. |
+| 9 | Tratamento de erros e concorrência | ✅ | `tools.ts` (erros viram texto para o LLM, `slotTakenWithAlternatives`), `SlotTakenError`/`isUniqueViolation` em `appointments.ts` | **Fase 3.3/3.4 (02/10/2026):** horário disputado resolvido por `UNIQUE (doctor_id, starts_at)` → 23505 vira 409 "horário acabou de ser ocupado" com alternativas no serviço, na API e no agente; fila `outbox` cobre falha de envio WhatsApp. "IA sem certeza" parcial via prompt/fallback (`agent.ts`). |
 
 ### 1.2 Funcionalidades principais do PRD (itens 1–9)
 
@@ -79,10 +79,10 @@ está completa.
 | 2. Sugestão automática da especialidade | ✅ | |
 | 3. Agendamento automático | ✅ | |
 | 4. Confirmação da consulta | ✅ | Localização da clínica incluída; "orientações de preparo" não existe no modelo. |
-| 5. Lembretes automáticos | 🟡 | Ver 1.1 #5 — código ok, gatilho em produção ausente. |
+| 5. Lembretes automáticos | ✅ | Ver 1.1 #5 — gatilho em produção resolvido (pg_cron + vercel.json, Fase 3.1). |
 | 6. Remarcação automática | ✅ | |
 | 7. Cancelamento automático | ✅ | |
-| 8. Transferência para humano | 🟡 | Ver 1.1 #8. |
+| 8. Transferência para humano | ✅ | Ver 1.1 #8 — resolvido na Fase 3.5. |
 | 9. Tratamento de erros/concorrência | 🟡/❌ | Ver 1.1 #9. |
 
 ### 1.3 Dashboard da clínica
@@ -300,7 +300,8 @@ Evidências do estado em que ficou (27/09) e do que a sessão 2 fez:
 - ~~**Aplicação da `20261002000002` (Fase 2.6) no banco vivo**~~ — **aplicada no SQL Editor em 02/10/2026.**
 - Jornada completa no navegador (formulários do painel, não só chamadas de API).
 - Envio/recebimento real via KOMUNIKA (HMAC, eventos, numeração).
-- Disparo dos lembretes fora de `npm run dev`.
+- ~~Disparo dos lembretes fora de `npm run dev`.~~ — **código pronto (Fase 3.1, 02/10/2026):** pg_cron no Supabase + `vercel.json` diário; **falta provar em produção** (ver 7.3).
+- **Aplicar `20261002000003` (outbox) e `20261002000004` (cron) no banco vivo** + criar os 2 segredos do Vault (`saudesync_base_url`, `saudesync_cron_token`) e o env `CRON_SECRET` na Vercel — **passos pendentes (não feitos nesta sessão)**.
 - Comportamento do app em Vercel (build + cron).
 
 ---
@@ -328,10 +329,11 @@ Evidências do estado em que ficou (27/09) e do que a sessão 2 fez:
 - [x] **1.7** `POST /api/pacientes` sem `clinic_id` (coluna `NOT NULL` sem default) e `GET ?phone=` mascarando erro de `single()` como 404. — **feito (01/10/2026):** `clinic_id` resolvido via `getDefaultClinicId()` (ou vindo do corpo) e lookup com `maybeSingle()` — 201/200/404 validados em dev, registro de teste removido.
 - [x] **1.8** **Dados do SQLite → Supabase** — **feito (01/10/2026)**: `006`, `007`, `008` e `009` aplicadas, `node scripts/setup-supabase.mjs --apply` executado (161 inseridos / 5 atualizados; reexecução = 0). Preflight com exit 0 e smoke pós-migração: `/dashboard`, `/consultas`, `/api/auth/me`, `/api/appointments`, `/api/stats`, `/api/pacientes`, `/api/clinica`, `/api/especialidades` → **todos 200**.
 
-> **Próximo passo (é onde paramos agora):** Fase 1 está **8/8 ✅** e a Fase 2 está
-> **6/6 ✅** (2.6 aplicada no SQL Editor em 02/10/2026). Seguir para a **Fase 3**
-> (P0: `vercel.json`/cron de lembretes, idempotência e trava de concorrência de
-> horário, fila da KOMUNIKA).
+> **Próximo passo (é onde paramos agora):** Fase 1 está **8/8 ✅**, Fase 2 está
+> **6/6 ✅** e a Fase 3 está **5/7 ✅** (3.1–3.5 em 02/10/2026, sessão 4 — ver log
+> abaixo). Faltam 3.6 (regras de negócio) e 3.7 (confirmação em duas etapas), além
+> da **configuração operacional** das migrations `000003`/`000004` + Vault/`CRON_SECRET`
+> no banco vivo.
 
 ### Fase 2 — Auth, tenant e RLS (P0/P1) — ✅ 6 de 6 concluídas
 
@@ -380,13 +382,40 @@ Evidências do estado em que ficou (27/09) e do que a sessão 2 fez:
 
 ### Fase 3 — Confiabilidade do agente e regras de negócio (P0/P1)
 
-- [ ] **3.1** **Lembretes em produção (P0):** criar `vercel.json` com cron apontando para `POST /api/reminders/run` (já pronto e protegido por `INTERNAL_API_TOKEN`), ou migrar para uma Edge/Supabase cron. Manter o `setInterval` apenas como fallback em dev.
-- [ ] **3.2** **Idempotência dos lembretes:** `UNIQUE (appointment_id, type)` + `INSERT ... ON CONFLICT DO NOTHING`.
-- [ ] **3.3** **Concorrência de horário (P0):** `UNIQUE (doctor_id, starts_at)` (ou lock transacional) + tratamento de erro amigável devolvendo "horário acabou de ser ocupado" e oferecendo o próximo.
-- [ ] **3.4** **Fila de mensagens do WhatsApp (P0):** tabela `outbox` + reprocessamento; o webhook deve devolver `5xx` em erro fatal para que a KOMUNIKA reenvie (hoje devolve `200`).
-- [ ] **3.5** **Transferência real (P0):** ler `conversation.status` no início de `handlePatientMessage` e **encerrar a participação da IA** (`transferred`/`WAITING_HUMAN_INTERVENTION`); não continuar o loop após `transfer_to_human`; notificar a recepção com o histórico.
+- [x] **3.1** **Lembretes em produção (P0):** criar `vercel.json` com cron apontando para `POST /api/reminders/run` (já pronto e protegido por `INTERNAL_API_TOKEN`), ou migrar para uma Edge/Supabase cron. Manter o `setInterval` apenas como fallback em dev. — **feito (02/10/2026, sessão 4):** caminho escolhido = **agendador primário pg_cron + pg_net + vault no Supabase** (migração `20261002000004`, 3 jobs: `saudesync_reminders` 5 min, `saudesync_outbox` 2–57/5 min, `saudesync_cycle` diário 02:43 UTC — o comando HTTP pula com segurança se o Vault não tiver segredos), porque a Vercel Hobby só aceita cron ≥1x/dia; `vercel.json` traz 3 crons **diários** como fallback de cobertura (guardado por teste — se alguém virar para 5 min, o deploy falha no Hobby); `setInterval` do `reminder-scheduler.ts` roda **só em dev** (desligado com log quando `VERCEL`/`NODE_ENV=production`); `requireInternalAuth` aceita `INTERNAL_API_TOKEN` **ou** `CRON_SECRET`; rotas `GET|POST /api/reminders/run` e novas `POST /api/outbox/run` e `POST /api/subscription/cycle/run` com `force-dynamic`.
+- [x] **3.2** **Idempotência dos lembretes:** `UNIQUE (appointment_id, type)` + `INSERT ... ON CONFLICT DO NOTHING`. — **feito (02/10/2026):** índice `uq_reminders_appointment_type` (migration 006) + `sendReminder` vira `upsert` com `ignoreDuplicates:true` e `.select("id")`; fila vazia (RLS/exclusão) → delete do registro para a próxima tentativa recriar; `runReminderCheck` conta só envios reais (`{sent}` = fila criada) e chama `processOutboxInBackground()`.
+- [x] **3.3** **Concorrência de horário (P0):** `UNIQUE (doctor_id, starts_at)` (ou lock transacional) + tratamento de erro amigável devolvendo "horário acabou de ser ocupado" e oferecendo o próximo. — **feito (02/10/2026):** índice `uq_appointments_professional_start` (migration 006) é a trava; `appointments.ts` exporta `SlotTakenError` (`code:"SLOT_TAKEN"`, msg PT) + `isUniqueViolation(23505)`; aplicado no insert, no `reschedule` (pre-check + update) e no catch da rota `POST /api/appointments` → **409 `{error, code:"SLOT_TAKEN"}`**; `PATCH /api/appointments/[id]` idem; no agente, `book_appointment` chama `slotTakenWithAlternatives()` (chama `getAvailableSlots`, devolve até 3 alternativas na resposta da tool), `reschedule_appointment` devolve hint para o LLM chamar `get_availability`.
+- [x] **3.4** **Fila de mensagens do WhatsApp (P0):** tabela `outbox` + reprocessamento; o webhook deve devolver `5xx` em erro fatal para que a KOMUNIKA reenvie (hoje devolve `200`). — **feito (02/10/2026):** migration `20261002000003` (BIGSERIAL, status `pending/sending/sent/failed` com CHECK, índices parciais, RLS sem policies, `REVOKE FROM anon`); `src/lib/services/outbox.ts` — `enqueueOutboxMessage()`, `processOutbox()` com claim por UPDATE condicionado (inclui recuperação de `sending` preso >15 min), backoff `[1,5,15,60,240]` min até `OUTBOX_MAX_ATTEMPTS=5`, `PERMANENT_HTTP_STATUS = {400,401,403,404,422}` (falha reprocessável → 5xx para a KOMUNIKA reenviar; 4xx permanente → `failed` sem loop); webhook passa a **enfileirar** (`chat_reply`/`transfer_notice`) em vez de enviar direto e o `catch` externo devolve **500** (antes 200 silencioso); rota `POST /api/outbox/run` dispara o processador (cron de 5 min).
+- [x] **3.5** **Transferência real (P0):** ler `conversation.status` no início de `handlePatientMessage` e **encerrar a participação da IA** (`transferred`/`WAITING_HUMAN_INTERVENTION`); não continuar o loop após `transfer_to_human`; notificar a recepção com o histórico. — **feito (02/10/2026):** novo `src/lib/services/transfers.ts` (`HUMAN_TRANSFER_NOTICE`, `TRANSFER_WAITING_REPLY`, `notifyReceptionTransfer()` → `createNotification type:"transfer"` com as últimas 10 mensagens); `agent.ts` — guarda `transferred` no início (grava msg e devolve `TRANSFER_WAITING_REPLY` **sem chamar a LLM**, `transferred:false` no callback), guarda `WAITING_HUMAN_INTERVENTION` (retoma com status "open" se `hasAiQuota()`, senão repete o aviso de cota), no tool loop: `updateConversation(transferred)` + `notifyReceptionTransfer()` + `if (transferred) break;` (quebra imediata, sem passar por tools seguintes nem LLM de novo) e o pós-loop devolve `HUMAN_TRANSFER_NOTICE` com `transferred:true`; webhook `transfer_to_human` enfileira `transfer_notice` ou usa `reply` (elimina duplo-envio); painel de notificações ganha tipo "Transferência" (ícone `UserCheck`).
 - [ ] **3.6** Fechar as regras que faltam: horário de funcionamento no agendamento do mesmo dia; corte das 4h para remarcar/cancelar só via humano; liberação de horário em no-show; `consultation_duration` no lugar do passo fixo de 30 min.
 - [ ] **3.7** Cancelamento/remarcação com confirmação explícita em duas etapas.
+
+### Log — Fase 3.1–3.5 (sessão 4, 02/10/2026)
+
+**Decisão de plataforma (3.1):** o usuário informou "não sei / verificar depois" sobre o plano da Vercel → implementado caminho que funciona em **qualquer plano**: **pg_cron + pg_net + Vault do Supabase são o agendador primário** (o banco agenda a si mesmo a cada 5 min); `vercel.json` fica só com 3 crons **diários** (no Hobby, qualquer expressão mais frequente que 1x/dia derruba o deploy — há teste unitário impedindo regressão). O `setInterval` do `instrumentation.ts` continua existindo mas só em dev.
+
+**Migrations novas (idempotentes, APLICAR NO SQL EDITOR DO BANCO VIVO — ainda não aplicadas):**
+
+1. `supabase/migrations/20261002000003_outbox.sql` — tabela `outbox` (BIGSERIAL, `text` com formato `YYYY-MM-DD HH24:MI`, CHECK de status, índices parciais `pending`/`sending` obsoletos, RLS habilitada **sem policies** = deny-all para anon/authenticated, `REVOKE ... FROM anon`).
+2. `supabase/migrations/20261002000004_cron_supabase.sql` — habilita `pg_cron`/`pg_net`/`pgcrypto` se disponíveis (guardas via `pg_available_extensions` + `to_regprocedure`/`to_regclass`), cria os 3 jobs com comando SQL gerado por `format` que lê os segredos do Vault a cada execução e **pula o HTTP com silêncio se `saudesync_base_url` estiver vazia**; sem extensão, só `RAISE NOTICE` (cadeia limpa continua verde).
+
+**Configuração pós-deploy (uma única vez, SQL Editor + Vercel):**
+
+```sql
+SELECT vault.create_secret('https://SEU-APP.vercel.app', 'saudesync_base_url');
+SELECT vault.create_secret('SEU_TOKEN_ALEATORIO_LONGO', 'saudesync_cron_token');
+-- conferir:
+SELECT jobname, schedule FROM cron.job ORDER BY jobname;
+```
+
+- O token do Vault **deve ser igual** ao env **`CRON_SECRET`** da Vercel (`requireInternalAuth` aceita ele ou `INTERNAL_API_TOKEN`; sem token configurado as rotas respondem 500/401 e os jobs pulam).
+- Verificação do agendador (depois de 5–10 min): `SELECT jobid, status, return_message FROM cron.job_run_details ORDER BY start_time DESC LIMIT 5;` e, no app, `SELECT status, count(*) FROM outbox GROUP BY 1;` + `SELECT * FROM net._http_response ORDER BY created DESC LIMIT 5;`.
+
+**Arquivos alterados/criados:** `vercel.json` (novo); `src/lib/services/outbox.ts` (novo); `src/lib/services/transfers.ts` (novo); `src/app/api/outbox/run/route.ts` e `src/app/api/subscription/cycle/run/route.ts` (novos); `src/lib/__tests__/fase3.test.ts` (novo, 12 testes); `supabase/migrations/20261002000003_outbox.sql` e `20261002000004_cron_supabase.sql` (novos); editados `src/lib/api-auth.ts`, `src/lib/services/reminders.ts`, `src/lib/services/appointments.ts`, `src/lib/services/reminder-scheduler.ts`, `src/lib/agent/agent.ts`, `src/lib/agent/tools.ts`, `src/app/api/webhooks/komunika/route.ts`, `src/app/api/reminders/run/route.ts`, `src/app/api/appointments/route.ts`, `src/app/api/appointments/[id]/route.ts`, `src/lib/types.ts` (`NotificationType` + `"transfer"`), `src/components/.../notification-panel.tsx`, `src/instrumentation.ts` (comentário).
+
+**Validação executada:** `eslint` 0/0 · `tsc --noEmit` ✅ · `vitest` **50/50** (4 arquivos) · `next build` ✅ (exit 0, rotas novas presentes) · cadeia limpa `clean-db-test.mjs` **13/13 migrations · 11/11 CHECKs · 3/3 testes de papel · exit 0** (a `000004` degrada com NOTICE no Docker, como projetado) · **caminho de agendamento do cron validado isoladamente** com stubs de `cron`/`vault`/`net` num Postgres 16 limpo: 3 jobs criados com os schedules corretos, reexecução da migration idempotente (segue 3 jobs, não 6), o SQL gerado do job executa com `EXECUTE` sem erro e sem `base_url` o comando não faz chamada.
+
+**Limitações registradas (backlog):** o `claim` do outbox é um UPDATE condicionado (race aceitável com execução única por cron; se duas instâncias rodarem ao mesmo tempo, só uma reivindica a linha); a mensagem *inbound* do WhatsApp que falhar no processamento assíncrono de background não é re-puxada pela KOMUNIKA (a resposta, que é o que importa para o usuário, já está em fila); backoff único por linha (`next_attempt_at`), sem cronologia por destinatário.
 
 ### Fase 4 — Dashboard e dados (P1)
 

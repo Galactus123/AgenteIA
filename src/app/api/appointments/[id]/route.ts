@@ -8,6 +8,7 @@ import {
   rescheduleAppointment,
   canCancel,
   canReschedule,
+  SlotTakenError,
 } from "@/lib/services/appointments";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -132,6 +133,10 @@ export async function PUT(
     const updated = await rescheduleAppointment(Number(id), String(body.new_starts_at));
     return NextResponse.json({ ok: true, appointment: updated });
   } catch (err) {
+    // Novo horario ocupado por corrida (indice unico) — 409 amigavel.
+    if (err instanceof SlotTakenError) {
+      return NextResponse.json({ error: err.message, code: err.code }, { status: 409 });
+    }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Erro ao remarcar." },
       { status: 500 }

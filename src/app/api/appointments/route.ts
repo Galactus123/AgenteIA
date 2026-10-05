@@ -3,8 +3,9 @@ import { requireAuth } from "@/lib/api-auth";
 import {
   listAppointmentsFiltered,
   createAppointment,
+  isSlotAvailable,
+  SlotTakenError,
 } from "@/lib/services/appointments";
-import { isSlotAvailable } from "@/lib/services/appointments";
 import { MAX_PATIENT_NAME_LENGTH } from "@/lib/agent/security";
 
 const MAX_REASON_LENGTH = 500;
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
 
   if (!(await isSlotAvailable(professionalId, startsAt))) {
     return NextResponse.json(
-      { error: "Este horario ja esta ocupado." },
+      { error: "Este horario ja esta ocupado.", code: "SLOT_TAKEN" },
       { status: 409 }
     );
   }
@@ -97,6 +98,11 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ ok: true, appointment }, { status: 201 });
   } catch (err) {
+    // Corrida de horario: outra requisicao ocupou o slot entre a
+    // verificacao e o insert (indice unico) — devolve 409 amigavel.
+    if (err instanceof SlotTakenError) {
+      return NextResponse.json({ error: err.message, code: err.code }, { status: 409 });
+    }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Erro ao criar agendamento." },
       { status: 500 }

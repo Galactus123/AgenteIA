@@ -4,7 +4,8 @@ export async function register() {
     const { initErrorMonitoring } = await import("@/lib/monitoring");
     initErrorMonitoring();
 
-    // Scheduler de lembretes e ciclos de faturamento
+    // Scheduler de lembretes/ciclo/fila — ativo so em dev;
+    // em producao quem agenda e o pg_cron do Supabase + vercel.json.
     const { startReminderScheduler } = await import("@/lib/services/reminder-scheduler");
     startReminderScheduler();
 

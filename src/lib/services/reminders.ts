@@ -2,7 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import type { AppointmentView } from "@/lib/types";
 import { parseDatetime, nowStr } from "@/lib/datetime";
 import { getOrCreateConversation, addMessage } from "@/lib/services/conversations";
-import { isKomunikaConfigured, sendKomunikaMessage } from "@/lib/services/komunika";
+import { enqueueOutboxMessage, processOutboxInBackground } from "@/lib/services/outbox";
 import { notifyDoctorReminder } from "@/lib/services/notifications";
 
 const VIEW_SELECT =
@@ -56,49 +56,56 @@ async function getProfessionalPhone(professionalId: string | null): Promise<stri
   return (data as { phone?: string } | null)?.phone ?? "";
 }
 
-async function reminderAlreadySent(appointmentId: number, type: string): Promise<boolean> {
-  const { data, error } = await supabaseAdmin
+// Registra o lembrete com INSERT idempotente (ON CONFLICT DO NOTHING
+// via indice unico uq_reminders_appointment_type) e so entao entrega.
+// Retorna true somente quando este chamado foi quem registrou — corrida
+// entre execucoes concorrentes resolve no banco, nao na aplicacao.
+async function sendReminder(appointment: AppointmentView, type: "24h" | "2h"): Promise<boolean> {
+  const { data: inserted, error } = await supabaseAdmin
     .from("reminders")
-    .select("id")
-    .eq("appointment_id", appointmentId)
-    .eq("type", type)
-    .limit(1);
+    .upsert(
+      {
+        appointment_id: appointment.id,
+        type,
+        sent_at: nowStr(),
+      },
+      { onConflict: "appointment_id,type", ignoreDuplicates: true }
+    )
+    .select("id");
 
   if (error) {
-    console.error("[reminders] Falha ao verificar lembrete:", error.message);
+    console.error("[reminders] Falha ao registrar o lembrete:", error.message);
     return false;
   }
-  return (data?.length ?? 0) > 0;
-}
-
-async function sendReminder(appointment: AppointmentView, type: "24h" | "2h"): Promise<void> {
-  if (await reminderAlreadySent(appointment.id, type)) return;
+  if (!inserted?.length) return false; // ja registrado por outra execucao
 
   const when = type === "24h" ? "amanhã" : "hoje";
   const text = `Olá, ${appointment.patient_name}! Lembrete da sua consulta na ${appointment.clinic_name}: ${appointment.specialty_name} com ${appointment.doctor_name} ${when} às ${appointment.starts_at.split(" ")[1]}. Local: ${appointment.clinic_address}. Responda aqui se precisar remarcar ou cancelar.`;
 
-  const { error } = await supabaseAdmin.from("reminders").insert({
-    appointment_id: appointment.id,
-    type,
-    sent_at: nowStr(),
-  });
-
-  if (error) {
-    console.error("[reminders] Falha ao registrar o lembrete:", error.message);
-    return;
-  }
-
-  if (appointment.conversation_id) {
-    await addMessage(appointment.conversation_id, "bot", text);
-  } else {
+  let conversationId = appointment.conversation_id;
+  if (!conversationId) {
     const conversation = await getOrCreateConversation(appointment.patient_phone);
-    await addMessage(conversation.id, "bot", text);
+    conversationId = conversation.id;
   }
 
-  if (isKomunikaConfigured()) {
-    await sendKomunikaMessage(appointment.patient_phone, text, { type: "text" }).catch((err) => {
-      console.error("[reminders] Falha ao enviar o lembrete via WhatsApp:", err);
-    });
+  const outboxId = await enqueueOutboxMessage({
+    phone: appointment.patient_phone,
+    text,
+    kind: "reminder",
+    conversationId,
+  });
+  if (!outboxId) {
+    // Sem fila nao ha entrega garantida: desfaz o registro para a
+    // proxima execucao tentar de novo (o indice unico garante 1 linha).
+    await supabaseAdmin.from("reminders").delete().eq("id", inserted[0].id);
+    console.error("[reminders] Lembrete devolvido (fila indisponivel); sera re-tentado.");
+    return false;
+  }
+
+  try {
+    await addMessage(conversationId, "bot", text);
+  } catch (err) {
+    console.error("[reminders] Falha ao gravar o lembrete no historico:", err);
   }
 
   try {
@@ -117,6 +124,8 @@ async function sendReminder(appointment: AppointmentView, type: "24h" | "2h"): P
   } catch (err) {
     console.error("[reminders] Falha ao notificar o profissional:", err);
   }
+
+  return true;
 }
 
 export async function runReminderCheck(now: Date = new Date()): Promise<number> {
@@ -125,12 +134,12 @@ export async function runReminderCheck(now: Date = new Date()): Promise<number> 
     const startsAt = parseDatetime(appointment.starts_at);
     const hours = (startsAt.getTime() - now.getTime()) / 3600000;
     if (hours > 23.5 && hours <= 24.5) {
-      await sendReminder(appointment, "24h");
-      sent++;
+      if (await sendReminder(appointment, "24h")) sent++;
     } else if (hours > 1.5 && hours <= 2.5) {
-      await sendReminder(appointment, "2h");
-      sent++;
+      if (await sendReminder(appointment, "2h")) sent++;
     }
   }
+  // Drena a fila (envio imediato + reprocessamento de atrasados).
+  processOutboxInBackground();
   return sent;
 }

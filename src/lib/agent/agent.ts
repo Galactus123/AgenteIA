@@ -4,6 +4,11 @@ import { buildSystemPrompt } from "@/lib/agent/prompts";
 import { addMessage, getMessages, getConversation, updateConversation, getOrCreateConversation } from "@/lib/services/conversations";
 import { blockForQuota, consumeTokens, hasAiQuota } from "@/lib/services/subscriptions";
 import { sanitizePatientInput } from "@/lib/agent/security";
+import {
+  HUMAN_TRANSFER_NOTICE,
+  TRANSFER_WAITING_REPLY,
+  notifyReceptionTransfer,
+} from "@/lib/services/transfers";
 import type { Conversation, Message } from "@/lib/types";
 
 const MAX_ITERATIONS = 8;
@@ -47,6 +52,31 @@ export async function handlePatientMessage(phone: string, text: string): Promise
 
   const conversation = await getOrCreateConversation(phone);
   log(`Conversa carregada/criada para phone=${phone} id=${conversation.id}, status="${conversation.status}"`);
+
+  // Fase 3.5 — a conversa ja foi transferida: a IA fica FORA do
+  // atendimento. Grava a mensagem do paciente, responde o padrao de
+  // espera e nao chama o LLM (sem custo de tokens, sem alucinacao).
+  if (conversation.status === "transferred") {
+    log(`Conversa ${conversation.id} ja transferida — IA fora do atendimento.`);
+    await addMessage(conversation.id, "patient", sanitizedText);
+    await addMessage(conversation.id, "bot", TRANSFER_WAITING_REPLY);
+    return { reply: TRANSFER_WAITING_REPLY, conversationId: conversation.id, transferred: false };
+  }
+
+  // Bloqueio por cota: com a cota restaurada a IA retoma (status volta
+  // a "open"); se ainda esgotada, mantem a IA fora e repete o aviso.
+  if (conversation.status === "WAITING_HUMAN_INTERVENTION") {
+    if (await hasAiQuota()) {
+      log(`Conversa ${conversation.id}: cota restaurada — retomando o atendimento da IA.`);
+      await updateConversation(conversation.id, { status: "open" });
+    } else {
+      log(`Conversa ${conversation.id}: cota esgotada — IA continua fora.`);
+      await addMessage(conversation.id, "patient", sanitizedText);
+      await addMessage(conversation.id, "bot", QUOTA_EXHAUSTED_MESSAGE);
+      return { reply: QUOTA_EXHAUSTED_MESSAGE, conversationId: conversation.id, transferred: false };
+    }
+  }
+
   await addMessage(conversation.id, "patient", sanitizedText);
   log(`Mensagem do paciente [${conversation.id}] gravada (tamanho=${sanitizedText.length})`);
 
@@ -133,7 +163,8 @@ export async function handlePatientMessage(phone: string, text: string): Promise
           if (result.transferToHuman) {
             transferred = true;
             await updateConversation(conversation.id, { status: "transferred" });
-            log(`Conversa ${conversation.id} marcada como transferred.`);
+            await notifyReceptionTransfer(conversation, result.transferReason ?? "");
+            log(`Conversa ${conversation.id} marcada como transferred; recepcao notificada.`);
           }
           messages.push({
             role: "tool",
@@ -141,6 +172,9 @@ export async function handlePatientMessage(phone: string, text: string): Promise
             content: result.output,
           });
         }
+        // Fase 3.5: encerra a participacao da IA — nao continuar o
+        // loop apos transfer_to_human.
+        if (transferred) break;
         continue;
       }
 
@@ -152,6 +186,14 @@ export async function handlePatientMessage(phone: string, text: string): Promise
 
       log(`Iteração ${i + 1}: LLM retornou sem content e sem tool_calls. Interrompendo loop para evitar loop infinito.`);
       break;
+    }
+
+    // Saida por transferencia: a IA se despede com o aviso padrao e
+    // sai de cena (o webhook entrega via outbox).
+    if (transferred) {
+      await addMessage(conversation.id, "bot", HUMAN_TRANSFER_NOTICE);
+      log(`Aviso de transferencia registrado para a conversa ${conversation.id}.`);
+      return { reply: HUMAN_TRANSFER_NOTICE, conversationId: conversation.id, transferred: true };
     }
 
     // Caiu no limite de iterações sem gerar uma resposta final útil.

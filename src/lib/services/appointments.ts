@@ -21,6 +21,25 @@ import { normalizeSchedule } from "@/lib/services/doctors";
 const CANCEL_WINDOW_HOURS = 4;
 const MAX_RESCHEDULES = 1;
 
+// Concorrencia de horario (Fase 3.3): o indice unico
+// uq_appointments_professional_start e a ultima barreira quando duas
+// requisicoes passam juntas pela verificacao de conflito. Em vez do
+// erro cruo do banco, o fluxo (API e agente) recebe um erro tipado e
+// amigavel para devolver "horario acabou de ser ocupado".
+export class SlotTakenError extends Error {
+  readonly code = "SLOT_TAKEN";
+
+  constructor(message = "Este horário acabou de ser ocupado. Escolha outro horário.") {
+    super(message);
+    this.name = "SlotTakenError";
+  }
+}
+
+function isUniqueViolation(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  return error.code === "23505" || (error.message ?? "").includes("duplicate key value");
+}
+
 // Embedding via FK: specialties(name), professionals(...), clinics(name, address).
 const VIEW_SELECT =
   "*, specialties(name), professionals(name, consultation_duration, price), clinics(name, address)";
@@ -349,7 +368,10 @@ export async function createAppointment(data: {
     .select("id")
     .single();
 
-  if (error) fail(`[appointments] Falha ao criar a consulta: ${error.message}`);
+  if (error) {
+    if (isUniqueViolation(error)) throw new SlotTakenError();
+    fail(`[appointments] Falha ao criar a consulta: ${error.message}`);
+  }
 
   const view = await getAppointmentView((row).id);
   if (!view) fail("Consulta criada mas não encontrada.");
@@ -482,7 +504,7 @@ export async function rescheduleAppointment(
   const endsAt = addMinutes(startsAt, duration);
 
   if (await hasConflict(appointment.professional_id, startsAt, duration, id)) {
-    fail("Este horário já não está disponível.");
+    throw new SlotTakenError("Este horário já não está disponível. Escolha outro horário.");
   }
 
   const { error } = await supabaseAdmin
@@ -496,7 +518,10 @@ export async function rescheduleAppointment(
     })
     .eq("id", id);
 
-  if (error) fail(`[appointments] Falha ao remarcar: ${error.message}`);
+  if (error) {
+    if (isUniqueViolation(error)) throw new SlotTakenError();
+    fail(`[appointments] Falha ao remarcar: ${error.message}`);
+  }
 
   const view = await getAppointmentView(id);
   if (!view) fail("Consulta não encontrada.");

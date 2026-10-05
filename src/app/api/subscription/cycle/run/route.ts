@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runReminderCheck } from "@/lib/services/reminders";
+import { runSubscriptionCycleCheck } from "@/lib/services/subscriptions";
 import { requireInternalAuth } from "@/lib/api-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET = disparo do Vercel Cron / pg_cron do Supabase;
-// POST = uso interno (mesma protecao por token).
+// GET = disparo do Vercel Cron / pg_cron do Supabase (reset diario do
+// ciclo de faturamento; a funcao so age no billing_cycle_day da clinica).
 async function handle(request: NextRequest) {
   const authError = await requireInternalAuth(request);
   if (authError) return authError;
-  const sent = await runReminderCheck();
-  return NextResponse.json({ sent, at: new Date().toISOString() });
+  await runSubscriptionCycleCheck();
+  return NextResponse.json({ ok: true, at: new Date().toISOString() });
 }
 
 export async function GET(request: NextRequest) {

@@ -60,17 +60,21 @@ export async function getUser(request: NextRequest) {
 export async function requireInternalAuth(request: NextRequest): Promise<NextResponse | null> {
   const authHeader = request.headers.get("authorization");
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const expected = process.env.INTERNAL_API_TOKEN;
+  // INTERNAL_API_TOKEN (uso interno) e CRON_SECRET (injecao automatica da
+  // Vercel Cron e, no nosso caso, tambem o token do pg_cron do Supabase).
+  const accepted = [process.env.INTERNAL_API_TOKEN, process.env.CRON_SECRET].filter(
+    (value): value is string => Boolean(value)
+  );
 
-  if (!expected) {
+  if (accepted.length === 0) {
     if (process.env.VERCEL) {
-      console.error("[auth] INTERNAL_API_TOKEN nao configurado — requisicao interna rejeitada em producao");
+      console.error("[auth] INTERNAL_API_TOKEN/CRON_SECRET nao configurado — requisicao interna rejeitada em producao");
       return NextResponse.json({ error: "Token interno nao configurado." }, { status: 500 });
     }
     return null;
   }
 
-  if (!token || token !== expected) {
+  if (!token || !accepted.includes(token)) {
     return NextResponse.json({ error: "Token invalido." }, { status: 401 });
   }
   return null;

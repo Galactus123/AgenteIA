@@ -1,6 +1,14 @@
 import type { LlmToolDefinition } from "@/lib/agent/llm";
 import { listSpecialties, getSpecialty } from "@/lib/services/specialties";
-import { getAvailableSlots, createAppointment, findUpcomingAppointmentByPhone, rescheduleAppointment, cancelAppointment } from "@/lib/services/appointments";
+import {
+  getAvailableSlots,
+  createAppointment,
+  findUpcomingAppointmentByPhone,
+  rescheduleAppointment,
+  cancelAppointment,
+  SlotTakenError,
+} from "@/lib/services/appointments";
+import type { AppointmentView, AvailableSlot } from "@/lib/types";
 
 export const toolDefinitions: LlmToolDefinition[] = [
   {
@@ -114,6 +122,7 @@ export const toolDefinitions: LlmToolDefinition[] = [
 export interface ToolResult {
   output: string;
   transferToHuman?: boolean;
+  transferReason?: string;
 }
 
 export interface ToolContext {
@@ -128,6 +137,39 @@ async function slotExists(
   const date = startsAt.split(" ")[0];
   const slots = await getAvailableSlots(specialtyId, date);
   return slots.some((s) => s.professional_id === professionalId && s.starts_at === startsAt);
+}
+
+// Resposta de "horario ocupado por corrida" com alternativas reais
+// para o LLM apresentar (Fase 3.3).
+async function slotTakenWithAlternatives(
+  specialtyId: number,
+  professionalId: string,
+  startsAt: string,
+  error: SlotTakenError
+): Promise<ToolResult> {
+  let alternatives: AvailableSlot[] = [];
+  try {
+    const date = startsAt.split(" ")[0];
+    const slots = await getAvailableSlots(specialtyId, date);
+    const sameProfessional = slots.filter((s) => s.professional_id === professionalId);
+    alternatives = (sameProfessional.length ? sameProfessional : slots).slice(0, 3);
+  } catch {
+    alternatives = [];
+  }
+  return {
+    output: JSON.stringify({
+      ok: false,
+      error: error.message,
+      alternatives: alternatives.map((s) => ({
+        professional_id: s.professional_id,
+        doctor_name: s.doctor_name,
+        starts_at: s.starts_at,
+        ends_at: s.ends_at,
+        price: s.price,
+      })),
+      hint: "Informe o paciente que o horario acabou de ser ocupado e apresente as alternativas.",
+    }),
+  };
 }
 
 export async function executeTool(
@@ -205,16 +247,25 @@ async function dispatchTool(
       if (!(await slotExists(specialtyId, professionalId, startsAt))) {
         return { output: "Erro: este horário não está mais disponível. Apresente outros horários." };
       }
-      const appointment = await createAppointment({
-        patient_name: String(args.patient_name),
-        patient_phone: String(args.patient_phone),
-        specialty_id: specialtyId,
-        professional_id: professionalId,
-        starts_at: startsAt,
-        reason: args.reason ? String(args.reason) : "",
-        source: "ia",
-        conversation_id: ctx.conversationId,
-      });
+      let appointment: AppointmentView;
+      try {
+        appointment = await createAppointment({
+          patient_name: String(args.patient_name),
+          patient_phone: String(args.patient_phone),
+          specialty_id: specialtyId,
+          professional_id: professionalId,
+          starts_at: startsAt,
+          reason: args.reason ? String(args.reason) : "",
+          source: "ia",
+          conversation_id: ctx.conversationId,
+        });
+      } catch (error) {
+        if (error instanceof SlotTakenError) {
+          // Outra conversa ocupou o horario entre a checagem e o insert.
+          return slotTakenWithAlternatives(specialtyId, professionalId, startsAt, error);
+        }
+        throw error;
+      }
       return {
         output: JSON.stringify({
           ok: true,
@@ -263,6 +314,15 @@ async function dispatchTool(
           }),
         };
       } catch (error) {
+        if (error instanceof SlotTakenError) {
+          return {
+            output: JSON.stringify({
+              ok: false,
+              error: error.message,
+              hint: "Chame get_availability para oferecer outros horarios ao paciente.",
+            }),
+          };
+        }
         return {
           output: `Erro ao remarcar: ${error instanceof Error ? error.message : "erro desconhecido"}`,
         };
@@ -282,8 +342,10 @@ async function dispatchTool(
 
     case "transfer_to_human": {
       return {
-        output: "Transferência solicitada. A recepção assumirá este atendimento.",
+        output:
+          "Transferência solicitada. A recepção assumirá este atendimento; não execute mais nenhuma ação.",
         transferToHuman: true,
+        transferReason: args.reason ? String(args.reason) : "",
       };
     }
 

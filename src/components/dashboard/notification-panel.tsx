@@ -7,6 +7,7 @@ import {
   Clock,
   Bell,
   BellOff,
+  UserCheck,
   X,
   CheckCheck,
 } from "lucide-react";
@@ -22,7 +23,7 @@ interface Notification {
   created_at: string;
 }
 
-type FilterType = "all" | "scheduled" | "cancelled" | "rescheduled" | "reminder";
+type FilterType = "all" | "scheduled" | "cancelled" | "rescheduled" | "reminder" | "transfer";
 
 const TYPE_CONFIG: Record<string, { icon: React.ReactNode; className: string; iconColor: string }> = {
   scheduled: {
@@ -45,6 +46,11 @@ const TYPE_CONFIG: Record<string, { icon: React.ReactNode; className: string; ic
     className: "neon-badge",
     iconColor: "#818cf8",
   },
+  transfer: {
+    icon: <UserCheck size={14} strokeWidth={1.75} />,
+    className: "neon-badge-warning",
+    iconColor: "#fbbf24",
+  },
 };
 
 const FILTER_LABELS: Record<FilterType, string> = {
@@ -53,6 +59,7 @@ const FILTER_LABELS: Record<FilterType, string> = {
   cancelled: "Cancelamentos",
   rescheduled: "Remarcações",
   reminder: "Lembretes",
+  transfer: "Transferências",
 };
 
 function timeAgo(dateStr: string): string {
