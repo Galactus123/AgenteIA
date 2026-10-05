@@ -101,6 +101,7 @@ export default function EspecialidadesPage() {
         <div>
           <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Nome</label>
           <input
+            aria-label="Nome"
             type="text"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -111,6 +112,7 @@ export default function EspecialidadesPage() {
         <div>
           <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Descrição</label>
           <textarea
+            aria-label="Descrição"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             rows={2}
@@ -122,6 +124,7 @@ export default function EspecialidadesPage() {
             Palavras-chave (separadas por vírgula)
           </label>
           <input
+            aria-label="Palavras-chave (separadas por vírgula)"
             type="text"
             value={keywordsText}
             onChange={(e) => setKeywordsText(e.target.value)}

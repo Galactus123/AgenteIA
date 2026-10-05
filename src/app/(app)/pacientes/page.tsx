@@ -102,6 +102,7 @@ export default function PacientesPage() {
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Nome *</label>
             <input
+              aria-label="Nome"
               type="text"
               value={form.nome}
               onChange={(e) => setForm({ ...form, nome: e.target.value })}
@@ -112,6 +113,7 @@ export default function PacientesPage() {
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Telefone *</label>
             <input
+              aria-label="Telefone"
               type="tel"
               value={form.telefone}
               onChange={(e) => setForm({ ...form, telefone: e.target.value })}
@@ -123,6 +125,7 @@ export default function PacientesPage() {
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">E-mail</label>
             <input
+              aria-label="E-mail"
               type="email"
               value={form.email ?? ""}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -132,6 +135,7 @@ export default function PacientesPage() {
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Data de nascimento</label>
             <input
+              aria-label="Data de nascimento"
               type="date"
               value={form.data_nascimento ?? ""}
               onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })}
@@ -141,6 +145,7 @@ export default function PacientesPage() {
           <div className="md:col-span-2">
             <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Endereço</label>
             <input
+              aria-label="Endereço"
               type="text"
               value={form.endereco ?? ""}
               onChange={(e) => setForm({ ...form, endereco: e.target.value })}
@@ -150,6 +155,7 @@ export default function PacientesPage() {
           <div className="md:col-span-2">
             <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Observações</label>
             <textarea
+              aria-label="Observações"
               value={form.observacoes ?? ""}
               onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
               rows={2}

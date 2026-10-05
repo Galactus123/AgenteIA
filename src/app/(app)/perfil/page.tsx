@@ -118,6 +118,7 @@ export default function PerfilPage() {
             Novo E-mail
           </label>
           <input
+            aria-label="Novo E-mail"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -132,6 +133,7 @@ export default function PerfilPage() {
             Senha Atual (confirmação)
           </label>
           <input
+            aria-label="Senha Atual (confirmação)"
             type="password"
             value={emailPassword}
             onChange={(e) => setEmailPassword(e.target.value)}
@@ -172,6 +174,7 @@ export default function PerfilPage() {
             Senha Atual
           </label>
           <input
+            aria-label="Senha Atual"
             type="password"
             value={currentPw}
             onChange={(e) => setCurrentPw(e.target.value)}
@@ -185,6 +188,7 @@ export default function PerfilPage() {
             Nova Senha
           </label>
           <input
+            aria-label="Nova Senha"
             type="password"
             value={newPw}
             onChange={(e) => setNewPw(e.target.value)}
@@ -200,6 +204,7 @@ export default function PerfilPage() {
             Confirmar Nova Senha
           </label>
           <input
+            aria-label="Confirmar Nova Senha"
             type="password"
             value={confirmPw}
             onChange={(e) => setConfirmPw(e.target.value)}

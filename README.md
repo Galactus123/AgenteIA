@@ -44,6 +44,7 @@ Acesse http://localhost:3000
 - **Cadastros:** clínica, médicos (com agenda semanal), especialidades (com palavras-chave que orientam a IA).
 - **Lembretes automáticos:** enviados 24h e 2h antes da consulta; aparecem como mensagens do bot na conversa do paciente. Verificados a cada minuto em segundo plano.
 - **Regras de negócio:** cancelamento/remarcação com 4h de antecedência, máximo de 1 remarcação, agendamento no mesmo dia até 2h antes, e disputa de horário resolvida por disponibilidade real.
+- **Segurança e auditoria:** audit log das ações sensíveis (Configurações → Auditoria, tabela `audit_logs` com RLS deny-all), rate limiting em login/cadastro/webhooks, PII mascarada nos logs e proteção de rotas internas por `CRON_SECRET`/`INTERNAL_API_TOKEN` (sem bypass de dev).
 
 ## Estrutura
 
@@ -55,6 +56,14 @@ Acesse http://localhost:3000
 ## Banco de dados
 
 O sistema usa **Supabase (Postgres + Auth)** como fonte única desde a Fase 1: `supabaseAdmin` (`service_role`) é a única porta de escrita, o `anon` não tem GRANT de tabela e o schema nasce de `supabase/migrations/`. Seed e verificação: `node scripts/setup-supabase.mjs` (exige Node 22+). `data/saudesync.db` é apenas o SQLite legado, lido por esse script.
+
+## Verificação (smoke, concorrência, CI)
+
+- **Smoke test do deploy** (somente leitura): `node scripts/ops/smoke-test.mjs` usa `PUBLIC_URL` do `.env` (ou `--url http://localhost:3000`); confere `/api/health`, páginas públicas, redirect de páginas protegidas para `/login`, APIs com 401 direto (nunca redirect) e login inválido com 401.
+- **Concorrência de slot** (requer Docker): `node scripts/ops/slot-concurrency-test.mjs` sobe um Postgres 16 descartável, aplica a cadeia inteira de migrations e dispara 2 e 5 inserções simultâneas no mesmo `(professional_id, starts_at)` — só pode vencer 1, e o índice parcial `uq_appointments_professional_start` rejeita as demais com `23505`.
+- **Schema em banco limpo** (requer Docker): `node scripts/ops/clean-db-test.mjs` valida as 14 migrations do zero e gera `scripts/ops/clean-db-run.log`.
+- **CI:** workflow em `.github/workflows/ci.yml` (Node 22) roda lint, `tsc`, `npm test` e cobertura com gates em `vitest.config.ts`; o status check **`quality`** deve ser exigido na branch protection (configuração manual no GitHub).
+- **Crons (Vercel):** `vercel.json` agenda `/api/reminders/run` (03:17 UTC), `/api/outbox/run` (03:41) e `/api/subscription/cycle/run` (01:51); todas exigem o token interno. Estado do agendador: `SELECT jobname FROM cron.job;` no SQL Editor.
 
 ## Backup e restauração
 

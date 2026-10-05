@@ -144,6 +144,7 @@ export default function ChatPage() {
       <div className="flex flex-wrap items-center gap-2">
         <label className="text-sm font-medium dark:text-slate-300 text-slate-600">WhatsApp do paciente:</label>
         <input
+          aria-label="WhatsApp do paciente"
           type="text"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
@@ -231,6 +232,7 @@ export default function ChatPage() {
 
         <div className="flex gap-2 p-3 border-t" style={{ background: "var(--surface)", borderColor: "var(--card-border)" }}>
           <input
+            aria-label="Mensagem"
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}

@@ -241,6 +241,7 @@ export default function MedicosPage() {
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Nome</label>
             <input
+              aria-label="Nome"
               type="text"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -251,6 +252,7 @@ export default function MedicosPage() {
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Email</label>
             <input
+              aria-label="Email"
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -262,6 +264,7 @@ export default function MedicosPage() {
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Especialidade</label>
             <select
+              aria-label="Especialidade"
               value={form.specialty_id || ""}
               onChange={(e) => setForm({ ...form, specialty_id: e.target.value })}
               className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
@@ -280,6 +283,7 @@ export default function MedicosPage() {
               Duração da consulta (minutos)
             </label>
             <input
+              aria-label="Duração da consulta (minutos)"
               type="number"
               min={10}
               step={5}
@@ -292,6 +296,7 @@ export default function MedicosPage() {
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Valor da consulta</label>
             <input
+              aria-label="Valor da consulta"
               type="number"
               min={0}
               step={10}
@@ -304,6 +309,7 @@ export default function MedicosPage() {
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Status</label>
             <select
+              aria-label="Status"
               value={form.status}
               onChange={(e) => setForm({ ...form, status: e.target.value })}
               className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
@@ -317,6 +323,7 @@ export default function MedicosPage() {
               Telefone / WhatsApp
             </label>
             <input
+              aria-label="Telefone / WhatsApp"
               type="tel"
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
@@ -343,6 +350,7 @@ export default function MedicosPage() {
                 {row.enabled && (
                   <div className="flex items-center gap-2">
                     <input
+                      aria-label={`Início ${DAY_LABELS[row.weekday]}`}
                       type="time"
                       value={row.start_time}
                       onChange={(e) => updateScheduleRow(row.weekday, { start_time: e.target.value })}
@@ -350,6 +358,7 @@ export default function MedicosPage() {
                     />
                     <span className="dark:text-slate-500 text-slate-400">até</span>
                     <input
+                      aria-label={`Fim ${DAY_LABELS[row.weekday]}`}
                       type="time"
                       value={row.end_time}
                       onChange={(e) => updateScheduleRow(row.weekday, { end_time: e.target.value })}

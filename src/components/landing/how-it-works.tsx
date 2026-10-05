@@ -109,6 +109,7 @@ export default function HowItWorks() {
                 >
                   <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-primary-dark shadow-sm">
                     <svg
+                      aria-hidden="true"
                       width="16"
                       height="16"
                       viewBox="0 0 24 24"

@@ -27,6 +27,7 @@ export default function ThemeToggle() {
     >
       {/* Sun icon */}
       <svg
+        aria-hidden="true"
         className="absolute h-5 w-5 transition-all duration-500"
         style={{
           color: isDark ? "#818cf8" : "#f59e0b",
@@ -43,6 +44,7 @@ export default function ThemeToggle() {
 
       {/* Moon icon */}
       <svg
+        aria-hidden="true"
         className="absolute h-5 w-5 transition-all duration-500"
         style={{
           color: isDark ? "#818cf8" : "#64748b",

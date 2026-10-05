@@ -92,6 +92,7 @@ export default function TesteGratisPage() {
               Nome da clínica
             </label>
             <input
+              aria-label="Nome da clínica"
               type="text"
               value={clinica}
               onChange={(e) => setClinica(e.target.value)}
@@ -104,6 +105,7 @@ export default function TesteGratisPage() {
               Seu nome
             </label>
             <input
+              aria-label="Seu nome"
               type="text"
               value={nome}
               onChange={(e) => setNome(e.target.value)}
@@ -116,6 +118,7 @@ export default function TesteGratisPage() {
               WhatsApp
             </label>
             <input
+              aria-label="WhatsApp"
               type="tel"
               value={whatsapp}
               onChange={(e) => setWhatsapp(e.target.value)}
@@ -128,6 +131,7 @@ export default function TesteGratisPage() {
               País
             </label>
             <select
+              aria-label="País"
               value={pais}
               onChange={(e) => setPais(e.target.value)}
               className={inputClass}
@@ -142,6 +146,7 @@ export default function TesteGratisPage() {
               Especialidade principal
             </label>
             <select
+              aria-label="Especialidade principal"
               value={especialidade}
               onChange={(e) => setEspecialidade(e.target.value)}
               className={inputClass}
@@ -159,6 +164,7 @@ export default function TesteGratisPage() {
               E-mail <span className="font-normal text-slate-400">(opcional)</span>
             </label>
             <input
+              aria-label="E-mail (opcional)"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}

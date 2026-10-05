@@ -76,6 +76,7 @@ export default function ClinicaPage() {
         <div>
           <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Nome da clínica</label>
           <input
+            aria-label="Nome da clínica"
             type="text"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -86,6 +87,7 @@ export default function ClinicaPage() {
         <div>
           <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Endereço</label>
           <input
+            aria-label="Endereço"
             type="text"
             value={form.address}
             onChange={(e) => setForm({ ...form, address: e.target.value })}
@@ -96,6 +98,7 @@ export default function ClinicaPage() {
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Telefone</label>
             <input
+              aria-label="Telefone"
               type="text"
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
@@ -105,6 +108,7 @@ export default function ClinicaPage() {
           <div>
             <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">WhatsApp</label>
             <input
+              aria-label="WhatsApp"
               type="text"
               value={form.whatsapp}
               onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
@@ -115,6 +119,7 @@ export default function ClinicaPage() {
         <div>
           <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Horário de funcionamento</label>
           <input
+            aria-label="Horário de funcionamento"
             type="text"
             value={form.opening_hours}
             onChange={(e) => setForm({ ...form, opening_hours: e.target.value })}
@@ -125,6 +130,7 @@ export default function ClinicaPage() {
         <div>
           <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Localização</label>
           <input
+            aria-label="Localização"
             type="text"
             value={form.location}
             onChange={(e) => setForm({ ...form, location: e.target.value })}
@@ -134,6 +140,7 @@ export default function ClinicaPage() {
         <div>
           <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Redes sociais (JSON)</label>
           <textarea
+            aria-label="Redes sociais (JSON)"
             value={form.social_media}
             onChange={(e) => setForm({ ...form, social_media: e.target.value })}
             rows={2}
