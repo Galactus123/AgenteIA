@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Activity,
+  AlertTriangle,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -20,14 +21,18 @@ const DEFAULT_STATS = {
   scheduled: 0,
   cancelled: 0,
   rescheduled: 0,
+  todayScheduled: 0,
+  todayCancelled: 0,
+  todayRescheduled: 0,
   totalConversations: 0,
   botMessages: 0,
   conversionRate: 0,
   activeDoctors: 0,
   totalPatients: 0,
   todayAppointments: [] as { id: number; patient_name: string; doctor_name: string; specialty_name: string; starts_at: string; status: string }[],
-  pendingRequests: [] as { id: number; patient_name: string; patient_phone: string; specialty_name: string; preferred_date: string; preferred_time: string; reason: string; source: string; created_at: string }[],
+  pendingRequests: [] as { id: number; patient_name: string; patient_phone: string; status: string; updated_at: string }[],
   doctors: [] as { id: string; name: string; specialty_name: string; status: string; schedule: { weekday: number; start_time: string; end_time: string }[] }[],
+  errors: [] as string[],
 };
 
 function safeDateLabel(): string {
@@ -45,6 +50,27 @@ function safeTime(at: string): string {
   } catch {
     return "--:--";
   }
+}
+
+function updatedLabel(at: string): string {
+  try {
+    const date = new Date(at);
+    if (Number.isNaN(date.getTime())) return "";
+    const time = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const isToday = date.toDateString() === new Date().toDateString();
+    return isToday ? `hoje às ${time}` : `${date.toLocaleDateString("pt-BR")} às ${time}`;
+  } catch {
+    return "";
+  }
+}
+
+interface KpiItem {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  color: string;
+  iconClassName: string;
+  sub?: string;
 }
 
 function IconBox({ children, color }: { children: React.ReactNode; color: string }) {
@@ -70,6 +96,9 @@ async function DashboardContent() {
       scheduled: loaded?.scheduled ?? 0,
       cancelled: loaded?.cancelled ?? 0,
       rescheduled: loaded?.rescheduled ?? 0,
+      todayScheduled: loaded?.todayScheduled ?? 0,
+      todayCancelled: loaded?.todayCancelled ?? 0,
+      todayRescheduled: loaded?.todayRescheduled ?? 0,
       totalConversations: loaded?.totalConversations ?? 0,
       botMessages: loaded?.botMessages ?? 0,
       conversionRate: loaded?.conversionRate ?? 0,
@@ -78,20 +107,23 @@ async function DashboardContent() {
       todayAppointments: Array.isArray(loaded?.todayAppointments) ? loaded.todayAppointments : [],
       pendingRequests: Array.isArray(loaded?.pendingRequests) ? loaded.pendingRequests : [],
       doctors: Array.isArray(loaded?.doctors) ? loaded.doctors : [],
+      errors: Array.isArray(loaded?.errors) ? loaded.errors : [],
     };
   } catch (error) {
     console.error("Detalhe do erro no Dashboard:", error);
+    stats = { ...DEFAULT_STATS, errors: ["dados gerais do dashboard"] };
   }
 
   const dateLabel = safeDateLabel();
 
-  const kpis = [
+  const kpis: KpiItem[] = [
     {
       label: "Consultas Hoje",
-      value: stats.scheduled,
+      value: stats.todayScheduled,
       icon: <Calendar size={20} strokeWidth={1.75} />,
       color: "rgba(79,109,245,0.12)",
       iconClassName: "dark:text-indigo-400 text-indigo-600",
+      sub: `${stats.todayCancelled} canceladas · ${stats.todayRescheduled} remarcadas`,
     },
     {
       label: "Médicos Ativos",
@@ -106,6 +138,13 @@ async function DashboardContent() {
       icon: <MessageSquare size={20} strokeWidth={1.75} />,
       color: "rgba(99,102,241,0.12)",
       iconClassName: "dark:text-indigo-300 text-indigo-500",
+    },
+    {
+      label: "Conversão IA",
+      value: `${stats.conversionRate}%`,
+      icon: <Activity size={20} strokeWidth={1.75} />,
+      color: "rgba(245,158,11,0.12)",
+      iconClassName: "dark:text-amber-400 text-amber-600",
     },
     {
       label: "Pacientes",
@@ -126,8 +165,22 @@ async function DashboardContent() {
         <p className="text-xs sm:text-sm mt-1 dark:text-slate-400 text-slate-500">Visão geral da clínica e do atendimento com IA.</p>
       </div>
 
+      {/* Falhas de leitura do banco (Fase 4.3) */}
+      {stats.errors.length > 0 && (
+        <div
+          role="alert"
+          className="relative z-10 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs sm:text-sm text-amber-700 dark:text-amber-300"
+        >
+          <AlertTriangle size={16} strokeWidth={1.75} className="mt-0.5 shrink-0" />
+          <span>
+            Alguns indicadores não puderam ser carregados: {stats.errors.join(", ")}. Os valores
+            exibidos podem estar incompletos — recarregue a página.
+          </span>
+        </div>
+      )}
+
       {/* KPI Cards */}
-      <div className="relative z-10 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="relative z-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         {kpis.map((kpi) => (
           <div
             key={kpi.label}
@@ -147,6 +200,9 @@ async function DashboardContent() {
             </div>
             <p className="relative text-xl sm:text-2xl font-bold mt-3 dark:text-white text-slate-900">{kpi.value}</p>
             <p className="relative text-xs sm:text-sm mt-1 dark:text-slate-400 text-slate-500">{kpi.label}</p>
+            {kpi.sub && (
+              <p className="relative text-[11px] mt-1 dark:text-slate-500 text-slate-400">{kpi.sub}</p>
+            )}
           </div>
         ))}
       </div>
@@ -211,14 +267,17 @@ async function DashboardContent() {
 
         {/* Right column */}
         <div className="space-y-4 sm:space-y-6">
-          {/* Solicitações */}
+          {/* Aguardando atendimento humano (Fase 4.2) */}
           <div className="group rounded-2xl p-4 sm:p-6 transition-all duration-300 hover:shadow-[0_0_20px_rgba(99,102,241,0.15)] active:shadow-[0_0_25px_rgba(99,102,241,0.25)] hover:border-indigo-500/30 active:border-indigo-500/50" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <IconBox color="rgba(245,158,11,0.12)">
                   <Activity size={18} strokeWidth={1.75} className="dark:text-amber-400 text-amber-600" />
                 </IconBox>
-                <h2 className="font-semibold text-base dark:text-white text-slate-900">Solicitações</h2>
+                <div>
+                  <h2 className="font-semibold text-base dark:text-white text-slate-900">Aguardando atendimento</h2>
+                  <p className="text-xs mt-0.5 dark:text-slate-400 text-slate-500">A IA parou de responder</p>
+                </div>
               </div>
               <span className="neon-badge-warning text-xs font-medium px-2 py-0.5 rounded-full">
                 {stats.pendingRequests.length}
@@ -230,7 +289,7 @@ async function DashboardContent() {
                 <div className="inline-flex p-3 rounded-xl mb-3" style={{ background: "rgba(16,185,129,0.08)" }}>
                   <CheckCircle2 size={24} strokeWidth={1.75} className="dark:text-emerald-400 text-emerald-600" />
                 </div>
-                <p className="text-sm dark:text-slate-500 text-slate-400">Nenhuma solicitação pendente.</p>
+                <p className="text-sm dark:text-slate-500 text-slate-400">Nenhuma conversa aguardando atendimento humano.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -242,13 +301,19 @@ async function DashboardContent() {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate dark:text-white text-slate-900">{req.patient_name}</p>
-                        <p className="text-xs mt-0.5 dark:text-slate-400 text-slate-500">
-                          {req.specialty_name} · {req.preferred_date} {req.preferred_time}
+                        <p className="text-sm font-medium truncate dark:text-white text-slate-900">
+                          {req.patient_name || "Paciente sem nome"}
+                        </p>
+                        <p className="text-xs mt-0.5 truncate dark:text-slate-400 text-slate-500">
+                          {req.patient_phone} · atualizada {updatedLabel(req.updated_at)}
                         </p>
                       </div>
-                      <span className="neon-badge text-xs shrink-0">
-                        {req.source === "ia" ? "IA" : "Web"}
+                      <span
+                        className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${
+                          req.status === "transferred" ? "neon-badge-warning" : "neon-badge"
+                        }`}
+                      >
+                        {req.status === "transferred" ? "Transferida" : "Cota esgotada"}
                       </span>
                     </div>
                   </div>

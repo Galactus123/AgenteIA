@@ -2,10 +2,21 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { todayStr, addDays } from "@/lib/datetime";
 import type { DoctorSchedule } from "@/lib/types";
 
+export interface PendingRequest {
+  id: number;
+  patient_name: string;
+  patient_phone: string;
+  status: string;
+  updated_at: string;
+}
+
 export interface DashboardStats {
   scheduled: number;
   cancelled: number;
   rescheduled: number;
+  todayScheduled: number;
+  todayCancelled: number;
+  todayRescheduled: number;
   totalConversations: number;
   botMessages: number;
   conversionRate: number;
@@ -19,17 +30,7 @@ export interface DashboardStats {
     starts_at: string;
     status: string;
   }[];
-  pendingRequests: {
-    id: number;
-    patient_name: string;
-    patient_phone: string;
-    specialty_name: string;
-    preferred_date: string;
-    preferred_time: string;
-    reason: string;
-    source: string;
-    created_at: string;
-  }[];
+  pendingRequests: PendingRequest[];
   doctors: {
     id: string;
     name: string;
@@ -37,6 +38,7 @@ export interface DashboardStats {
     status: string;
     schedule: DoctorSchedule[];
   }[];
+  errors: string[];
 }
 
 function warn(scope: string, message: string): void {
@@ -56,30 +58,48 @@ function parseSchedule(value: unknown): DoctorSchedule[] {
 export async function getStats(): Promise<DashboardStats> {
   const today = todayStr();
   const tomorrow = addDays(today, 1);
+  const errors: string[] = [];
 
-  const [scheduled, cancelled, rescheduled, totalConversations, botMessages, activeDoctors, conversions] =
-    await Promise.all([
-      countRun(() => appointmentsCount().eq("status", "scheduled"), "appointments: status=scheduled"),
-      countRun(() => appointmentsCount().eq("status", "cancelled"), "appointments: status=cancelled"),
-      countRun(() => appointmentsCount().eq("rescheduled", 1), "appointments: rescheduled=1"),
-      countRun(() => countQuery("conversations"), "conversations"),
-      countRun(() => countQuery("messages").eq("sender", "bot"), "messages: sender=bot"),
-      countRun(() => countQuery("professionals").eq("status", "active"), "professionals: status=active"),
-      countRun(() => appointmentsCount().eq("source", "ia").eq("status", "scheduled"), "conversions"),
-    ]);
+  const [
+    scheduled,
+    cancelled,
+    rescheduled,
+    todayScheduled,
+    todayCancelled,
+    todayRescheduled,
+    totalConversations,
+    botMessages,
+    activeDoctors,
+    conversions,
+    totalPatients,
+  ] = await Promise.all([
+    countRun(() => appointmentsCount().eq("status", "scheduled"), "appointments: status=scheduled", "consultas marcadas", errors),
+    countRun(() => appointmentsCount().eq("status", "cancelled"), "appointments: status=cancelled", "consultas canceladas", errors),
+    countRun(() => appointmentsCount().eq("rescheduled", 1), "appointments: rescheduled=1", "consultas remarcadas", errors),
+    countRun(() => todayAppointmentsCount(today, tomorrow).eq("status", "scheduled"), "appointments: hoje status=scheduled", "consultas de hoje", errors),
+    countRun(() => todayAppointmentsCount(today, tomorrow).eq("status", "cancelled"), "appointments: hoje status=cancelled", "cancelamentos de hoje", errors),
+    countRun(() => todayAppointmentsCount(today, tomorrow).eq("rescheduled", 1), "appointments: hoje rescheduled=1", "remarcacoes de hoje", errors),
+    countRun(() => countQuery("conversations"), "conversations", "conversas", errors),
+    countRun(() => countQuery("messages").eq("sender", "bot"), "messages: sender=bot", "mensagens da IA", errors),
+    countRun(() => countQuery("professionals").eq("status", "active"), "professionals: status=active", "profissionais", errors),
+    countRun(() => appointmentsCount().eq("source", "ia").eq("status", "scheduled"), "conversions", "conversoes", errors),
+    countRun(() => countQuery("patients"), "patients", "pacientes", errors),
+  ]);
 
-  const totalPatients = await countDistinctPatients();
   const conversionRate =
     totalConversations > 0 ? Math.round((conversions / totalConversations) * 100) : 0;
 
-  const todayAppointments = await loadTodayAppointments(today, tomorrow);
-  const pendingRequests = await loadPendingRequests(today, tomorrow);
-  const doctors = await loadDoctorStats();
+  const todayAppointments = await loadTodayAppointments(today, tomorrow, errors);
+  const pendingRequests = await loadPendingRequests(errors);
+  const doctors = await loadDoctorStats(errors);
 
   return {
     scheduled,
     cancelled,
     rescheduled,
+    todayScheduled,
+    todayCancelled,
+    todayRescheduled,
     totalConversations,
     botMessages,
     conversionRate,
@@ -88,6 +108,7 @@ export async function getStats(): Promise<DashboardStats> {
     todayAppointments,
     pendingRequests,
     doctors,
+    errors: Array.from(new Set(errors)),
   };
 }
 
@@ -95,43 +116,39 @@ function appointmentsCount() {
   return supabaseAdmin.from("appointments").select("id", { count: "exact", head: true });
 }
 
-function countQuery(table: "conversations" | "messages" | "professionals") {
+function todayAppointmentsCount(today: string, tomorrow: string) {
+  return appointmentsCount().gte("starts_at", `${today} 00:00`).lt("starts_at", `${tomorrow} 00:00`);
+}
+
+function countQuery(table: "conversations" | "messages" | "professionals" | "patients") {
   return supabaseAdmin.from(table).select("id", { count: "exact", head: true });
 }
 
 async function countRun(
   run: () => PromiseLike<CountResponse>,
-  scope: string
+  scope: string,
+  label: string,
+  errors: string[]
 ): Promise<number> {
   try {
     const { count, error } = await run();
     if (error) {
       warn(scope, error.message);
+      errors.push(label);
       return 0;
     }
     return count ?? 0;
   } catch (err) {
     warn(scope, err instanceof Error ? err.message : String(err));
-    return 0;
-  }
-}
-
-async function countDistinctPatients(): Promise<number> {
-  try {
-    const { data, error } = await supabaseAdmin.from("appointments").select("patient_name");
-    if (error) {
-      warn("distinct patients", error.message);
-      return 0;
-    }
-    return new Set((data ?? []).map((row) => row.patient_name).filter(Boolean)).size;
-  } catch {
+    errors.push(label);
     return 0;
   }
 }
 
 async function loadTodayAppointments(
   today: string,
-  tomorrow: string
+  tomorrow: string,
+  errors: string[]
 ): Promise<DashboardStats["todayAppointments"]> {
   try {
     const { data, error } = await supabaseAdmin
@@ -143,6 +160,7 @@ async function loadTodayAppointments(
 
     if (error) {
       warn("todayAppointments", error.message);
+      errors.push("agenda de hoje");
       return [];
     }
 
@@ -156,49 +174,45 @@ async function loadTodayAppointments(
     }));
   } catch (err) {
     warn("todayAppointments", err instanceof Error ? err.message : String(err));
+    errors.push("agenda de hoje");
     return [];
   }
 }
 
+const HUMAN_WAITING_STATUSES = ["transferred", "WAITING_HUMAN_INTERVENTION"];
+
 async function loadPendingRequests(
-  today: string,
-  tomorrow: string
+  errors: string[]
 ): Promise<DashboardStats["pendingRequests"]> {
   try {
     const { data, error } = await supabaseAdmin
-      .from("appointments")
-      .select(
-        "id, patient_name, patient_phone, starts_at, reason, source, created_at, specialties(name)"
-      )
-      .eq("status", "scheduled")
-      .gte("starts_at", `${today} 00:00`)
-      .lt("starts_at", `${tomorrow} 00:00`)
-      .order("starts_at", { ascending: true })
+      .from("conversations")
+      .select("id, phone, patient_name, status, updated_at")
+      .in("status", HUMAN_WAITING_STATUSES)
+      .order("updated_at", { ascending: false })
       .limit(5);
 
     if (error) {
       warn("pendingRequests", error.message);
+      errors.push("conversas aguardando humano");
       return [];
     }
 
     return (data ?? []).map((row) => ({
       id: row.id,
-      patient_name: row.patient_name,
-      patient_phone: row.patient_phone,
-      specialty_name: (row.specialties as unknown as { name?: string } | null)?.name ?? "",
-      preferred_date: String(row.starts_at ?? "").slice(0, 10),
-      preferred_time: String(row.starts_at ?? "").slice(11, 16),
-      reason: row.reason ?? "",
-      source: row.source ?? "ia",
-      created_at: row.created_at,
+      patient_name: row.patient_name ?? "",
+      patient_phone: row.phone ?? "",
+      status: row.status,
+      updated_at: row.updated_at,
     }));
   } catch (err) {
     warn("pendingRequests", err instanceof Error ? err.message : String(err));
+    errors.push("conversas aguardando humano");
     return [];
   }
 }
 
-async function loadDoctorStats(): Promise<DashboardStats["doctors"]> {
+async function loadDoctorStats(errors: string[]): Promise<DashboardStats["doctors"]> {
   try {
     const { data, error } = await supabaseAdmin
       .from("professionals")
@@ -207,6 +221,7 @@ async function loadDoctorStats(): Promise<DashboardStats["doctors"]> {
 
     if (error) {
       warn("doctors", error.message);
+      errors.push("medicos");
       return [];
     }
 
@@ -219,6 +234,7 @@ async function loadDoctorStats(): Promise<DashboardStats["doctors"]> {
     }));
   } catch (err) {
     warn("doctors", err instanceof Error ? err.message : String(err));
+    errors.push("medicos");
     return [];
   }
 }
