@@ -129,11 +129,12 @@ console.log(
 
 console.log(`
 Pendencias MANUAIS do go-live (nao cobertas pelo smoke):
-  [ ] migrations aplicadas no SQL Editor (14, inclusive 20261005000001_audit_logs.sql)
+  [ ] migrations aplicadas no SQL Editor (15, inclusive 20261005000001_audit_logs.sql
+      e 20261005000002_grants_audit_outbox.sql — sem ela audit_logs/outbox dao 42501)
   [ ] seed: node scripts/setup-supabase.mjs
   [ ] env vars da Vercel completas (OPENAI_API_KEY, KOMUNIKA_*, LOJOU_*, CRON_SECRET, INTERNAL_API_TOKEN)
   [ ] Vault/pg_cron: scripts/ops/setup-cron-secrets.sql + SELECT jobname FROM cron.job;
   [ ] branch protection exige o status check "quality"
-  [ ] rotacao das 5 chaves expostas`);
+  [ ] rotacao das 5 chaves expostas (token Komunika atual responde 401)`);
 
 process.exit(failed.length === 0 ? 0 : 1);
