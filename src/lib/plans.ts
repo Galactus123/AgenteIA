@@ -274,17 +274,27 @@ export function getPlan(id: PlanId): Plan {
   return PLANS.find((p) => p.id === id) ?? PLANS[0];
 }
 
-export function getPlanByPriceId(_priceId: string): Plan | undefined {
-  // Mapear price_id do LOJOU para plan_id
-  // TODO: Preencher com os IDs reais da LOJOU
-  const mapping: Record<string, PlanId> = {
-    [process.env.LOJOU_START_PRICE_ID ?? ""]: "start",
-    [process.env.LOJOU_PRO_PRICE_ID ?? ""]: "pro",
-    [process.env.LOJOU_BUSINESS_PRICE_ID ?? ""]: "business",
-    [process.env.LOJOU_ENTERPRISE_PRICE_ID ?? ""]: "enterprise",
-  };
-  const planId = mapping[_priceId];
+// ── Mapeamento de produtos LOJOU → plano ──────────────────────────────
+// IDs exatos dos produtos registados na LOJOU. Fonte única: o webhook usa-os
+// para gravar subscriptions.plan_id da clínica e o checkout usa-os para
+// construir o URL de pagamento — garantem que os dois lados coincidem.
+export const LOJOU_PLAN_BY_PRICE_ID: Record<string, PlanId> = {
+  JzRcy: "start",
+  CZqfz: "pro",
+  CvPAy: "business",
+  Z8cWN: "enterprise",
+};
+
+// price_id/product_id recebido no webhook → plano interno.
+// undefined quando o ID não corresponde a nenhum produto LOJOU mapeado.
+export function getPlanByLojouId(priceId: string): Plan | undefined {
+  const planId = LOJOU_PLAN_BY_PRICE_ID[priceId];
   return planId ? getPlan(planId) : undefined;
+}
+
+// plan_id interno → ID do produto LOJOU usado no URL de checkout.
+export function getLojouIdForPlan(planId: PlanId): string | undefined {
+  return Object.entries(LOJOU_PLAN_BY_PRICE_ID).find(([, id]) => id === planId)?.[0];
 }
 
 export function formatPrice(price: number, currency = "R$"): string {

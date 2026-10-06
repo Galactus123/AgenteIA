@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api-auth";
-import { getPlan, type PlanId } from "@/lib/plans";
+import { getPlan, getLojouIdForPlan, type PlanId } from "@/lib/plans";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,16 +34,12 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Mapear plan_id para price_id da LOJOU
-    const priceIdMap: Record<string, string | undefined> = {
-      start: process.env.LOJOU_START_PRICE_ID,
-      pro: process.env.LOJOU_PRO_PRICE_ID,
-      business: process.env.LOJOU_BUSINESS_PRICE_ID,
-    };
-
-    const priceId = priceIdMap[planId];
+    // Mapear plan_id para o ID fixo do produto LOJOU — mesmo dicionário que o
+    // webhook usa para gravar subscriptions.plan_id, para os dois lados
+    // coincidirem sempre.
+    const priceId = getLojouIdForPlan(planId);
     if (!priceId) {
-      console.error(`[checkout] LOJOU price ID não configurado para o plano ${planId}`);
+      console.error(`[checkout] Produto LOJOU não mapeado para o plano ${planId}`);
       return NextResponse.json({
         type: "error",
         error: "Checkout não configurado para este plano. Entre em contato com o suporte.",

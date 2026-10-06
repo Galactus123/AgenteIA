@@ -54,7 +54,6 @@ function instanceConnectCalls(): unknown[][] {
 }
 
 const originalSecret = process.env.LOJOU_WEBHOOK_SECRET;
-const originalPriceId = process.env.LOJOU_PRO_PRICE_ID;
 const originalInstance = process.env.KOMUNIKA_INSTANCE_ID;
 const originalToken = process.env.KOMUNIKA_API_TOKEN;
 
@@ -69,12 +68,12 @@ function makeRequest(payload: unknown, secret = SECRET): NextRequest {
   );
 }
 
-function approvedPayload(overrides: Record<string, unknown> = {}) {
+function approvedPayload(overrides: Record<string, unknown> = {}, productId = "CZqfz") {
   return {
     event: "order_approved",
     order: {
       id: "ORD-900",
-      product_id: "price_pro",
+      product_id: productId,
       customer: {
         email: "clinica@example.com",
         name: "Clínica Central",
@@ -170,7 +169,6 @@ describe("Webhook Lojou — pagamento confirmado", () => {
     connectMode = "ok";
     vi.stubGlobal("fetch", fetchMock);
     process.env.LOJOU_WEBHOOK_SECRET = SECRET;
-    process.env.LOJOU_PRO_PRICE_ID = "price_pro";
     // Global propositalmente diferente da instância da clínica, para provar
     // que o ID registado em clinics.komunika_instance_id tem prioridade.
     process.env.KOMUNIKA_INSTANCE_ID = "inst-global";
@@ -186,8 +184,6 @@ describe("Webhook Lojou — pagamento confirmado", () => {
     fakeSupabase.reset();
     if (originalSecret === undefined) delete process.env.LOJOU_WEBHOOK_SECRET;
     else process.env.LOJOU_WEBHOOK_SECRET = originalSecret;
-    if (originalPriceId === undefined) delete process.env.LOJOU_PRO_PRICE_ID;
-    else process.env.LOJOU_PRO_PRICE_ID = originalPriceId;
     if (originalInstance === undefined) delete process.env.KOMUNIKA_INSTANCE_ID;
     else process.env.KOMUNIKA_INSTANCE_ID = originalInstance;
     if (originalToken === undefined) delete process.env.KOMUNIKA_API_TOKEN;
@@ -222,6 +218,36 @@ describe("Webhook Lojou — pagamento confirmado", () => {
       .join(" ");
     expect(logged).toContain("inst-clinica-1");
     expect(logged).toContain("própria da clínica");
+  });
+
+  it("mapeia os IDs exatos dos produtos Lojou para o plano da assinatura", async () => {
+    const captured = setScenario();
+    const cases: Array<[string, string]> = [
+      ["JzRcy", "start"],
+      ["CZqfz", "pro"],
+      ["CvPAy", "business"],
+      ["Z8cWN", "enterprise"],
+    ];
+
+    for (const [productId] of cases) {
+      const res = await POST(makeRequest(approvedPayload({}, productId)));
+      expect(res.status).toBe(200);
+    }
+
+    expect(captured.subscriptionInserts.map((row) => row.plan_id)).toEqual(
+      cases.map(([, planId]) => planId)
+    );
+  });
+
+  it("produto Lojou fora do mapeamento não grava plano mas responde 200", async () => {
+    const captured = setScenario();
+
+    const res = await POST(makeRequest(approvedPayload({}, "desconhecido")));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ success: true });
+    expect(captured.subscriptionInserts).toHaveLength(0);
+    expect(captured.subscriptionUpdates).toHaveLength(0);
   });
 
   it("sem id próprio na clínica usa a instância global do ambiente", async () => {

@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { nowStr } from "@/lib/datetime";
 import { isKomunikaConfigured, sendKomunikaMessage, connectKomunikaInstanceForClinic } from "@/lib/services/komunika";
 import { isValidPayloadSize } from "@/lib/agent/security";
-import { getPlanByPriceId } from "@/lib/plans";
+import { getPlanByLojouId } from "@/lib/plans";
 import {
   createSubscription,
   updateSubscription,
@@ -534,7 +534,7 @@ async function handleSubscriptionEvent(params: {
     }
 
     const priceId = body.price_id ?? productId;
-    const plan = getPlanByPriceId(priceId);
+    const plan = getPlanByLojouId(priceId);
     const existingSub = await getSubscription(clinicId);
 
     if (plan) {
