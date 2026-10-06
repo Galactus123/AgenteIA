@@ -149,7 +149,8 @@ const APPROVED_EVENTS = new Set([
   "invoice.paid",
 ]);
 
-// Eventos de assinatura.
+// Eventos de assinatura (criação/renovação): contidos em APPROVED_EVENTS,
+// usados no handler para distinguir renovação de primeira ativação.
 const SUBSCRIPTION_EVENTS = new Set([
   "subscription.created",
   "subscription.active",
@@ -229,7 +230,6 @@ export async function POST(request: NextRequest) {
     // 3. Verificar se e evento de pagamento/assinatura a processar
     const eventName = resolveEventName(body);
     const isPaymentConfirmedEvent = APPROVED_EVENTS.has(eventName);
-    const isSubscriptionEvent = SUBSCRIPTION_EVENTS.has(eventName);
     const isCancellationEvent = CANCELLATION_EVENTS.has(eventName);
     const isPastDueEvent = PAST_DUE_EVENTS.has(eventName);
 
@@ -257,8 +257,13 @@ export async function POST(request: NextRequest) {
 
     console.log("[lojou-webhook] Dados extraidos: orderId=", orderId ? "presente" : "ausente", "email=", email ? "presente" : "ausente", "phone=", phone ? "presente" : "ausente");
 
-    // 5. Verificar idempotencia: se ja existe um utilizador com este order_id, ignorar
-    //    (previne duplicacao por reenvio do webhook)
+    // 5. Idempotência apenas da CRIAÇÃO do utilizador. O pagamento continua
+    //    sempre a ser processado quando o utilizador ou o pedido já existem:
+    //    caso contrário renovações, upgrades e reenvios do webhook nunca
+    //    atualizariam o plano nem ativariam a instância da clínica.
+    let userId: number | null = null;
+    let created = false;
+
     if (orderId) {
       const { data: existingByOrder, error: orderByOrderError } = await supabaseAdmin
         .from("users")
@@ -269,97 +274,105 @@ export async function POST(request: NextRequest) {
         console.error("[lojou-webhook] Falha ao verificar pedido:", orderByOrderError.message);
       }
       if (existingByOrder?.length) {
-        console.log("[lojou-webhook] Pedido ja processado (order_id), ignorando.");
-        return NextResponse.json({ success: true, user_id: existingByOrder[0].id, created: false });
+        userId = Number(existingByOrder[0].id);
+        console.log(
+          "[lojou-webhook] Pedido ja processado (order_id) — utilizador existente, a seguir para a assinatura."
+        );
       }
     }
 
-    // 6. Verificar se o utilizador ja existe por email
-    const { data: existingRows, error: existingError } = await supabaseAdmin
-      .from("users")
-      .select("id")
-      .eq("email", email)
-      .limit(1);
-    if (existingError) {
-      console.error("[lojou-webhook] Falha ao verificar utilizador:", existingError.message);
-    }
-    const existing = existingRows?.[0];
-    if (existing) {
-      console.log("[lojou-webhook] Utilizador ja existe, ignorando.");
-      return NextResponse.json({ success: true, user_id: existing.id, created: false });
-    }
-
-    // 7. Criar utilizador com senha provisoria
-    const tempPassword = generateTempPassword();
-    const passwordHash = hashSync(tempPassword, 10);
-
-    const { data: createdRow, error: createError } = await supabaseAdmin
-      .from("users")
-      .insert({
-        name,
-        email,
-        phone,
-        password_hash: passwordHash,
-        lojou_order_id: orderId,
-        product_id: productId,
-        status: "active",
-        created_at: nowStr(),
-      })
-      .select("id")
-      .single();
-
-    if (createError) {
-      console.error("[lojou-webhook] Falha ao criar utilizador:", createError.message);
-      return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
+    if (userId === null) {
+      const { data: existingRows, error: existingError } = await supabaseAdmin
+        .from("users")
+        .select("id")
+        .eq("email", email)
+        .limit(1);
+      if (existingError) {
+        console.error("[lojou-webhook] Falha ao verificar utilizador:", existingError.message);
+      }
+      if (existingRows?.length) {
+        userId = Number(existingRows[0].id);
+        console.log(
+          "[lojou-webhook] Utilizador ja existe — a seguir para a assinatura."
+        );
+      }
     }
 
-    const userId = Number(createdRow.id);
-    console.log("[lojou-webhook] Utilizador criado: id=", userId);
+    if (userId === null) {
+      // 6. Criar utilizador com senha provisoria
+      const tempPassword = generateTempPassword();
+      const passwordHash = hashSync(tempPassword, 10);
 
-    // 7. Enviar credenciais via Komunika WhatsApp
-    if (phone && isKomunikaConfigured()) {
-      const displayName = name || email.split("@")[0];
-      const credsMessage = [
-        `Olá ${displayName}! 🎉`,
-        ``,
-        `A sua conta SaúdeSync foi criada com sucesso!`,
-        ``,
-        `📧 E-mail: ${email}`,
-        `🔑 Senha provisória: ${tempPassword}`,
-        ``,
-        `Pode alterar a senha após o primeiro login em:`,
-        `${process.env.PUBLIC_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://syncbot-123.vercel.app"}/login`,
-        ``,
-        `Se precisar de ajuda, responda esta mensagem.`,
-      ].join("\n");
+      const { data: createdRow, error: createError } = await supabaseAdmin
+        .from("users")
+        .insert({
+          name,
+          email,
+          phone,
+          password_hash: passwordHash,
+          lojou_order_id: orderId,
+          product_id: productId,
+          status: "active",
+          created_at: nowStr(),
+        })
+        .select("id")
+        .single();
 
-      const sendResult = await sendKomunikaMessage(phone, credsMessage, { type: "text" });
-      if (!sendResult.ok) {
-        console.error("[lojou-webhook] Falha ao enviar credenciais via WhatsApp:", sendResult.error);
+      if (createError) {
+        console.error("[lojou-webhook] Falha ao criar utilizador:", createError.message);
+        return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
+      }
+
+      userId = Number(createdRow.id);
+      created = true;
+      console.log("[lojou-webhook] Utilizador criado: id=", userId);
+
+      // 6.1 Enviar credenciais via Komunika WhatsApp
+      if (phone && isKomunikaConfigured()) {
+        const displayName = name || email.split("@")[0];
+        const credsMessage = [
+          `Olá ${displayName}! 🎉`,
+          ``,
+          `A sua conta SaúdeSync foi criada com sucesso!`,
+          ``,
+          `📧 E-mail: ${email}`,
+          `🔑 Senha provisória: ${tempPassword}`,
+          ``,
+          `Pode alterar a senha após o primeiro login em:`,
+          `${process.env.PUBLIC_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://syncbot-123.vercel.app"}/login`,
+          ``,
+          `Se precisar de ajuda, responda esta mensagem.`,
+        ].join("\n");
+
+        const sendResult = await sendKomunikaMessage(phone, credsMessage, { type: "text" });
+        if (!sendResult.ok) {
+          console.error("[lojou-webhook] Falha ao enviar credenciais via WhatsApp:", sendResult.error);
+        } else {
+          console.log("[lojou-webhook] Credenciais enviadas via WhatsApp");
+        }
+      } else if (!phone) {
+        console.warn("[lojou-webhook] Telefone não informado — credenciais não enviadas via WhatsApp");
       } else {
-        console.log("[lojou-webhook] Credenciais enviadas via WhatsApp");
+        console.warn("[lojou-webhook] Komunika não configurado — credenciais não enviadas");
       }
-    } else if (!phone) {
-      console.warn("[lojou-webhook] Telefone não informado — credenciais não enviadas via WhatsApp");
-    } else {
-      console.warn("[lojou-webhook] Komunika não configurado — credenciais não enviadas");
+
+      // 6.2 Criar notificação no dashboard
+      try {
+        const { createNotification } = await import("@/lib/services/notifications");
+        await createNotification({
+          type: "scheduled",
+          title: "Nova conta criada via Lojou",
+          message: `Conta criada para ${name || email} (pedido #${orderId || "N/A"}).`,
+        });
+      } catch {
+        // Notificação é opcional — não falha o webhook
+      }
     }
 
-    // 8. Criar notificação no dashboard
-    try {
-      const { createNotification } = await import("@/lib/services/notifications");
-      await createNotification({
-        type: "scheduled",
-        title: "Nova conta criada via Lojou",
-        message: `Conta criada para ${name || email} (pedido #${orderId || "N/A"}).`,
-      });
-    } catch {
-      // Notificação é opcional — não falha o webhook
-    }
-
-    // 9. Pagamento confirmado: atualizar plano/assinatura (service role) e
-    //    ativar a instancia WhatsApp da clinica (best-effort).
-    if (isPaymentConfirmedEvent || isSubscriptionEvent || isCancellationEvent || isPastDueEvent) {
+    // 7. Pagamento confirmado: atualizar plano/assinatura (service role) e
+    //    ativar a instancia WhatsApp da clinica (best-effort). Corre SEMPRE
+    //    que o evento e relevante, quer o utilizador fosse novo ou ja existente.
+    if (isPaymentConfirmedEvent || isCancellationEvent || isPastDueEvent) {
       await handleSubscriptionEvent({
         eventName,
         orderId,
@@ -370,7 +383,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ success: true, user_id: userId, created: true });
+    return NextResponse.json({ success: true, user_id: userId, created });
   } catch (error) {
     console.error("[lojou-webhook] Erro fatal:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -585,7 +598,12 @@ async function handleSubscriptionEvent(params: {
       await activateClinicWhatsAppInstance(clinicId);
     }
 
-    // Notificar (opcional)
+    // Notificar (opcional). Renovação = evento recorrente de assinatura
+    // que não é a primeira ativação.
+    const isRenewal =
+      SUBSCRIPTION_EVENTS.has(eventName) &&
+      eventName !== "subscription.created" &&
+      eventName !== "subscription.active";
     try {
       const { createNotification } = await import("@/lib/services/notifications");
       await createNotification({
@@ -593,9 +611,9 @@ async function handleSubscriptionEvent(params: {
         title:
           status !== "active"
             ? `Assinatura ${status === "cancelled" ? "cancelada" : "em atraso"}`
-            : `Assinatura ${eventName.includes("renewed") ? "renovada" : "ativada"}`,
+            : `Assinatura ${isRenewal ? "renovada" : "ativada"}`,
         message: plan
-          ? `Plano ${plan.name} ${status !== "active" ? "com estado " + status : eventName.includes("renewed") ? "renovado" : "ativado"} para a clínica.`
+          ? `Plano ${plan.name} ${status !== "active" ? "com estado " + status : isRenewal ? "renovado" : "ativado"} para a clínica.`
           : `Estado da assinatura alterado para ${status} na clínica.`,
       });
     } catch {

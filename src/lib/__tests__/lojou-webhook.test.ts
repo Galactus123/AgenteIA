@@ -89,6 +89,10 @@ interface Scenario {
   clinics?: Array<{ id: number }>;
   clinicRow?: (typeof CLINIC_ROW) | null;
   existingSubscription?: Record<string, unknown> | null;
+  // Utilizador já registado: `existingUser` é encontrado por e-mail,
+  // `existingUserByOrder` pelo lojou_order_id.
+  existingUser?: { id: number } | null;
+  existingUserByOrder?: { id: number } | null;
 }
 
 interface Captured {
@@ -109,8 +113,14 @@ function setScenario(scenario: Scenario = {}): Captured {
 
   fakeSupabase.setResolver((q) => {
     switch (q.table) {
-      case "users":
+      case "users": {
+        if (q.op === "select") {
+          const byOrder = q.filters.some((f) => f.startsWith("lojou_order_id="));
+          const row = byOrder ? scenario.existingUserByOrder : scenario.existingUser;
+          return { data: row ? [row] : [] };
+        }
         return q.op === "insert" ? { data: { id: 42 } } : { data: [] };
+      }
       case "admins":
       case "clinic_members":
         return { data: [] };
@@ -231,6 +241,39 @@ describe("Webhook Lojou — pagamento confirmado", () => {
       .join(" ");
     expect(logged).toContain("inst-global");
     expect(logged).toContain("global do ambiente");
+  });
+
+  it("cliente já registado: não recria o utilizador mas ativa plano e instância", async () => {
+    const captured = setScenario({ existingUser: { id: 55 } });
+
+    const res = await POST(makeRequest(approvedPayload()));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      user_id: 55,
+      created: false,
+    });
+    expect(fakeSupabase.find("users", "insert")).toHaveLength(0);
+    expect(captured.subscriptionInserts).toHaveLength(1);
+    expect(captured.subscriptionInserts[0]).toMatchObject({ plan_id: "pro" });
+    expect(instanceConnectCalls()).toHaveLength(1);
+  });
+
+  it("pedido já processado: idempotência do utilizador não bloqueia o pagamento", async () => {
+    const captured = setScenario({ existingUserByOrder: { id: 77 } });
+
+    const res = await POST(makeRequest(approvedPayload()));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      user_id: 77,
+      created: false,
+    });
+    expect(fakeSupabase.find("users", "insert")).toHaveLength(0);
+    expect(captured.subscriptionInserts).toHaveLength(1);
+    expect(instanceConnectCalls()).toHaveLength(1);
   });
 
   it("erro de comunicação com a Komunika não quebra a resposta do webhook", async () => {
