@@ -26,6 +26,7 @@ import {
   buyOveragePack,
   runSubscriptionCycleCheck,
   resetSubscriptionCycle,
+  syncTokenLimitWithPlan,
   OVERAGE_PACK_TOKENS,
   OVERAGE_PACK_PRICE_MZN,
 } from "@/lib/services/subscriptions";
@@ -46,6 +47,7 @@ const clinic: Clinic = {
   current_token_usage: 500,
   near_limit_notified: 0,
   overage_blocks_purchased: 0,
+  komunika_instance_id: "inst-clinica-1",
   subscription_status: "active",
   billing_cycle_day: 5,
   last_reset_at: null,
@@ -191,6 +193,109 @@ describe("subscriptions (Fase 8.3)", () => {
       fakeSupabase.setResolver(router({ clinic: null }));
       expect(await consumeTokens(10)).toEqual({ clinic: null, nearLimitAlert: false });
       expect(fakeSupabase.find("clinics", "update")).toHaveLength(0);
+    });
+  });
+
+  describe("consumo atómico de tokens (RPC)", () => {
+    it("usa a RPC e só grava o estado derivado (alerta de 80%)", async () => {
+      fakeSupabase.setResolver((q) =>
+        q.op === "rpc"
+          ? { data: 850, error: null }
+          : router({ clinic: { ...clinic, current_token_usage: 750 } })(q)
+      );
+
+      const result = await consumeTokens(100);
+
+      const rpc = fakeSupabase.queries.find((q) => q.op === "rpc");
+      expect(rpc?.table).toBe("increment_clinic_token_usage");
+      expect(rpc?.payload).toMatchObject({ p_clinic_id: 1, p_amount: 100 });
+
+      // O total ja foi somado pelo Postgres: so o flag de notificacao muda.
+      const upd = fakeSupabase.last("clinics", "update");
+      expect(upd?.payload).toMatchObject({ near_limit_notified: 1 });
+      expect(upd?.payload).not.toHaveProperty("current_token_usage");
+      expect(result.nearLimitAlert).toBe(true);
+      expect(fakeSupabase.last("clinic_alerts", "insert")?.payload).toMatchObject({
+        clinic_id: 1,
+        type: "near_limit",
+      });
+    });
+
+    it("sem alerta a disparar não faz nenhuma escrita extra", async () => {
+      fakeSupabase.setResolver((q) =>
+        q.op === "rpc" ? { data: 550, error: null } : router({ clinic })(q)
+      );
+
+      const result = await consumeTokens(50);
+
+      expect(result.nearLimitAlert).toBe(false);
+      expect(fakeSupabase.find("clinics", "update")).toHaveLength(0);
+      expect(fakeSupabase.find("clinic_alerts", "insert")).toHaveLength(0);
+    });
+
+    it("RPC inexistente cai no caminho legado (contagem à mão)", async () => {
+      fakeSupabase.setResolver((q) =>
+        q.op === "rpc"
+          ? { data: null, error: { message: "function not found" } }
+          : router({ clinic })(q)
+      );
+
+      await consumeTokens(50);
+
+      expect(fakeSupabase.last("clinics", "update")?.payload).toMatchObject({
+        current_token_usage: 550,
+      });
+      expect(console.error).toHaveBeenCalled();
+    });
+
+    it("valor negativo é normalizado para zero (nao reduz consumo)", async () => {
+      fakeSupabase.setResolver((q) =>
+        q.op === "rpc" ? { data: 500, error: null } : router({ clinic })(q)
+      );
+
+      await consumeTokens(-999);
+
+      const rpc = fakeSupabase.queries.find((q) => q.op === "rpc");
+      expect(rpc?.payload).toMatchObject({ p_amount: 0 });
+    });
+  });
+
+  describe("syncTokenLimitWithPlan", () => {
+    it("escreve base e total do plano preservando os pacotes overage", async () => {
+      fakeSupabase.setResolver(
+        router({
+          clinic: {
+            ...clinic,
+            base_token_limit: 100_000,
+            token_limit: 200_000,
+            overage_blocks_purchased: 2,
+          },
+        })
+      );
+
+      await syncTokenLimitWithPlan(1, "pro");
+
+      const upd = fakeSupabase.last("clinics", "update");
+      expect(upd?.payload).toMatchObject({
+        base_token_limit: 500_000,
+        token_limit: 500_000 + 2 * OVERAGE_PACK_TOKENS,
+      });
+      expect(upd?.filters).toContain("id=1");
+    });
+
+    it("sem clinica nao escreve nada", async () => {
+      fakeSupabase.setResolver(router({ clinic: null }));
+      await syncTokenLimitWithPlan(1, "start");
+      expect(fakeSupabase.find("clinics", "update")).toHaveLength(0);
+    });
+
+    it("erro de banco e reportado sem lancar", async () => {
+      fakeSupabase.setResolver(router({ clinic, clinicsUpdateError: { message: "lock" } }));
+      await expect(syncTokenLimitWithPlan(1, "business")).resolves.toBeUndefined();
+      expect(console.error).toHaveBeenCalledWith(
+        "[subscriptions] Falha ao sincronizar a cota com o plano:",
+        "lock"
+      );
     });
   });
 

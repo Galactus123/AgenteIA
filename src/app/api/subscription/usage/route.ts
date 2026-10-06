@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-auth";
+import { requireAuth, resolveClinicId } from "@/lib/api-auth";
 import { getUsageDashboard, getWhatsappUsage, getAiUsage } from "@/lib/services/plan-limits";
 
 export const runtime = "nodejs";
@@ -10,9 +10,10 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const dashboard = await getUsageDashboard();
-    const whatsapp = await getWhatsappUsage();
-    const ai = await getAiUsage();
+    const clinicId = (await resolveClinicId(request)) ?? undefined;
+    const dashboard = await getUsageDashboard(clinicId);
+    const whatsapp = await getWhatsappUsage(clinicId);
+    const ai = await getAiUsage(clinicId);
 
     return NextResponse.json({
       dashboard,

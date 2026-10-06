@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-auth";
+import { requireAuth, resolveClinicId } from "@/lib/api-auth";
+import { PlanLimitError } from "@/lib/services/plan-limits";
 import {
   getOrCreateConversation,
   getConversation,
@@ -56,22 +57,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Número de telefone é obrigatório." }, { status: 400 });
   }
 
-  if (message !== undefined && message !== null && sender) {
-    const conversation = await getOrCreateConversation(phone);
-    const added = await addMessage(
-      conversation.id,
-      sender as "patient" | "bot" | "system",
-      String(message)
-    );
-    return NextResponse.json({ conversation, message: added }, { status: 201 });
-  }
+  const clinicId = await resolveClinicId(request);
 
-  if (message !== undefined && message !== null) {
-    const conversation = await getOrCreateConversation(phone);
-    const added = await addMessage(conversation.id, "patient", String(message));
-    return NextResponse.json({ conversation, message: added }, { status: 201 });
-  }
+  try {
+    if (message !== undefined && message !== null && sender) {
+      const conversation = await getOrCreateConversation(phone, clinicId);
+      const added = await addMessage(
+        conversation.id,
+        sender as "patient" | "bot" | "system",
+        String(message)
+      );
+      return NextResponse.json({ conversation, message: added }, { status: 201 });
+    }
 
-  const conversation = await getOrCreateConversation(phone);
-  return NextResponse.json({ conversation }, { status: 201 });
+    if (message !== undefined && message !== null) {
+      const conversation = await getOrCreateConversation(phone, clinicId);
+      const added = await addMessage(conversation.id, "patient", String(message));
+      return NextResponse.json({ conversation, message: added }, { status: 201 });
+    }
+
+    const conversation = await getOrCreateConversation(phone, clinicId);
+    return NextResponse.json({ conversation }, { status: 201 });
+  } catch (err) {
+    // Conversas ativas / WhatsApp no limite do plano → 402 com o motivo.
+    if (err instanceof PlanLimitError) {
+      return NextResponse.json(
+        { error: err.message, code: "PLAN_LIMIT", plan: err.planName },
+        { status: 402 }
+      );
+    }
+    console.error("[api/conversations]", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Erro ao criar a conversa." }, { status: 500 });
+  }
 }

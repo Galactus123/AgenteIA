@@ -36,6 +36,12 @@ export interface PlanLimits {
   maxUnits: number;
   maxWhatsappConversations: number;
   maxAiInteractions: number;
+  // Conversas ativas simultaneas (linhas da tabela conversations).
+  maxConversations: number;
+  // Teto de tokens de IA por ciclo de faturamento (clinics.base_token_limit).
+  // Sempre finito: a coluna e INTEGER no Postgres (Enterprise usa um teto
+  // alto de cortesia; o excedente e comprado via pacotes overage).
+  tokensPerCycle: number;
 }
 
 export interface Plan {
@@ -116,6 +122,9 @@ export const PLANS: Plan[] = [
       maxUnits: 1,
       maxWhatsappConversations: 500,
       maxAiInteractions: 200,
+      maxConversations: 100,
+      // 100k = DEFAULT de clinics.base_token_limit (200 interações x ~500 tokens).
+      tokensPerCycle: 100_000,
     },
     features: [
       "agenda",
@@ -143,6 +152,8 @@ export const PLANS: Plan[] = [
       maxUnits: 1,
       maxWhatsappConversations: 2000,
       maxAiInteractions: 1000,
+      maxConversations: 500,
+      tokensPerCycle: 500_000,
     },
     features: [
       "agenda",
@@ -180,6 +191,8 @@ export const PLANS: Plan[] = [
       maxUnits: 3,
       maxWhatsappConversations: 5000,
       maxAiInteractions: 3000,
+      maxConversations: 2000,
+      tokensPerCycle: 1_500_000,
     },
     features: [
       "agenda",
@@ -222,6 +235,8 @@ export const PLANS: Plan[] = [
       maxUnits: Infinity,
       maxWhatsappConversations: Infinity,
       maxAiInteractions: Infinity,
+      maxConversations: Infinity,
+      tokensPerCycle: 10_000_000,
     },
     features: [
       "agenda",

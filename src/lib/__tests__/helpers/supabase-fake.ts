@@ -13,7 +13,7 @@
 
 export interface FakeQuery {
   table: string;
-  op: "select" | "insert" | "update" | "delete" | "upsert";
+  op: "select" | "insert" | "update" | "delete" | "upsert" | "rpc";
   columns: string;
   payload: Record<string, unknown> | Record<string, unknown>[] | null;
   filters: string[];
@@ -39,8 +39,11 @@ function resolveQuery(q: FakeQuery): FakeResult {
   return { data: wantsRow ? null : [], count: 0, error: null };
 }
 
-function createAdmin(): { from: (table: string) => unknown } {
-  return {
+function createAdmin(): {
+  from: (table: string) => unknown;
+  rpc: (fn: string, params?: Record<string, unknown>) => Promise<FakeResult>;
+} {
+  const admin = {
     from(table: string) {
       const q: FakeQuery = {
         table,
@@ -133,7 +136,24 @@ function createAdmin(): { from: (table: string) => unknown } {
 
       return b;
     },
+    // supabaseAdmin.rpc("fn", params): regista a funcao em `table` e os
+    // argumentos em `payload`. O default devolve data [], que os services
+    // tratam como "RPC indisponivel" e caem no caminho legado
+    // (read-modify-write) - para exercitar o caminho atomico o resolver
+    // devolve { data: ... }.
+    rpc(fn: string, params?: Record<string, unknown>) {
+      const q: FakeQuery = {
+        table: fn,
+        op: "rpc",
+        columns: "",
+        payload: params ?? null,
+        filters: [],
+        opts: {},
+      };
+      return Promise.resolve(resolveQuery(q));
+    },
   };
+  return admin;
 }
 
 export const fakeSupabase = {

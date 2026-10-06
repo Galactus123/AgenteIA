@@ -67,6 +67,31 @@ vi.mock("@/lib/services/subscriptions", () => ({
   blockForQuota: vi.fn(async () => undefined),
 }));
 
+vi.mock("@/lib/services/plan-limits", () => {
+  class PlanLimitError extends Error {
+    planName: string;
+    constructor(message: string, planName = "Start") {
+      super(message);
+      this.name = "PlanLimitError";
+      this.planName = planName;
+    }
+  }
+  return {
+    PlanLimitError,
+    canUseAI: vi.fn(async () => true),
+    getAiUsage: vi.fn(async () => ({
+      allowed: true,
+      current: 0,
+      limit: 200,
+      remaining: 200,
+      percentage: 0,
+      planName: "Start",
+      message: undefined as string | undefined,
+    })),
+    incrementAiUsage: vi.fn(async () => undefined),
+  };
+});
+
 vi.mock("@/lib/services/transfers", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/services/transfers")>();
   return { ...actual, notifyReceptionTransfer: vi.fn(async () => undefined) };
@@ -75,8 +100,9 @@ vi.mock("@/lib/services/transfers", async (importOriginal) => {
 import { handlePatientMessage } from "@/lib/agent/agent";
 import { callLlm, isLlmConfigured } from "@/lib/agent/llm";
 import { executeTool } from "@/lib/agent/tools";
-import { addMessage, updateConversation } from "@/lib/services/conversations";
+import { addMessage, updateConversation, getOrCreateConversation } from "@/lib/services/conversations";
 import { blockForQuota, consumeTokens, hasAiQuota } from "@/lib/services/subscriptions";
+import { PlanLimitError, canUseAI, incrementAiUsage } from "@/lib/services/plan-limits";
 import {
   HUMAN_TRANSFER_NOTICE,
   TRANSFER_WAITING_REPLY,
@@ -106,6 +132,7 @@ describe("agente - loop, transferência e quota (Fase 5.3)", () => {
     store.reset();
     vi.mocked(isLlmConfigured).mockReturnValue(true);
     vi.mocked(hasAiQuota).mockResolvedValue(true);
+    vi.mocked(canUseAI).mockResolvedValue(true);
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
   });
@@ -119,7 +146,8 @@ describe("agente - loop, transferência e quota (Fase 5.3)", () => {
     expect(result.transferred).toBe(false);
     expect(llmMock).toHaveBeenCalledTimes(1);
     expect(toolMock).not.toHaveBeenCalled();
-    expect(consumeTokens).toHaveBeenCalledWith(120);
+    expect(consumeTokens).toHaveBeenCalledWith(120, undefined);
+    expect(incrementAiUsage).toHaveBeenCalledTimes(1);
     expect(addMessage).toHaveBeenCalledWith(1, "bot", "Olá! Posso ajudar.");
     expect(addMessage).toHaveBeenCalledWith(1, "patient", "oi, tudo bem?");
   });
@@ -137,7 +165,8 @@ describe("agente - loop, transferência e quota (Fase 5.3)", () => {
     expect(toolMock).toHaveBeenCalledTimes(1);
     expect(toolMock).toHaveBeenCalledWith("get_availability", {}, expect.anything());
     expect(consumeTokens).toHaveBeenCalledTimes(2);
-    expect(consumeTokens).toHaveBeenCalledWith(55);
+    expect(consumeTokens).toHaveBeenCalledWith(55, undefined);
+    expect(incrementAiUsage).toHaveBeenCalledTimes(2);
   });
 
   it("para no limite de iterações com fallback consciente (sem loop infinito)", async () => {
@@ -179,7 +208,7 @@ describe("agente - loop, transferência e quota (Fase 5.3)", () => {
     expect(result.transferred).toBe(true);
     expect(result.reply).toContain("transferindo sua conversa para a nossa equipe de recepção");
     expect(updateConversation).toHaveBeenCalledWith(1, { status: "WAITING_HUMAN_INTERVENTION" });
-    expect(blockForQuota).toHaveBeenCalledWith(PHONE);
+    expect(blockForQuota).toHaveBeenCalledWith(PHONE, undefined);
     expect(addMessage).toHaveBeenCalledWith(1, "bot", expect.stringContaining("recepção"));
   });
 
@@ -225,5 +254,46 @@ describe("agente - loop, transferência e quota (Fase 5.3)", () => {
 
     expect(llmMock).not.toHaveBeenCalled();
     expect(result.reply).toContain("chave de IA não foi configurada");
+  });
+
+  it("limite de interações IA do plano: não chama o LLM e responde aviso neutro", async () => {
+    vi.mocked(canUseAI).mockResolvedValueOnce(false);
+
+    const result = await handlePatientMessage(PHONE, "oi, tudo bem?");
+
+    expect(llmMock).not.toHaveBeenCalled();
+    expect(result.reply).toContain("limite deste período");
+    expect(result.transferred).toBe(false);
+    expect(result.conversationId).toBe(1);
+    expect(addMessage).toHaveBeenCalledWith(1, "patient", "oi, tudo bem?");
+    expect(addMessage).toHaveBeenCalledWith(1, "bot", expect.stringContaining("limite"));
+    expect(incrementAiUsage).not.toHaveBeenCalled();
+    expect(consumeTokens).not.toHaveBeenCalled();
+  });
+
+  it("nova conversa bloqueada pelo limite do plano responde sem conversationId", async () => {
+    vi.mocked(getOrCreateConversation).mockRejectedValueOnce(
+      new PlanLimitError("Você atingiu o limite de 100 conversas ativas do plano Start.", "Start")
+    );
+
+    const result = await handlePatientMessage(PHONE, "oi");
+
+    expect(result.conversationId).toBeNull();
+    expect(result.reply).toContain("limite deste período");
+    expect(llmMock).not.toHaveBeenCalled();
+    expect(addMessage).not.toHaveBeenCalled();
+  });
+
+  it("propaga o clinicId recebido para cota de tokens, plano e contagem de IA", async () => {
+    llmMock.mockResolvedValueOnce(finalReply("Olá!"));
+
+    const result = await handlePatientMessage(PHONE, "oi", 7);
+
+    expect(result.reply).toBe("Olá!");
+    expect(hasAiQuota).toHaveBeenCalledWith(7);
+    expect(canUseAI).toHaveBeenCalledWith(7);
+    expect(consumeTokens).toHaveBeenCalledWith(120, 7);
+    expect(incrementAiUsage).toHaveBeenCalledWith(7);
+    expect(blockForQuota).not.toHaveBeenCalled();
   });
 });

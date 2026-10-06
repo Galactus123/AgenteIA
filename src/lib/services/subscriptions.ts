@@ -3,6 +3,7 @@ import { getClinic } from "@/lib/services/clinics";
 import { nowStr } from "@/lib/datetime";
 import { sendKomunikaMessage } from "@/lib/services/komunika";
 import { renderOverageReceiptText, type OverageReceiptData } from "@/lib/email-templates/overage-receipt";
+import { getPlan, type PlanId } from "@/lib/plans";
 import type { BillingEvent, Clinic, ClinicAlert, SubscriptionInfo } from "@/lib/types";
 
 export const OVERAGE_PACK_TOKENS = 50_000;
@@ -15,8 +16,8 @@ const overagePackPrice = () => {
   return Number.isFinite(configured) && configured > 0 ? configured : OVERAGE_PACK_PRICE_MZN;
 };
 
-export async function getSubscription(): Promise<SubscriptionInfo | null> {
-  const clinic = await getClinic();
+export async function getSubscription(clinicId?: number): Promise<SubscriptionInfo | null> {
+  const clinic = await getClinic(clinicId);
   if (!clinic) return null;
   const usagePercent =
     clinic.token_limit > 0
@@ -31,23 +32,56 @@ export async function getSubscription(): Promise<SubscriptionInfo | null> {
 }
 
 // Guard pré-chamada de IA: só libera a chamada se houver cota disponível.
-export async function hasAiQuota(): Promise<boolean> {
-  const clinic = await getClinic();
+export async function hasAiQuota(clinicId?: number): Promise<boolean> {
+  const clinic = await getClinic(clinicId);
   if (!clinic) return false;
   return clinic.current_token_usage < clinic.token_limit;
 }
 
+// Soma atómica de tokens no banco (migration 20261006000001). Devolve o
+// novo total, ou null quando a RPC não existe ainda — nesse caso o
+// chamador usa o read-modify-write legado.
+async function incrementTokenUsageAtomic(clinicId: number, amount: number): Promise<number | null> {
+  try {
+    const { data, error } = await supabaseAdmin.rpc("increment_clinic_token_usage", {
+      p_clinic_id: clinicId,
+      p_amount: amount,
+    });
+    if (error) {
+      console.error(
+        "[subscriptions] RPC de tokens indisponível (aplique a migration de quotas):",
+        error.message
+      );
+      return null;
+    }
+    return typeof data === "number" ? data : null;
+  } catch (err) {
+    console.error(
+      "[subscriptions] Falha ao incrementar tokens de forma atómica:",
+      err instanceof Error ? err.message : err
+    );
+    return null;
+  }
+}
+
 // Contabilidade pós-chamada: acumula tokens consumidos e dispara alerta de 80%.
 export async function consumeTokens(
-  amount: number
+  amount: number,
+  clinicId?: number
 ): Promise<{ clinic: Clinic | null; nearLimitAlert: boolean }> {
-  const clinic = await getClinic();
+  const clinic = await getClinic(clinicId);
   if (!clinic) return { clinic: null, nearLimitAlert: false };
 
-  const usage = clinic.current_token_usage + Math.max(0, Math.round(amount));
-  const patch: Record<string, unknown> = { current_token_usage: usage };
-  let nearLimitAlert = false;
+  const delta = Math.max(0, Math.round(amount));
+  const bumped = await incrementTokenUsageAtomic(clinic.id, delta);
+  const usage = bumped ?? clinic.current_token_usage + delta;
 
+  const patch: Record<string, unknown> = {};
+  // No caminho atómico o total já foi gravado pelo Postgres: só falta o
+  // estado derivado (alerta/bloqueio).
+  if (bumped === null) patch.current_token_usage = usage;
+
+  let nearLimitAlert = false;
   if (usage >= clinic.token_limit) {
     patch.subscription_status = "quota_exhausted";
   } else if (!clinic.near_limit_notified && usage >= clinic.token_limit * NEAR_LIMIT_THRESHOLD) {
@@ -55,21 +89,22 @@ export async function consumeTokens(
     nearLimitAlert = true;
   }
 
-  await updateClinicRow(clinic.id, patch);
+  if (Object.keys(patch).length > 0) await updateClinicRow(clinic.id, patch);
 
   if (nearLimitAlert) {
     await createAlert(
       "near_limit",
-      "A clínica atingiu 80% da cota mensal de tokens da IA. Considere adquirir um pacote excedente."
+      "A clínica atingiu 80% da cota mensal de tokens da IA. Considere adquirir um pacote excedente.",
+      clinic.id
     );
   }
 
-  return { clinic: await getClinic(), nearLimitAlert };
+  return { clinic: await getClinic(clinic.id), nearLimitAlert };
 }
 
 // Bloqueia a clínica por cota esgotada e notifica a recepção (uma única vez por ciclo).
-export async function blockForQuota(patientPhone?: string): Promise<void> {
-  const clinic = await getClinic();
+export async function blockForQuota(patientPhone?: string, clinicId?: number): Promise<void> {
+  const clinic = await getClinic(clinicId);
   if (!clinic) return;
   const alreadyBlocked = clinic.subscription_status === "quota_exhausted";
   await updateClinicRow(clinic.id, { subscription_status: "quota_exhausted" });
@@ -77,22 +112,56 @@ export async function blockForQuota(patientPhone?: string): Promise<void> {
 
   await createAlert(
     "quota_exhausted",
-    "A cota de tokens da IA foi esgotada. As novas conversas serão transferidas para atendimento humano até a compra de um pacote excedente."
+    "A cota de tokens da IA foi esgotada. As novas conversas serão transferidas para atendimento humano até a compra de um pacote excedente.",
+    clinic.id
   );
   if (patientPhone) {
     await notifyReception(
-      `Atenção recepção: a cota de tokens da IA da clínica foi esgotada. O paciente ${patientPhone} foi transferido para atendimento manual.`
+      `Atenção recepção: a cota de tokens da IA da clínica foi esgotada. O paciente ${patientPhone} foi transferido para atendimento manual.`,
+      clinic.id
     );
   }
 }
 
-export async function createAlert(type: string, message: string): Promise<ClinicAlert> {
-  const clinic = await getClinic();
-  const clinicId = clinic?.id ?? 1;
+// Mantém clinics.base_token_limit/token_limit alinhados com o plano ativo.
+// Chamada pelo webhook da LOJOU após ativar/atualizar a assinatura — sem
+// isto um upgrade não aumentava a cota e o reset mensal voltava ao teto
+// antigo. Preserva os pacotes overage já comprados no ciclo.
+export async function syncTokenLimitWithPlan(clinicId: number, planId: PlanId): Promise<void> {
+  const clinic = await getClinic(clinicId);
+  if (!clinic) return;
+
+  const plan = getPlan(planId);
+  const base = isFinite(plan.limits.tokensPerCycle)
+    ? Math.round(plan.limits.tokensPerCycle)
+    : clinic.base_token_limit;
+  const overage = Math.max(0, clinic.overage_blocks_purchased) * OVERAGE_PACK_TOKENS;
+
+  const { error } = await supabaseAdmin
+    .from("clinics")
+    .update({ base_token_limit: base, token_limit: base + overage })
+    .eq("id", clinicId);
+
+  if (error) {
+    console.error("[subscriptions] Falha ao sincronizar a cota com o plano:", error.message);
+    return;
+  }
+  console.log(
+    `[subscriptions] Cota sincronizada com o plano ${plan.id}: base=${base}, total=${base + overage}`
+  );
+}
+
+export async function createAlert(
+  type: string,
+  message: string,
+  clinicId?: number
+): Promise<ClinicAlert> {
+  const clinic = await getClinic(clinicId);
+  const clinicIdToUse = clinic?.id ?? 1;
 
   const { data, error } = await supabaseAdmin
     .from("clinic_alerts")
-    .insert({ clinic_id: clinicId, type, message, created_at: nowStr() })
+    .insert({ clinic_id: clinicIdToUse, type, message, created_at: nowStr() })
     .select("*")
     .single();
 
@@ -118,8 +187,8 @@ export async function listAlerts(limit = 30): Promise<ClinicAlert[]> {
   return data ?? [];
 }
 
-export async function notifyReception(message: string): Promise<void> {
-  const clinic = await getClinic();
+export async function notifyReception(message: string, clinicId?: number): Promise<void> {
+  const clinic = await getClinic(clinicId);
   if (!clinic?.whatsapp) return;
   try {
     await sendKomunikaMessage(clinic.whatsapp, message, { type: "text" });

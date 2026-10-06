@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/lib/supabase";
 
 export async function requireAuth(request: NextRequest): Promise<NextResponse | null> {
   let supabaseResponse = NextResponse.next({ request });
@@ -55,6 +56,31 @@ export async function getUser(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   return user;
+}
+
+// Clínica do utilizador autenticado (clinic_members ativo). Sem vínculo →
+// null: o chamador decide o fallback (nunca é o "limit(1)" silencioso).
+// Lê via service role apenas a associação do próprio user_id — não expõe
+// outras clínicas e não depende do RLS de clinic_members.
+export async function resolveClinicId(request: NextRequest): Promise<number | null> {
+  const user = await getUser(request);
+  if (!user) return null;
+
+  const { data, error } = await supabaseAdmin
+    .from("clinic_members")
+    .select("clinic_id")
+    .eq("user_id", user.id)
+    .eq("active", true)
+    .order("clinic_id", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[auth] Falha ao resolver a clínica do utilizador:", error.message);
+    return null;
+  }
+  const clinicId = (data as { clinic_id?: number | string } | null)?.clinic_id;
+  return clinicId === undefined || clinicId === null ? null : Number(clinicId);
 }
 
 export async function requireInternalAuth(request: NextRequest): Promise<NextResponse | null> {

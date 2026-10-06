@@ -18,6 +18,9 @@ export interface Clinic {
   current_token_usage: number;
   near_limit_notified: number;
   overage_blocks_purchased: number;
+  // Instância WhatsApp Komunika própria da clínica (migração
+  // 20261006000002); vazio = usa a global KOMUNIKA_INSTANCE_ID.
+  komunika_instance_id: string;
   subscription_status: string;
   billing_cycle_day: number;
   last_reset_at: string | null;

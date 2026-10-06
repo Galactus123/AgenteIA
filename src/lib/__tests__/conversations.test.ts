@@ -8,6 +8,7 @@ vi.mock("@/lib/supabase", async () => {
 });
 
 import { fakeSupabase } from "./helpers/supabase-fake";
+import { PlanLimitError } from "@/lib/services/plan-limits";
 import {
   getOrCreateConversation,
   getConversation,
@@ -159,5 +160,67 @@ describe("conversations (Fase 8.3)", () => {
 
     fakeSupabase.setResolver(() => ({ error: { message: "off" } }));
     await expect(listConversations()).rejects.toThrow("[conversations] off");
+  });
+
+  describe("limites de plano na criação", () => {
+    it("no limite de conversas ativas lança PlanLimitError e não insere", async () => {
+      fakeSupabase.setResolver((q) => {
+        if (q.table === "conversations" && q.opts.head) return { count: 100, error: null };
+        if (q.op === "select") return { data: null };
+        return { data: row };
+      });
+
+      const err = await getOrCreateConversation("84 999 000 111").catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(PlanLimitError);
+      expect((err as PlanLimitError).planName).toBe("Start");
+      expect((err as Error).message).toContain("conversas ativas");
+      expect(fakeSupabase.find("conversations", "insert")).toHaveLength(0);
+    });
+
+    it("com cota de WhatsApp esgotada também bloqueia a conversa nova", async () => {
+      fakeSupabase.setResolver((q) => {
+        if (q.table === "usage" && q.op === "select")
+          return { data: [{ id: "u1", whatsapp_conversations: 500, ai_interactions: 0 }] };
+        if (q.table === "conversations" && q.opts.head) return { count: 1, error: null };
+        if (q.op === "select") return { data: null };
+        return { data: row };
+      });
+
+      const err = await getOrCreateConversation("84 999 000 222").catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(PlanLimitError);
+      expect((err as Error).message).toContain("500 conversas WhatsApp");
+      expect(fakeSupabase.find("conversations", "insert")).toHaveLength(0);
+    });
+
+    it("conversa existente segue livre mesmo no limite", async () => {
+      fakeSupabase.setResolver((q) => {
+        if (q.table === "conversations" && q.opts.head) return { count: 100, error: null };
+        if (q.op === "select") return { data: row };
+        return { data: row };
+      });
+
+      expect(await getOrCreateConversation("+258 84 123 4567")).toEqual(row);
+      expect(fakeSupabase.find("conversations", "insert")).toHaveLength(0);
+    });
+
+    it("criação nova incrementa o contador de conversas WhatsApp do período", async () => {
+      fakeSupabase.setResolver((q) => {
+        if (q.op === "rpc")
+          return {
+            data: { id: "u1", clinic_id: 1, period: "2026-10", whatsapp_conversations: 1, ai_interactions: 0 },
+            error: null,
+          };
+        if (q.op === "select") return { data: null };
+        if (q.table === "conversations") return { data: row };
+        return { data: null, error: null };
+      });
+
+      expect(await getOrCreateConversation("84 123 4567")).toEqual(row);
+
+      const rpc = fakeSupabase.queries.find((q) => q.op === "rpc");
+      expect(rpc?.table).toBe("increment_usage_counters");
+      expect(rpc?.payload).toMatchObject({ p_whatsapp: 1, p_ai: 0 });
+      expect(fakeSupabase.find("usage", "insert")).toHaveLength(0);
+    });
   });
 });

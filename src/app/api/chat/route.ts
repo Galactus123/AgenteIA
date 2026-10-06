@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { handlePatientMessage } from "@/lib/agent/agent";
-import { requireAuth } from "@/lib/api-auth";
+import { requireAuth, resolveClinicId } from "@/lib/api-auth";
 import { MAX_PATIENT_MESSAGE_LENGTH } from "@/lib/agent/security";
 
 export const runtime = "nodejs";
@@ -34,8 +34,11 @@ export async function POST(request: NextRequest) {
 
   const phone = String(body?.phone ?? "").trim() || FALLBACK_PHONE;
 
+  // Limites de plano e cota de tokens valem para a clínica do utilizador.
+  const clinicId = await resolveClinicId(request);
+
   try {
-    const result = await handlePatientMessage(phone, mensagem);
+    const result = await handlePatientMessage(phone, mensagem, clinicId);
     return NextResponse.json({
       resposta: result.reply,
       transferred: result.transferred,

@@ -25,6 +25,10 @@ export type SubscriptionStatus =
   | "trialing"
   | "active"
   | "past_due"
+  // Valores aceites pelo CHECK de subscriptions no Postgres:
+  // ('none','trialing','active','past_due','cancelled','expired').
+  | "cancelled"
+  | "expired"
   | "canceled"
   | "unpaid"
   | "incomplete"
@@ -56,6 +60,19 @@ export interface LimitCheck {
   remaining: number;
   planName: string;
   message: string;
+}
+
+// Resposta HTTP pronta para uma recusa por plano (402 Payment Required).
+export interface PlanLimitFailure {
+  status: number;
+  body: {
+    error: string;
+    code: "PLAN_LIMIT";
+    plan: string;
+    current: number | null;
+    limit: number | null;
+    remaining: number | null;
+  };
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -259,6 +276,72 @@ function buildLimitCheck(
   };
 }
 
+export function planLimitFailure(check: {
+  allowed: boolean;
+  current: number;
+  limit: number;
+  remaining: number;
+  planName: string;
+  message?: string;
+}): PlanLimitFailure {
+  return {
+    status: 402,
+    body: {
+      error: check.message ?? `Limite do plano ${check.planName} atingido.`,
+      code: "PLAN_LIMIT",
+      plan: check.planName,
+      current: check.current,
+      limit: isFinite(check.limit) ? check.limit : null,
+      remaining: isFinite(check.remaining) ? check.remaining : null,
+    },
+  };
+}
+
+export function planLimitFailureFromError(error: PlanLimitError): PlanLimitFailure {
+  return {
+    status: 402,
+    body: {
+      error: error.message,
+      code: "PLAN_LIMIT",
+      plan: error.planName,
+      current: null,
+      limit: null,
+      remaining: null,
+    },
+  };
+}
+
+// Guards de rota: feature + quantidade num unico call. Devolvem null quando
+// a acao e permitida e a resposta 402 quando o plano nao cobre.
+async function guardWithFeature(
+  clinicId: number | undefined,
+  feature: FeatureId,
+  check: () => Promise<LimitCheck>
+): Promise<PlanLimitFailure | null> {
+  try {
+    await requireFeature(clinicId, feature);
+  } catch (err) {
+    if (err instanceof PlanLimitError) return planLimitFailureFromError(err);
+    throw err;
+  }
+  const result = await check();
+  return result.allowed ? null : planLimitFailure(result);
+}
+
+export function guardProfessionalLimit(clinicId?: number): Promise<PlanLimitFailure | null> {
+  return guardWithFeature(clinicId, "professionals_management", () =>
+    canAddProfessional(clinicId)
+  );
+}
+
+export function guardAdminUserLimit(clinicId?: number): Promise<PlanLimitFailure | null> {
+  return guardWithFeature(clinicId, "team_management", () => canAddAdminUser(clinicId));
+}
+
+export function guardUnitLimit(clinicId?: number): Promise<PlanLimitFailure | null> {
+  return guardWithFeature(clinicId, "units_management", () => canAddUnit(clinicId));
+}
+
 export async function canAddProfessional(clinicId?: number): Promise<LimitCheck> {
   const cid = clinicId ?? (await getClinicId());
   const plan = await getClinicPlan(cid);
@@ -346,6 +429,42 @@ async function writeUsage(
   if (error) console.error("[plan-limits] Falha ao criar o consumo:", error.message);
 }
 
+// Escrita atômica dos contadores do período via RPC
+// (increment_usage_counters, migration 20261006000001). O Postgres soma em
+// um único UPDATE ... ON CONFLICT DO UPDATE, por isso duas mensagens
+// simultâneas não se sobrescrevem (o read-modify-write antigo perdia 1).
+// Devolve false quando a função ainda não existe no banco ou devolve algo
+// inesperado — nesse caso o chamador cai no caminho legado.
+async function incrementUsageAtomic(
+  clinicId: number,
+  period: string,
+  whatsapp: number,
+  ai: number
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabaseAdmin.rpc("increment_usage_counters", {
+      p_clinic_id: clinicId,
+      p_period: period,
+      p_whatsapp: whatsapp,
+      p_ai: ai,
+    });
+    if (error) {
+      console.error("[plan-limits] RPC de contadores indisponível:", error.message);
+      return false;
+    }
+    const row = data as { ai_interactions?: number } | null;
+    return Boolean(
+      row && typeof row === "object" && !Array.isArray(row) && "ai_interactions" in row
+    );
+  } catch (err) {
+    console.error(
+      "[plan-limits] Falha ao incrementar contadores de forma atómica:",
+      err instanceof Error ? err.message : err
+    );
+    return false;
+  }
+}
+
 export async function getWhatsappUsage(clinicId?: number): Promise<UsageCheck> {
   const cid = clinicId ?? (await getClinicId());
   const plan = await getClinicPlan(cid);
@@ -375,6 +494,7 @@ export async function canSendWhatsapp(clinicId?: number): Promise<boolean> {
 export async function incrementWhatsappUsage(clinicId?: number, amount = 1): Promise<void> {
   const cid = clinicId ?? (await getClinicId());
   const period = getCurrentPeriod();
+  if (await incrementUsageAtomic(cid, period, amount, 0)) return;
   const current = (await readUsage(cid, period)).whatsapp;
   await writeUsage(cid, period, { whatsapp_conversations: current + amount });
 }
@@ -414,8 +534,29 @@ export async function canUseAiInteraction(clinicId?: number): Promise<boolean> {
 export async function incrementAiUsage(clinicId?: number, amount = 1): Promise<void> {
   const cid = clinicId ?? (await getClinicId());
   const period = getCurrentPeriod();
+  if (await incrementUsageAtomic(cid, period, 0, amount)) return;
   const current = (await readUsage(cid, period)).ai;
   await writeUsage(cid, period, { ai_interactions: current + amount });
+}
+
+// ── Conversas ativas ───────────────────────────────────────────────────
+
+// conversations não tem clinic_id (modelo single-tenant atual): conta as
+// linhas existentes e compara com o teto do plano.
+export async function canCreateConversation(clinicId?: number): Promise<LimitCheck> {
+  const cid = clinicId ?? (await getClinicId());
+  const plan = await getClinicPlan(cid);
+  const { count, error } = await supabaseAdmin
+    .from("conversations")
+    .select("id", { count: "exact", head: true });
+
+  if (error) console.error("[plan-limits] Falha ao contar conversas:", error.message);
+
+  return buildLimitCheck(count ?? 0, plan.limits.maxConversations, plan.name, {
+    limit: "conversas ativas",
+    more: "conversas ativas",
+    add: "conversa(s)",
+  });
 }
 
 // ── Dashboard Usage ────────────────────────────────────────────────────
@@ -423,12 +564,13 @@ export async function incrementAiUsage(clinicId?: number, amount = 1): Promise<v
 export async function getUsageDashboard(clinicId?: number) {
   const cid = clinicId ?? (await getClinicId());
   const plan = await getClinicPlan(cid);
-  const [whatsapp, ai, professionals, adminUsers, units] = await Promise.all([
+  const [whatsapp, ai, professionals, adminUsers, units, conversations] = await Promise.all([
     getWhatsappUsage(cid),
     getAiUsage(cid),
     canAddProfessional(cid),
     canAddAdminUser(cid),
     canAddUnit(cid),
+    canCreateConversation(cid),
   ]);
 
   return {
@@ -468,6 +610,13 @@ export async function getUsageDashboard(clinicId?: number) {
       current: ai.current,
       limit: ai.limit,
       percentage: ai.percentage,
+    },
+    conversations: {
+      current: conversations.current,
+      limit: conversations.limit,
+      percentage: isFinite(conversations.limit)
+        ? Math.min(100, Math.round((conversations.current / conversations.limit) * 100))
+        : 0,
     },
   };
 }

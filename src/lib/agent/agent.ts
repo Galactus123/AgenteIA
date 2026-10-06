@@ -3,6 +3,7 @@ import { toolDefinitions, executeTool } from "@/lib/agent/tools";
 import { buildSystemPrompt } from "@/lib/agent/prompts";
 import { addMessage, getMessages, getConversation, updateConversation, getOrCreateConversation } from "@/lib/services/conversations";
 import { blockForQuota, consumeTokens, hasAiQuota } from "@/lib/services/subscriptions";
+import { PlanLimitError, canUseAI, getAiUsage, incrementAiUsage } from "@/lib/services/plan-limits";
 import { sanitizePatientInput } from "@/lib/agent/security";
 import {
   HUMAN_TRANSFER_NOTICE,
@@ -22,12 +23,17 @@ const LLM_ERROR_MESSAGE =
 const QUOTA_EXHAUSTED_MESSAGE =
   "Olá! Para te dar o melhor atendimento, estou transferindo sua conversa para a nossa equipe de recepção. Um de nossos atendentes falará com você em instantes!";
 
+// Limite de plano (conversas ativas ou interações de IA do período): o
+// paciente não precisa saber de planos — o log técnico fica no servidor.
+const PLAN_LIMIT_MESSAGE =
+  "Olá! Meu atendimento automático atingiu o limite deste período. Deixe sua mensagem por aqui que a nossa recepção responde em breve, ou ligue para a clínica. 😊";
+
 const FALLBACK_BASE =
-  "Ainda estou aqui! 😊 Para te ajudar a marcar uma consulta, me conta o que você está sentindo ou qual especialidade você procura. Se preferir, posso transferir para um atendente.";
+  "Ainda estou aqui! 😊 Para te ajudar a marcar uma consulta, me conta o que você está sentindo ou qual especialidade você procura. Se preferir, posso te transferir para um atendente.";
 
 type AgentReply = {
   reply: string;
-  conversationId: number;
+  conversationId: number | null;
   transferred: boolean;
 };
 
@@ -39,18 +45,31 @@ function logError(...args: unknown[]): void {
   console.error(`[agent:${new Date().toISOString()}]`, ...args);
 }
 
-export async function handlePatientMessage(phone: string, text: string): Promise<AgentReply> {
+export async function handlePatientMessage(
+  phone: string,
+  text: string,
+  clinicId?: number | null
+): Promise<AgentReply> {
+  const clinic = clinicId ?? undefined;
+
   // Sanitizar input do paciente contra prompt injection
   const sanitizedText = sanitizePatientInput(text);
   if (!sanitizedText) {
     log("Mensagem rejeitada por seguranca (prompt injection detectado).");
     const safeReply = "Desculpe, nao consegui processar sua mensagem. Pode reformular?";
-    const conversation = await getOrCreateConversation(phone);
+    const conversation = await resolveConversation(phone, clinic);
+    if (!conversation) return { reply: safeReply, conversationId: null, transferred: false };
     await addMessage(conversation.id, "bot", safeReply);
     return { reply: safeReply, conversationId: conversation.id, transferred: false };
   }
 
-  const conversation = await getOrCreateConversation(phone);
+  const conversation = await resolveConversation(phone, clinic);
+  if (!conversation) {
+    // Limite de conversas ativas do plano: sem linha nova nao ha historico
+    // para gravar — respondemos o paciente e deixamos a falha no log.
+    log(`Conversa nova bloqueada pelo limite do plano (phone=${phone}).`);
+    return { reply: PLAN_LIMIT_MESSAGE, conversationId: null, transferred: false };
+  }
   log(`Conversa carregada/criada para phone=${phone} id=${conversation.id}, status="${conversation.status}"`);
 
   // Fase 3.5 — a conversa ja foi transferida: a IA fica FORA do
@@ -66,7 +85,7 @@ export async function handlePatientMessage(phone: string, text: string): Promise
   // Bloqueio por cota: com a cota restaurada a IA retoma (status volta
   // a "open"); se ainda esgotada, mantem a IA fora e repete o aviso.
   if (conversation.status === "WAITING_HUMAN_INTERVENTION") {
-    if (await hasAiQuota()) {
+    if (await hasAiQuota(clinic)) {
       log(`Conversa ${conversation.id}: cota restaurada — retomando o atendimento da IA.`);
       await updateConversation(conversation.id, { status: "open" });
     } else {
@@ -80,6 +99,18 @@ export async function handlePatientMessage(phone: string, text: string): Promise
   await addMessage(conversation.id, "patient", sanitizedText);
   log(`Mensagem do paciente [${conversation.id}] gravada (tamanho=${sanitizedText.length})`);
 
+  // Guard de plano: interações de IA do período (usage.ai_interactions x
+  // plan.limits.maxAiInteractions). Sem chamada ao LLM, sem custo — o
+  // paciente recebe um aviso neutro e no proximo periodo a IA retoma.
+  if (!(await canUseAI(clinic))) {
+    const aiUsage = await getAiUsage(clinic);
+    log(
+      `Limite de interações IA do plano ${aiUsage.planName} atingido (${aiUsage.current}/${aiUsage.limit}). Sem chamada de LLM.`
+    );
+    await addMessage(conversation.id, "bot", PLAN_LIMIT_MESSAGE);
+    return { reply: PLAN_LIMIT_MESSAGE, conversationId: conversation.id, transferred: false };
+  }
+
   if (!isLlmConfigured()) {
     log("LLM não configurado (OPENAI_API_KEY ausente). Retornando NO_KEY_MESSAGE.");
     await addMessage(conversation.id, "bot", NO_KEY_MESSAGE);
@@ -87,9 +118,9 @@ export async function handlePatientMessage(phone: string, text: string): Promise
   }
 
   // Guard pré-chamada: bloqueia a chamada de IA quando a cota de tokens da clínica está esgotada.
-  if (!(await hasAiQuota())) {
+  if (!(await hasAiQuota(clinic))) {
     log(`Cota de tokens esgotada para phone=${phone}. Transferindo para atendimento humano.`);
-    return blockConversationForQuota(conversation.id, phone);
+    return blockConversationForQuota(conversation.id, phone, clinic);
   }
 
   const history = await getMessages(conversation.id);
@@ -125,14 +156,17 @@ export async function handlePatientMessage(phone: string, text: string): Promise
 
   try {
     for (let i = 0; i < MAX_ITERATIONS; i++) {
-      if (!(await hasAiQuota())) {
+      if (!(await hasAiQuota(clinic))) {
         log(`Cota de tokens esgotada na iteração ${i + 1}. Transferindo para atendimento humano.`);
-        return blockConversationForQuota(conversation.id, phone);
+        return blockConversationForQuota(conversation.id, phone, clinic);
       }
       log(`Iteração ${i + 1}/${MAX_ITERATIONS}: chamando LLM (${messages.length} mensagens no payload).`);
       const response = await callLlm(messages, toolDefinitions);
+      // Conta a interação no corte do plano (usage.ai_interactions) — feito
+      // antes do consumo de tokens: a chamada aconteceu, custou e conta.
+      await incrementAiUsage(clinic);
       if (response.totalTokens > 0) {
-        const { nearLimitAlert } = await consumeTokens(response.totalTokens);
+        const { nearLimitAlert } = await consumeTokens(response.totalTokens, clinic);
         if (nearLimitAlert) {
           log(`Alerta de 80% da cota emitido para a clínica (${response.totalTokens} tokens consumidos nesta chamada).`);
         }
@@ -210,12 +244,33 @@ export async function handlePatientMessage(phone: string, text: string): Promise
 
 // Em vez de repetir a mesma mensagem genérica, tenta produzir uma resposta útil
 // baseada no fluxo real da conversa (evita o fallback genérico repetitivo).
-async function blockConversationForQuota(conversationId: number, phone: string): Promise<AgentReply> {
+async function blockConversationForQuota(
+  conversationId: number,
+  phone: string,
+  clinicId?: number
+): Promise<AgentReply> {
   await addMessage(conversationId, "bot", QUOTA_EXHAUSTED_MESSAGE);
   await updateConversation(conversationId, { status: "WAITING_HUMAN_INTERVENTION" });
-  await blockForQuota(phone);
+  await blockForQuota(phone, clinicId);
   log(`Conversa ${conversationId} marcada como WAITING_HUMAN_INTERVENTION por cota esgotada.`);
   return { reply: QUOTA_EXHAUSTED_MESSAGE, conversationId, transferred: true };
+}
+
+// Cria (ou carrega) a conversa; devolve null quando o plano não permite
+// mais conversas ativas — PlanLimitError vira resposta neutra ao paciente.
+async function resolveConversation(
+  phone: string,
+  clinicId?: number
+): Promise<Conversation | null> {
+  try {
+    return await getOrCreateConversation(phone, clinicId);
+  } catch (err) {
+    if (err instanceof PlanLimitError) {
+      log(`Limite de conversas do plano ${err.planName}: ${err.message}`);
+      return null;
+    }
+    throw err;
+  }
 }
 
 function buildContextAwareFallback(history: Message[]): string {

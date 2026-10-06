@@ -1,10 +1,10 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import type { Clinic } from "@/lib/types";
 
-export async function getClinic(): Promise<Clinic | null> {
-  const { data, error } = await supabaseAdmin
-    .from("clinics")
-    .select("*")
+export async function getClinic(clinicId?: number): Promise<Clinic | null> {
+  const base = supabaseAdmin.from("clinics").select("*");
+  const query = clinicId === undefined ? base : base.eq("id", clinicId);
+  const { data, error } = await query
     .order("id", { ascending: true })
     .limit(1)
     .maybeSingle();

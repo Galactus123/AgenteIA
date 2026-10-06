@@ -3,14 +3,15 @@ import { randomBytes } from "node:crypto";
 import { hashSync } from "bcryptjs";
 import { supabaseAdmin } from "@/lib/supabase";
 import { nowStr } from "@/lib/datetime";
-import { isKomunikaConfigured, sendKomunikaMessage } from "@/lib/services/komunika";
+import { isKomunikaConfigured, sendKomunikaMessage, connectKomunikaInstanceForClinic } from "@/lib/services/komunika";
 import { isValidPayloadSize } from "@/lib/agent/security";
 import { getPlanByPriceId } from "@/lib/plans";
 import {
   createSubscription,
   updateSubscription,
-  getActiveSubscription,
+  getSubscription,
 } from "@/lib/services/plan-limits";
+import { syncTokenLimitWithPlan } from "@/lib/services/subscriptions";
 import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { maskEmail } from "@/lib/lgpd";
 
@@ -132,6 +133,54 @@ function resolveProductId(order: LojouOrder): string {
   return String(order.product_id ?? "");
 }
 
+// ── Classificacao de eventos ───────────────────────────────────────────────
+
+// Pagamento aprovado (compra avulsa ou ativacao de assinatura).
+const APPROVED_EVENTS = new Set([
+  "order_approved",
+  "approved",
+  "order.paid",
+  "order.completed",
+  "sale.approved",
+  "payment.approved",
+  "subscription.created",
+  "subscription.active",
+  "subscription.renewed",
+  "invoice.paid",
+]);
+
+// Eventos de assinatura.
+const SUBSCRIPTION_EVENTS = new Set([
+  "subscription.created",
+  "subscription.active",
+  "subscription.renewed",
+  "invoice.paid",
+]);
+
+// Eventos de cancelamento.
+const CANCELLATION_EVENTS = new Set([
+  "subscription.canceled",
+  "subscription.cancelled",
+  "subscription.expired",
+]);
+
+// Eventos de pagamento atrasado.
+const PAST_DUE_EVENTS = new Set([
+  "subscription.past_due",
+  "subscription.payment_failed",
+  "invoice.payment_failed",
+]);
+
+type SubscriptionEventStatus = "active" | "cancelled" | "past_due";
+
+// O estado da assinatura e derivado do evento: um cancelamento NUNCA pode
+// gravar "active" (bug original: todos os eventos gravavam active).
+function resolveSubscriptionStatus(eventName: string): SubscriptionEventStatus {
+  if (CANCELLATION_EVENTS.has(eventName)) return "cancelled";
+  if (PAST_DUE_EVENTS.has(eventName)) return "past_due";
+  return "active";
+}
+
 // ── Handlers ───────────────────────────────────────────────────────────────
 
 export async function OPTIONS() {
@@ -177,48 +226,18 @@ export async function POST(request: NextRequest) {
 
     console.log("[lojou-webhook] Payload recebido, tipo:", resolveEventName(body) || "desconhecido");
 
-    // 3. Verificar se é evento de pedido aprovado
+    // 3. Verificar se e evento de pagamento/assinatura a processar
     const eventName = resolveEventName(body);
-    const APPROVED_EVENTS = new Set([
-      "order_approved",
-      "approved",
-      "order.paid",
-      "order.completed",
-      "sale.approved",
-      "payment.approved",
-      "subscription.created",
-      "subscription.active",
-      "subscription.renewed",
-      "invoice.paid",
-    ]);
-
-    // Eventos de assinatura
-    const SUBSCRIPTION_EVENTS = new Set([
-      "subscription.created",
-      "subscription.active",
-      "subscription.renewed",
-      "invoice.paid",
-    ]);
-
-    // Eventos de cancelamento
-    const CANCELLATION_EVENTS = new Set([
-      "subscription.canceled",
-      "subscription.cancelled",
-      "subscription.expired",
-    ]);
-
-    // Eventos de pagamento atrasado
-    const PAST_DUE_EVENTS = new Set([
-      "subscription.past_due",
-      "subscription.payment_failed",
-      "invoice.payment_failed",
-    ]);
-
+    const isPaymentConfirmedEvent = APPROVED_EVENTS.has(eventName);
     const isSubscriptionEvent = SUBSCRIPTION_EVENTS.has(eventName);
     const isCancellationEvent = CANCELLATION_EVENTS.has(eventName);
     const isPastDueEvent = PAST_DUE_EVENTS.has(eventName);
 
-    if (!APPROVED_EVENTS.has(eventName) && !isCancellationEvent && !isPastDueEvent) {
+    if (
+      !isPaymentConfirmedEvent &&
+      !isCancellationEvent &&
+      !isPastDueEvent
+    ) {
       console.log("[lojou-webhook] Evento ignorado:", eventName);
       return NextResponse.json({ received: true, ignored: true });
     }
@@ -338,8 +357,9 @@ export async function POST(request: NextRequest) {
       // Notificação é opcional — não falha o webhook
     }
 
-    // 9. Processar eventos de assinatura
-    if (isSubscriptionEvent || isCancellationEvent || isPastDueEvent) {
+    // 9. Pagamento confirmado: atualizar plano/assinatura (service role) e
+    //    ativar a instancia WhatsApp da clinica (best-effort).
+    if (isPaymentConfirmedEvent || isSubscriptionEvent || isCancellationEvent || isPastDueEvent) {
       await handleSubscriptionEvent({
         eventName,
         orderId,
@@ -357,7 +377,126 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ── Handler de eventos de assinatura ──────────────────────────────────────
+// ── Resolução da clínica do comprador ─────────────────────────────────────
+
+// Resolve a clínica usando exclusivamente o service role (bypassa RLS):
+//   1. clinic_members do utilizador autenticado (e-mail -> auth.users);
+//   2. admins legado (e-mail/id) — mantém a compatibilidade com o seed;
+//   3. primeira clínica registada (instalação single-tenant).
+// Devolve null apenas quando não existe nenhuma clínica (nada a atualizar).
+async function resolveClinicForSubscriber(
+  email: string,
+  userId: number
+): Promise<number | null> {
+  // 1. vínculo via auth (clinic_members.user_id -> auth.users)
+  try {
+    const authAdmin = (
+      supabaseAdmin as unknown as {
+        auth?: {
+          admin?: {
+            listUsers?: (opts: { page: number; perPage: number }) => Promise<{
+              data: { users: Array<{ id: string; email?: string }> } | null;
+              error: { message: string } | null;
+            }>;
+          };
+        };
+      }
+    ).auth?.admin;
+    if (authAdmin?.listUsers) {
+      const { data, error } = await authAdmin.listUsers({ page: 1, perPage: 1000 });
+      if (error) {
+        console.error("[lojou-webhook] Falha ao listar utilizadores do auth:", error.message);
+      } else {
+        const authUser = (data?.users ?? []).find(
+          (u) => (u.email ?? "").toLowerCase() === email
+        );
+        if (authUser) {
+          const { data: member, error: memberError } = await supabaseAdmin
+            .from("clinic_members")
+            .select("clinic_id")
+            .eq("user_id", authUser.id)
+            .eq("active", true)
+            .order("clinic_id", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+          if (memberError) {
+            console.error(
+              "[lojou-webhook] Falha ao consultar clinic_members:",
+              memberError.message
+            );
+          } else if (member) {
+            return Number(member.clinic_id);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error(
+      "[lojou-webhook] Erro ao resolver a clínica via auth:",
+      err instanceof Error ? err.message : String(err)
+    );
+  }
+
+  // 2. admin legado (apenas para o log de diagnóstico)
+  const { data: admins, error: adminError } = await supabaseAdmin
+    .from("admins")
+    .select("id")
+    .or(`email.eq.${email},id.eq.${userId}`)
+    .limit(1);
+  if (adminError) {
+    console.error("[lojou-webhook] Falha ao consultar admins:", adminError.message);
+  }
+  if (!admins?.length) {
+    console.log(
+      "[lojou-webhook] Admin legado não encontrado para o pagamento:",
+      maskEmail(email ?? "")
+    );
+  }
+
+  // 3. primeira clínica registada (fallback single-tenant)
+  const { data: clinics, error: clinicError } = await supabaseAdmin
+    .from("clinics")
+    .select("id")
+    .order("id", { ascending: true })
+    .limit(1);
+  if (clinicError) {
+    console.error("[lojou-webhook] Falha ao resolver a clínica:", clinicError.message);
+    return null;
+  }
+  const clinicId = clinics?.[0]?.id;
+  return clinicId === undefined || clinicId === null ? null : Number(clinicId);
+}
+
+// Ativa/conecta a instância WhatsApp da clínica após o pagamento confirmado.
+// Usa clinics.komunika_instance_id (instância própria da clínica) com
+// fallback para KOMUNIKA_INSTANCE_ID global. Best-effort: qualquer falha é
+// REGISTADA nos logs e nunca se propaga — o webhook tem de responder 200 à
+// Lojou, senão ela reenvia o evento.
+async function activateClinicWhatsAppInstance(clinicId: number): Promise<void> {
+  try {
+    const result = await connectKomunikaInstanceForClinic(clinicId);
+    const origem = result.source === "clinica" ? "própria da clínica" : "global do ambiente";
+    if (result.ok) {
+      console.log(
+        `[lojou-webhook] Instância WhatsApp ativada para a clínica ${clinicId}: ` +
+          `${result.instanceId} (instância ${origem}).`
+      );
+    } else {
+      console.error(
+        `[lojou-webhook] Falha ao ativar a instância WhatsApp da clínica ${clinicId} ` +
+          `(${result.instanceId || "sem id"}, instância ${origem}):`,
+        result.error
+      );
+    }
+  } catch (err) {
+    console.error(
+      `[lojou-webhook] Exceção ao ativar a instância WhatsApp da clínica ${clinicId}:`,
+      err
+    );
+  }
+}
+
+// ── Handler de pagamento/assinatura ───────────────────────────────────────
 
 async function handleSubscriptionEvent(params: {
   eventName: string;
@@ -370,86 +509,94 @@ async function handleSubscriptionEvent(params: {
   const { eventName, orderId, productId, email, userId, body } = params;
 
   try {
-    // Resolver plano pelo product_id/price_id
+    const status = resolveSubscriptionStatus(eventName);
+
+    // 1. Estado da assinatura no Supabase (service role)
+    const clinicId = await resolveClinicForSubscriber(email, userId);
+    if (clinicId === null) {
+      console.log(
+        "[lojou-webhook] Nenhuma clínica encontrada — plano e assinatura não atualizados."
+      );
+      return;
+    }
+
     const priceId = body.price_id ?? productId;
     const plan = getPlanByPriceId(priceId);
+    const existingSub = await getSubscription(clinicId);
 
-    if (!plan) {
-      console.log("[lojou-webhook] Plano não resolvido para price_id:", priceId);
-      return;
-    }
+    if (plan) {
+      const now = nowStr();
+      const periodStart = body.current_period_start ?? now;
+      const periodEnd = body.current_period_end ?? now;
+      const subscriptionId = body.subscription_id ?? orderId;
 
-    // Buscar a clínica do utilizador.
-    // Nota: clinic_members não possui admin_id no Postgres (apenas user_id UUID do auth),
-    // por isso usamos o primeiro admin existente apenas para validar o contexto e
-    // recorremos à primeira clínica registada como fallback.
-    const { data: admins, error: adminError } = await supabaseAdmin
-      .from("admins")
-      .select("id")
-      .or(`email.eq.${email},id.eq.${userId}`)
-      .limit(1);
-    if (adminError) {
-      console.error("[lojou-webhook] Falha ao consultar admins:", adminError.message);
-      return;
-    }
-    if (!admins?.length) {
-      console.log("[lojou-webhook] Admin não encontrado para assinatura:", maskEmail(email ?? ""));
-      return;
-    }
+      if (existingSub && existingSub.status === status && existingSub.plan_id === plan.id) {
+        console.log("[lojou-webhook] Assinatura já reflete este evento, escrita ignorada.");
+      } else if (existingSub) {
+        await updateSubscription(existingSub.id, {
+          status,
+          plan_id: plan.id,
+          lojou_subscription_id: subscriptionId,
+          current_period_start: periodStart,
+          current_period_end: periodEnd,
+          cancel_at_period_end: false,
+        });
+        console.log(
+          `[lojou-webhook] Assinatura atualizada: clinic=${clinicId}, plan=${plan.id}, status=${status}`
+        );
+      } else if (status === "active") {
+        await createSubscription({
+          clinic_id: clinicId,
+          plan_id: plan.id,
+          lojou_customer_id: String(userId),
+          lojou_subscription_id: subscriptionId,
+          current_period_start: periodStart,
+          current_period_end: periodEnd,
+        });
+        console.log(
+          `[lojou-webhook] Assinatura criada: clinic=${clinicId}, plan=${plan.id}, status=active`
+        );
+      } else {
+        console.log(
+          `[lojou-webhook] Sem assinatura prévia para o evento "${eventName}" — nada a atualizar.`
+        );
+      }
 
-    const { data: clinics, error: clinicError } = await supabaseAdmin
-      .from("clinics")
-      .select("id")
-      .order("id", { ascending: true })
-      .limit(1);
-    const clinicId = clinics?.[0]?.id ?? 1;
-    if (clinicError) {
-      console.error("[lojou-webhook] Falha ao resolver a clínica:", clinicError.message);
-    }
-
-    // Verificar idempotência
-    const existingSub = await getActiveSubscription(clinicId);
-    if (existingSub && existingSub.status === "active" && existingSub.plan_id === plan.id) {
-      console.log("[lojou-webhook] Assinatura já ativa para este plano, ignorando.");
-      return;
-    }
-
-    const now = nowStr();
-    const periodStart = body.current_period_start ?? now;
-    const periodEnd = body.current_period_end ?? now;
-    const subscriptionId = body.subscription_id ?? orderId;
-
-    if (existingSub) {
-      // Atualizar assinatura existente
-      await updateSubscription(existingSub.id, {
-        status: "active",
-        plan_id: plan.id,
-        lojou_subscription_id: subscriptionId,
-        current_period_start: periodStart,
-        current_period_end: periodEnd,
-        cancel_at_period_end: false,
-      });
-      console.log(`[lojou-webhook] Assinatura atualizada: clinic=${clinicId}, plan=${plan.id}`);
+      // Cota de tokens acompanha o plano: base_token_limit/token_limit em
+      // clinics deixam de valer o default de 100k e passam a valer o teto do
+      // plano ativado (preserva pacotes overage já comprados no ciclo).
+      if (status === "active") {
+        await syncTokenLimitWithPlan(clinicId, plan.id);
+      }
     } else {
-      // Criar nova assinatura
-      await createSubscription({
-        clinic_id: clinicId,
-        plan_id: plan.id,
-        lojou_customer_id: String(userId),
-        lojou_subscription_id: subscriptionId,
-        current_period_start: periodStart,
-        current_period_end: periodEnd,
-      });
-      console.log(`[lojou-webhook] Assinatura criada: clinic=${clinicId}, plan=${plan.id}`);
+      console.log("[lojou-webhook] Plano não resolvido para price_id:", priceId);
+      // Cancelamento/atraso continua a atualizar o estado mesmo sem plano
+      // resolvível (o price_id pode já não estar no mapeamento).
+      if (status !== "active" && existingSub) {
+        await updateSubscription(existingSub.id, { status });
+        console.log(
+          `[lojou-webhook] Estado da assinatura atualizado: clinic=${clinicId}, status=${status}`
+        );
+      }
     }
 
-    // Notificar
+    // 2. Pagamento confirmado → ativar a instância WhatsApp da clínica.
+    if (status === "active") {
+      await activateClinicWhatsAppInstance(clinicId);
+    }
+
+    // Notificar (opcional)
     try {
       const { createNotification } = await import("@/lib/services/notifications");
       await createNotification({
         type: "scheduled",
-        title: `Assinatura ${eventName.includes("renewed") ? "renovada" : "ativada"}`,
-        message: `Plano ${plan.name} ${eventName.includes("renewed") ? "renovado" : "ativado"} para a clínica.`,
+        title:
+          status !== "active"
+            ? `Assinatura ${status === "cancelled" ? "cancelada" : "em atraso"}`
+            : `Assinatura ${eventName.includes("renewed") ? "renovada" : "ativada"}`,
+        message: plan
+          ? `Plano ${plan.name} ${status !== "active" ? "com estado " + status : eventName.includes("renewed") ? "renovado" : "ativado"} para a clínica.`
+          : `Estado da assinatura alterado para ${status} na clínica.`,
       });
     } catch {
       // Notificação é opcional

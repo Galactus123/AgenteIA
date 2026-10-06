@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-auth";
+import { requireAuth, resolveClinicId } from "@/lib/api-auth";
 import { listDoctors, createDoctor } from "@/lib/services/doctors";
 import type { ScheduleInput } from "@/lib/services/doctors";
 import { auditRequest } from "@/lib/services/audit";
+import { guardProfessionalLimit } from "@/lib/services/plan-limits";
 
 function message(err: unknown, fallback: string): string {
   return err instanceof Error && err.message ? err.message : fallback;
@@ -30,6 +31,11 @@ export async function POST(request: NextRequest) {
   if (body.specialty_id === undefined || body.specialty_id === null || body.specialty_id === "") {
     return NextResponse.json({ error: "Especialidade é obrigatória." }, { status: 400 });
   }
+
+  // Cota do plano: feature professionals_management + maxProfessionals.
+  const clinicId = await resolveClinicId(request);
+  const denied = await guardProfessionalLimit(clinicId ?? undefined);
+  if (denied) return NextResponse.json(denied.body, { status: denied.status });
 
   try {
     const doctor = await createDoctor({

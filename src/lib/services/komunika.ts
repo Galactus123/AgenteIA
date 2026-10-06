@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { supabaseAdmin } from "@/lib/supabase";
 
 const baseUrl = () => (process.env.KOMUNIKA_BASE_URL ?? "https://api.komunika.site/api/v1").replace(/\/+$/, "");
 const apiToken = () => process.env.KOMUNIKA_API_TOKEN ?? "";
@@ -191,6 +192,122 @@ export async function sendKomunikaMessage(
     console.error(`[komunika] Exceção ao enviar mensagem:`, err);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+export interface KomunikaConnectResult {
+  ok: boolean;
+  status?: number;
+  error?: string;
+}
+
+// Ativa (conecta) a instancia WhatsApp de uma clinica apos a confirmacao do
+// pagamento. Best-effort: NUNCA lanca excecao e tem timeout proprio — quem
+// chama (webhook Lojou) apenas regista o resultado, para que uma falha de
+// comunicacao com a Komunika nao quebre a resposta do webhook.
+export async function connectKomunikaInstance(
+  instanceId: string = process.env.KOMUNIKA_INSTANCE_ID ?? "",
+  opts: { clinicId?: number } = {}
+): Promise<KomunikaConnectResult> {
+  const scope = opts.clinicId !== undefined ? `clinic=${opts.clinicId} ` : "";
+  if (!apiToken()) {
+    return { ok: false, error: "Komunika nao configurado (KOMUNIKA_API_TOKEN)." };
+  }
+  if (!instanceId) {
+    return { ok: false, error: "Komunika nao configurado (KOMUNIKA_INSTANCE_ID)." };
+  }
+  try {
+    const res = await fetch(`${baseUrl()}/instances/${encodeURIComponent(instanceId)}/connect`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiToken()}`,
+      },
+      body: JSON.stringify({ instanceId }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const rawText = await res.text();
+    const parsed = (() => {
+      try {
+        return JSON.parse(rawText) as { message?: string; error?: string } | null;
+      } catch {
+        return null;
+      }
+    })();
+    if (!res.ok) {
+      console.error(
+        `[komunika] Falha ao ativar a instancia ${scope}: status=${res.status} body=${rawText.slice(0, 500)}`
+      );
+      return {
+        ok: false,
+        status: res.status,
+        error: parsed?.message ?? parsed?.error ?? (rawText || res.statusText),
+      };
+    }
+    console.log(`[komunika] Instancia ativada com sucesso: ${scope}status=${res.status}`);
+    return { ok: true, status: res.status };
+  } catch (err) {
+    console.error(`[komunika] Excecao ao ativar a instancia ${scope}:`, err);
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export interface KomunikaInstanceRef {
+  instanceId: string;
+  // "clinica" = clinics.komunika_instance_id preenchido;
+  // "ambiente" = vazio/ausente, usado KOMUNIKA_INSTANCE_ID global.
+  source: "clinica" | "ambiente";
+}
+
+// Resolve a instancia WhatsApp de uma clinica (migracao
+// 20261006000002_komunika_instance_por_clinica): clinics.komunika_instance_id
+// tem prioridade e, quando vazio ou se a leitura falhar, cai para a instancia
+// global KOMUNIKA_INSTANCE_ID. Nunca lanca excecao.
+export async function getKomunikaInstanceIdForClinic(
+  clinicId: number
+): Promise<KomunikaInstanceRef> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("clinics")
+      .select("komunika_instance_id")
+      .eq("id", clinicId)
+      .maybeSingle();
+    if (error) {
+      console.error(
+        "[komunika] Falha ao ler komunika_instance_id da clinica:",
+        error.message
+      );
+    } else {
+      const clinicInstanceId = String(
+        (data as { komunika_instance_id?: string | null } | null)
+          ?.komunika_instance_id ?? ""
+      ).trim();
+      if (clinicInstanceId) {
+        return { instanceId: clinicInstanceId, source: "clinica" };
+      }
+    }
+  } catch (err) {
+    console.error(
+      "[komunika] Erro ao resolver a instancia da clinica:",
+      err instanceof Error ? err.message : String(err)
+    );
+  }
+  return { instanceId: process.env.KOMUNIKA_INSTANCE_ID ?? "", source: "ambiente" };
+}
+
+export interface KomunikaClinicConnectResult extends KomunikaConnectResult {
+  instanceId: string;
+  source: "clinica" | "ambiente";
+}
+
+// Ativa a instancia WhatsApp da clinica usando o ID registado na linha dela
+// (fallback: variavel global). Best-effort: qualquer erro fica nos logs e o
+// resultado devolvido e apenas para diagnostico do chamador.
+export async function connectKomunikaInstanceForClinic(
+  clinicId: number
+): Promise<KomunikaClinicConnectResult> {
+  const { instanceId, source } = await getKomunikaInstanceIdForClinic(clinicId);
+  const result = await connectKomunikaInstance(instanceId, { clinicId });
+  return { ...result, instanceId, source };
 }
 
 export function verifyKomunikaSignature(rawBody: Buffer | string, signature?: string | null): boolean {

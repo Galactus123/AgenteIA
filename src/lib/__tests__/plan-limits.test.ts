@@ -28,6 +28,12 @@ import {
   incrementAiUsage,
   getUsageDashboard,
   canDowngradeTo,
+  canCreateConversation,
+  planLimitFailure,
+  planLimitFailureFromError,
+  guardProfessionalLimit,
+  guardAdminUserLimit,
+  guardUnitLimit,
 } from "@/lib/services/plan-limits";
 
 type Sub = Record<string, unknown>;
@@ -372,6 +378,142 @@ describe("plan-limits (Fase 8.3)", () => {
       );
       const result = await canDowngradeTo("start");
       expect(result).toEqual({ allowed: true, issues: [] });
+    });
+  });
+
+  describe("conversas ativas", () => {
+    function withConversationCount(count: number, opts: RouterOpts = {}) {
+      fakeSupabase.setResolver((q) => {
+        if (q.table === "conversations" && q.opts.head) return { count, error: null };
+        return router(opts)(q);
+      });
+    }
+
+    it("canCreateConversation compara as conversas existentes com maxConversations", async () => {
+      withConversationCount(100, { sub: null });
+      const blocked = await canCreateConversation(1);
+      expect(blocked).toMatchObject({ allowed: false, current: 100, limit: 100, remaining: 0 });
+      expect(blocked.message).toContain("limite de 100 conversas ativas");
+
+      fakeSupabase.reset();
+      withConversationCount(10, { sub: null });
+      const ok = await canCreateConversation(1);
+      expect(ok).toMatchObject({ allowed: true, remaining: 90 });
+
+      fakeSupabase.reset();
+      withConversationCount(99999, { sub: { ...activeSub, plan_id: "enterprise" } });
+      const enterprise = await canCreateConversation(1);
+      expect(enterprise.allowed).toBe(true);
+      expect(enterprise.limit).toBe(Infinity);
+    });
+
+    it("erro ao contar vira 0 (nao bloqueia por falha de banco)", async () => {
+      fakeSupabase.setResolver((q) => {
+        if (q.table === "conversations" && q.opts.head)
+          return { count: null, error: { message: "count off" } };
+        return router({ sub: null })(q);
+      });
+      expect((await canCreateConversation(1)).allowed).toBe(true);
+      expect(console.error).toHaveBeenCalled();
+    });
+  });
+
+  describe("guards de rota (402)", () => {
+    it("planLimitFailure monta a resposta 402 com codigo e uso atual", async () => {
+      fakeSupabase.setResolver(router({ sub: null, counts: { professionals: 5 } }));
+      const failure = planLimitFailure(await canAddProfessional(1));
+      expect(failure.status).toBe(402);
+      expect(failure.body).toMatchObject({
+        code: "PLAN_LIMIT",
+        plan: "Start",
+        current: 5,
+        limit: 5,
+        remaining: 0,
+      });
+      expect(failure.body.error).toContain("limite de 5 profissionais");
+    });
+
+    it("planLimitFailureFromError traduz o requireFeature", async () => {
+      fakeSupabase.setResolver(router({ sub: null }));
+      const err = (await requireFeature(undefined, "financial_control").catch(
+        (e: unknown) => e
+      )) as PlanLimitError;
+      const failure = planLimitFailureFromError(err);
+      expect(failure.status).toBe(402);
+      expect(failure.body.code).toBe("PLAN_LIMIT");
+      expect(failure.body.plan).toBe("Start");
+      expect(failure.body.error).toContain("financial_control");
+    });
+
+    it("guardProfessionalLimit bloqueia no limite do plano com 402", async () => {
+      fakeSupabase.setResolver(
+        router({ sub: { ...activeSub, plan_id: "pro" }, counts: { professionals: 15 } })
+      );
+      const denied = await guardProfessionalLimit(1);
+      expect(denied?.status).toBe(402);
+      expect(denied?.body).toMatchObject({ code: "PLAN_LIMIT", plan: "Pro", current: 15, limit: 15 });
+      expect(denied?.body.error).toContain("limite de 15 profissionais");
+    });
+
+    it("guardUnitLimit bloqueia feature ausente no plano (Start sem units_management)", async () => {
+      fakeSupabase.setResolver(router({ sub: null }));
+      const denied = await guardUnitLimit(1);
+      expect(denied?.status).toBe(402);
+      expect(denied?.body.error).toContain("units_management");
+    });
+
+    it("guards devolvem null quando a acao cabe no plano", async () => {
+      fakeSupabase.setResolver(
+        router({ sub: null, counts: { professionals: 2, clinic_members: 1, units: 1 } })
+      );
+      expect(await guardProfessionalLimit(1)).toBeNull();
+      expect(await guardAdminUserLimit(1)).toBeNull();
+    });
+  });
+
+  describe("incremento atômico (RPC)", () => {
+    const usageRow = {
+      id: "u1",
+      clinic_id: 1,
+      period: "2026-10",
+      whatsapp_conversations: 0,
+      ai_interactions: 201,
+    };
+
+    it("incrementAiUsage usa a RPC quando ela existe e não escreve à mão", async () => {
+      fakeSupabase.setResolver((q) =>
+        q.op === "rpc"
+          ? { data: usageRow, error: null }
+          : router({ sub: null, usage: { id: "u1", ai_interactions: 200 } })(q)
+      );
+
+      await incrementAiUsage(1, 1);
+
+      const rpc = fakeSupabase.queries.find((q) => q.op === "rpc");
+      expect(rpc?.table).toBe("increment_usage_counters");
+      expect(rpc?.payload).toMatchObject({
+        p_clinic_id: 1,
+        p_period: "2026-10",
+        p_whatsapp: 0,
+        p_ai: 1,
+      });
+      expect(fakeSupabase.find("usage", "update")).toHaveLength(0);
+      expect(fakeSupabase.find("usage", "insert")).toHaveLength(0);
+    });
+
+    it("RPC com erro cai no caminho legado de read-modify-write", async () => {
+      fakeSupabase.setResolver((q) =>
+        q.op === "rpc"
+          ? { data: null, error: { message: "function not found" } }
+          : router({ sub: null, usage: { id: "u1", whatsapp_conversations: 7 } })(q)
+      );
+
+      await incrementWhatsappUsage(1, 3);
+
+      expect(fakeSupabase.last("usage", "update")?.payload).toMatchObject({
+        whatsapp_conversations: 10,
+      });
+      expect(console.error).toHaveBeenCalled();
     });
   });
 });

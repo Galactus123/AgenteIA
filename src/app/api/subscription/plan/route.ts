@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-auth";
+import { requireAuth, resolveClinicId } from "@/lib/api-auth";
 import { getClinicPlan, getActiveSubscription, getUsageDashboard } from "@/lib/services/plan-limits";
 
 export const runtime = "nodejs";
@@ -10,9 +10,10 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const plan = await getClinicPlan();
-    const subscription = await getActiveSubscription();
-    const usage = await getUsageDashboard();
+    const clinicId = (await resolveClinicId(request)) ?? undefined;
+    const plan = await getClinicPlan(clinicId);
+    const subscription = await getActiveSubscription(clinicId);
+    const usage = await getUsageDashboard(clinicId);
 
     return NextResponse.json({
       plan: {
