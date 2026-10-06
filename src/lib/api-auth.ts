@@ -1,6 +1,18 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { guardActiveSubscription } from "@/lib/services/plan-limits";
+
+// Rotas de API que continuam acessíveis sem subscrição ativa: autenticação,
+// estado/faturação da própria assinatura e health. Tudo o resto (funcionali-
+// dades operacionais) passa pelo gate de assinatura ativa em requireAuth.
+const SUBSCRIPTION_EXEMPT_PREFIXES = ["/api/auth", "/api/subscription", "/api/health"];
+
+export function isSubscriptionExemptApi(pathname: string): boolean {
+  return SUBSCRIPTION_EXEMPT_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
 
 export async function requireAuth(request: NextRequest): Promise<NextResponse | null> {
   let supabaseResponse = NextResponse.next({ request });
@@ -34,6 +46,16 @@ export async function requireAuth(request: NextRequest): Promise<NextResponse | 
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
 
+  // Gate de subscrição: clínica sem linha ativa em subscriptions não acede
+  // às rotas operacionais (a de faturação é isenta para poder cobrar).
+  if (!isSubscriptionExemptApi(request.nextUrl.pathname)) {
+    const clinicId = (await resolveClinicIdByUserId(user.id)) ?? undefined;
+    const gate = await guardActiveSubscription(clinicId);
+    if (gate) {
+      return NextResponse.json(gate.body, { status: gate.status });
+    }
+  }
+
   return null;
 }
 
@@ -62,14 +84,11 @@ export async function getUser(request: NextRequest) {
 // null: o chamador decide o fallback (nunca é o "limit(1)" silencioso).
 // Lê via service role apenas a associação do próprio user_id — não expõe
 // outras clínicas e não depende do RLS de clinic_members.
-export async function resolveClinicId(request: NextRequest): Promise<number | null> {
-  const user = await getUser(request);
-  if (!user) return null;
-
+export async function resolveClinicIdByUserId(userId: string): Promise<number | null> {
   const { data, error } = await supabaseAdmin
     .from("clinic_members")
     .select("clinic_id")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .eq("active", true)
     .order("clinic_id", { ascending: true })
     .limit(1)
@@ -81,6 +100,13 @@ export async function resolveClinicId(request: NextRequest): Promise<number | nu
   }
   const clinicId = (data as { clinic_id?: number | string } | null)?.clinic_id;
   return clinicId === undefined || clinicId === null ? null : Number(clinicId);
+}
+
+export async function resolveClinicId(request: NextRequest): Promise<number | null> {
+  const user = await getUser(request);
+  if (!user) return null;
+
+  return resolveClinicIdByUserId(user.id);
 }
 
 export async function requireInternalAuth(request: NextRequest): Promise<NextResponse | null> {

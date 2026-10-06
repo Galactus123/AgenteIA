@@ -39,8 +39,13 @@ function hasSessionCookie(request: NextRequest): boolean {
 }
 
 export async function proxy(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
   const pathname = request.nextUrl.pathname;
+  // Encaminha o caminho pedido para os Server Components: o layout do app
+  // precisa de saber a página atual para redirecionar clínicas sem
+  // subscrição ativa só quando a página não é a de faturação.
+  request.headers.set("x-pathname", pathname);
+
+  let supabaseResponse = NextResponse.next({ request });
 
   // ── Rate-limit global por IP na API inteira (9.3) ──────────────────────
   // Teto geral que cobre qualquer rota nova sem limite próprio. Os limites

@@ -4,6 +4,7 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { nowStr } from "@/lib/datetime";
 import { getPlan, type PlanId, type FeatureId, type Plan } from "@/lib/plans";
+import { BILLING_PATH, isActiveSubscriptionStatus } from "@/lib/subscription-access";
 
 // ── Tipos ──────────────────────────────────────────────────────────────
 
@@ -144,6 +145,49 @@ export async function getClinicPlan(clinicId?: number): Promise<Plan> {
 export async function getSubscriptionStatus(clinicId?: number): Promise<SubscriptionStatus> {
   const sub = await getSubscription(clinicId);
   return sub?.status ?? "none";
+}
+
+// ── Gate de subscrição ativa ───────────────────────────────────────────
+// Exige uma linha em subscriptions com estado ativo (active/trialing) para a
+// clínica. Sem linha (nunca pagou) ou com estado pendente/cancelado →
+// bloqueio 402. Usado pelo requireAuth (rotas operacionais) e pelo layout do
+// app (redirect para a página de faturação).
+export interface SubscriptionGateFailure {
+  status: number;
+  body: {
+    error: string;
+    code: "SUBSCRIPTION_REQUIRED";
+    subscriptionStatus: SubscriptionStatus;
+    redirectTo: string;
+  };
+}
+
+// Corte de emergência do gate: SUBSCRIPTION_GATE_DISABLED=1/true/yes desliga
+// o bloqueio (requireAuth, layout do app e /api/subscription/status) sem
+// novo deploy — usado quando a BD ainda não tem assinaturas ativas gravadas.
+export function subscriptionGateEnabled(): boolean {
+  const flag = (process.env.SUBSCRIPTION_GATE_DISABLED ?? "").trim().toLowerCase();
+  return flag !== "1" && flag !== "true" && flag !== "yes";
+}
+
+export async function guardActiveSubscription(
+  clinicId?: number
+): Promise<SubscriptionGateFailure | null> {
+  if (!subscriptionGateEnabled()) return null;
+
+  const sub = await getSubscription(clinicId);
+  if (sub && isActiveSubscriptionStatus(sub.status)) return null;
+
+  return {
+    status: 402,
+    body: {
+      error:
+        "Assinatura inativa. Ative o seu plano para continuar a usar as funcionalidades da plataforma.",
+      code: "SUBSCRIPTION_REQUIRED",
+      subscriptionStatus: sub?.status ?? "none",
+      redirectTo: BILLING_PATH,
+    },
+  };
 }
 
 export async function createSubscription(data: {
