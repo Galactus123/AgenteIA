@@ -65,7 +65,11 @@ export default function AuthPage() {
     });
     const data = await res.json().catch(() => null);
     if (res.ok) {
-      router.replace("/dashboard");
+      // Retoma o destino interrompido (ex.: /precos?plan=pro vindo do CTA
+      // "Assinar"). Só caminhos internos: `//host` e URLs absolutas caem no dashboard.
+      const next = new URLSearchParams(window.location.search).get("next");
+      const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+      router.replace(safeNext ?? "/dashboard");
       router.refresh();
     } else {
       setLoginError(data?.error ?? "Erro ao entrar.");

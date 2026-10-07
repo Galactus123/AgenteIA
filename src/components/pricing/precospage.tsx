@@ -1,6 +1,8 @@
 "use client";
 
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check, X, ArrowRight, MessageCircle, Sparkles, Zap } from "lucide-react";
 import { PLANS, FEATURE_CATEGORIES, formatLimit, type PlanId, type FeatureId } from "@/lib/plans";
 
@@ -61,7 +63,71 @@ const featureLabels: Record<FeatureId, string> = {
   custom_config: "Configurações personalizadas",
 };
 
-export default function PrecosPage() {
+interface PrecosPageProps {
+  // Plano devolvido pelo login (?plan=...): retoma o checkout interrompido.
+  resumePlan?: PlanId | null;
+}
+
+export default function PrecosPage({ resumePlan = null }: PrecosPageProps) {
+  const router = useRouter();
+  const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
+  const [errorPlan, setErrorPlan] = useState<{ plan: PlanId; message: string } | null>(null);
+  const resumedRef = useRef(false);
+
+  // CTA → /api/subscription/checkout → redireciona para o pagamento da LOJOU.
+  // Sem sessão (401) leva o utilizador ao login e devolve-o aqui com o plano
+  // escolhido, para o checkout retomar sozinho após autenticar.
+  const startCheckout = useCallback(
+    async (planId: PlanId, fromResume: boolean) => {
+      setLoadingPlan(planId);
+      setErrorPlan(null);
+      try {
+        const res = await fetch("/api/subscription/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ planId }),
+        });
+        const data = await res.json().catch(() => null);
+
+        if (res.status === 401) {
+          // Retomada já autenticada e ainda assim 401: não há loop — mostra erro.
+          if (fromResume) {
+            setErrorPlan({ plan: planId, message: "Sessão expirada. Entre novamente para continuar." });
+          } else {
+            router.push(`/login?next=${encodeURIComponent(`/precos?plan=${planId}`)}`);
+          }
+          return;
+        }
+
+        if (!res.ok || data?.type !== "checkout" || !data?.checkoutUrl) {
+          setErrorPlan({
+            plan: planId,
+            message: data?.error ?? "Não foi possível iniciar o checkout. Tente novamente.",
+          });
+          return;
+        }
+
+        // Destino externo (hosting de pagamento da LOJOU): navegação total.
+        window.location.href = data.checkoutUrl as string;
+      } catch {
+        setErrorPlan({
+          plan: planId,
+          message: "Falha de ligação. Verifique a internet e tente novamente.",
+        });
+      } finally {
+        setLoadingPlan(null);
+      }
+    },
+    [router]
+  );
+
+  // Retoma pós-login: /precos?plan=pro vindo de /login?next=...
+  useEffect(() => {
+    if (!resumePlan || resumedRef.current) return;
+    resumedRef.current = true;
+    void startCheckout(resumePlan, true);
+  }, [resumePlan, startCheckout]);
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0D14]">
       {/* Header */}
@@ -186,19 +252,28 @@ export default function PrecosPage() {
                     <ArrowRight size={16} />
                   </a>
                 ) : (
-                  <Link
-                    href={`/teste-gratis?plan=${plan.id}&utm_source=precos`}
-                    className={`flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition-colors ${
-                      isHighlighted
-                        ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
-                        : plan.buttonVariant === "primary"
-                          ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                          : "bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-white/10"
-                    }`}
-                  >
-                    {plan.buttonLabel}
-                    <ArrowRight size={16} />
-                  </Link>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => void startCheckout(plan.id, false)}
+                      disabled={loadingPlan !== null}
+                      className={`flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-wait ${
+                        isHighlighted
+                          ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
+                          : plan.buttonVariant === "primary"
+                            ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                            : "bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-white/10"
+                      }`}
+                    >
+                      {loadingPlan === plan.id ? "Abrindo checkout..." : plan.buttonLabel}
+                      <ArrowRight size={16} />
+                    </button>
+                    {errorPlan?.plan === plan.id && (
+                      <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">
+                        {errorPlan.message}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             );

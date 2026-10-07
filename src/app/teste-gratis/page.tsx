@@ -7,6 +7,16 @@ import { SPECIALTIES } from "@/lib/landing-data";
 const inputClass =
   "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary";
 
+// Atribuição vinda dos CTAs de /precos (?plan= e ?utm_source=). Lida no
+// momento do envio: o formulário não precisa de a mostrar, então não há
+// estado reativo nem efeito — só query string da própria página.
+function readAttribution(): { plan?: string; utmSource?: string } {
+  const params = new URLSearchParams(window.location.search);
+  const plan = params.get("plan");
+  const utmSource = params.get("utm_source");
+  return { plan: plan ?? undefined, utmSource: utmSource ?? undefined };
+}
+
 export default function TesteGratisPage() {
   const [clinica, setClinica] = useState("");
   const [nome, setNome] = useState("");
@@ -16,14 +26,38 @@ export default function TesteGratisPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
-    window.setTimeout(() => {
-      setLoading(false);
+    setError("");
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clinicName: clinica,
+          contactName: nome,
+          whatsapp,
+          country: pais,
+          specialty: especialidade,
+          email: email || undefined,
+          ...readAttribution(),
+          source: "teste-gratis",
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(data?.error ?? "Não foi possível enviar. Tente novamente.");
+        return;
+      }
       setSent(true);
-    }, 900);
+    } catch {
+      setError("Sem ligação à internet. Verifique a rede e tente novamente.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (sent) {
@@ -171,6 +205,11 @@ export default function TesteGratisPage() {
               className={inputClass}
             />
           </div>
+          {error && (
+            <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+              {error}
+            </p>
+          )}
           <button
             type="submit"
             disabled={loading}
