@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-auth";
+import { requireClinic } from "@/lib/api-auth";
 import { markAsRead } from "@/lib/services/notifications";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -8,8 +8,8 @@ export async function PATCH(
   request: NextRequest,
   ctx: RouteContext
 ) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
 
   const { id } = await ctx.params;
   const notificationId = Number(id);
@@ -18,6 +18,10 @@ export async function PATCH(
     return NextResponse.json({ error: "ID inválido." }, { status: 400 });
   }
 
-  await markAsRead(notificationId);
+  // Ownership: id de outra clínica não é atualizado nem confirmado (404).
+  const updated = await markAsRead(notificationId, session.clinicId);
+  if (!updated) {
+    return NextResponse.json({ error: "Notificação não encontrada." }, { status: 404 });
+  }
   return NextResponse.json({ ok: true });
 }

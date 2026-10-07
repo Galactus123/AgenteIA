@@ -1,4 +1,5 @@
 import { listAppointments } from "@/lib/services/appointments";
+import { resolvePageClinicId } from "@/lib/page-auth";
 import { displayDateTime } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
@@ -6,7 +7,10 @@ export const dynamic = "force-dynamic";
 export default async function ConsultasPage() {
   let appointments;
   try {
-    appointments = await listAppointments();
+    // Clínica da sessão: sem vínculo não há listagem (fail-closed).
+    const clinicId = await resolvePageClinicId();
+    if (!clinicId) throw new Error("Sem clínica vinculada à conta.");
+    appointments = await listAppointments(clinicId);
   } catch {
     return (
       <div className="space-y-6">

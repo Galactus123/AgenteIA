@@ -34,12 +34,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // ── Gate de subscrição ativa ───────────────────────────────────────────
   // Sem linha ativa em subscriptions (nunca pagou, pendente ou cancelado),
   // só a página de faturação fica acessível: as restantes redirecionam
-  // para lá. A falha na consulta NÃO tranca a app (falha aberta aqui) — o
-  // gate das rotas de API continua a valer e falha fechado.
+  // para lá. Conta sem vínculo em clinic_members também cai aqui (sem
+  // clinic_id não há assinatura que justifique acesso). Um erro LANÇADO na
+  // consulta não tranca a app (falha aberta neste gate) — o gate das rotas
+  // de API continua a valer e falha fechado.
   let subscriptionActive = true;
   try {
-    const clinicId = (await resolveClinicIdByUserId(userId)) ?? undefined;
-    subscriptionActive = (await guardActiveSubscription(clinicId)) === null;
+    const clinicId = await resolveClinicIdByUserId(userId);
+    // Sem vínculo em clinic_members não há que verificar: não se deixa o
+    // gate correr sem clinic_id (a consulta sem filtro pegaria a assinatura
+    // de outra clínica). Quem não tem clínica fica como "sem assinatura".
+    subscriptionActive =
+      clinicId !== null && (await guardActiveSubscription(clinicId)) === null;
   } catch (error) {
     console.error(
       "[app-layout] Falha ao verificar a assinatura:",

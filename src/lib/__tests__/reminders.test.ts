@@ -27,6 +27,7 @@ const NOW = new Date("2026-10-05T10:00:00");
 function appointmentRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: 1,
+    clinic_id: 4,
     patient_name: "Maria Silva",
     patient_phone: "841234567",
     professional_id: null,
@@ -236,7 +237,8 @@ describe("runReminderCheck (Fase 8.3)", () => {
       "Maria Silva",
       "Cardiologia",
       "2026-10-06 10:00",
-      1
+      1,
+      4
     );
 
     notify.notifyDoctorReminder.mockClear();

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-auth";
+import { requireClinic } from "@/lib/api-auth";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getDefaultClinicId } from "@/lib/services/clinics";
 import { auditRequest } from "@/lib/services/audit";
 
 export async function GET(request: NextRequest) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
+  const { clinicId } = session;
 
   const { searchParams } = new URL(request.url);
   const phone = searchParams.get("phone") || searchParams.get("telefone");
@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from("patients")
       .select("*")
+      .eq("clinic_id", clinicId)
       .eq("phone", phone)
       .order("created_at", { ascending: false })
       .maybeSingle();
@@ -39,6 +40,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabaseAdmin
     .from("patients")
     .select("*")
+    .eq("clinic_id", clinicId)
     .order("name", { ascending: true });
 
   if (error) {
@@ -49,8 +51,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
+  const { clinicId } = session;
 
   const body = await request.json().catch(() => null);
   if (!body?.name || !body?.phone) {
@@ -60,10 +63,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // clinic_id e NOT NULL sem default (migracao ...000003) — sem ele o
-  // insert devolve erro de null constraint.
-  const clinicId = body.clinic_id ? Number(body.clinic_id) : await getDefaultClinicId();
-
+  // clinic_id vem SEMPRE da sessão (servidor): um clinic_id no corpo é
+  // ignorado, para o chamador nunca criar pacientes em outra clínica.
   const { data, error } = await supabaseAdmin
     .from("patients")
     .insert({
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
     action: "patient.create",
     entity: "patients",
     entityId: data.id,
-    clinicId: clinicId,
+    clinicId,
   });
 
   return NextResponse.json(data, { status: 201 });

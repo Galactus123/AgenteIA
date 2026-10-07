@@ -585,14 +585,15 @@ export async function incrementAiUsage(clinicId?: number, amount = 1): Promise<v
 
 // ── Conversas ativas ───────────────────────────────────────────────────
 
-// conversations não tem clinic_id (modelo single-tenant atual): conta as
-// linhas existentes e compara com o teto do plano.
+// Conta apenas as conversas da própria clínica (coluna clinic_id presente
+// desde a migration 20260911000002) contra o teto do plano.
 export async function canCreateConversation(clinicId?: number): Promise<LimitCheck> {
   const cid = clinicId ?? (await getClinicId());
   const plan = await getClinicPlan(cid);
   const { count, error } = await supabaseAdmin
     .from("conversations")
-    .select("id", { count: "exact", head: true });
+    .select("id", { count: "exact", head: true })
+    .eq("clinic_id", cid);
 
   if (error) console.error("[plan-limits] Falha ao contar conversas:", error.message);
 

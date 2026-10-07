@@ -58,10 +58,6 @@ vi.mock("@/lib/api-auth", () => ({
   getUser: getUserMock,
 }));
 
-vi.mock("@/lib/services/clinics", () => ({
-  getDefaultClinicId: vi.fn(async () => 7),
-}));
-
 import { recordAudit, auditRequest, listAuditLogs } from "@/lib/services/audit";
 
 beforeEach(() => {
@@ -81,13 +77,13 @@ afterEach(() => {
 });
 
 describe("recordAudit (Fase 6.3)", () => {
-  it("grava evento com clínica padrão e campos nulos quando ausentes", async () => {
+  it("grava evento sem clínica como clinic_id nulo (nunca a clínica #1)", async () => {
     await recordAudit({ action: "auth.login" });
 
     expect(inserted).toHaveLength(1);
     expect(inserted[0].table).toBe("audit_logs");
     expect(inserted[0].values).toMatchObject({
-      clinic_id: 7,
+      clinic_id: null,
       action: "auth.login",
       actor_id: null,
       actor_label: null,
@@ -118,13 +114,6 @@ describe("recordAudit (Fase 6.3)", () => {
     state.insertError = { message: "banco indisponivel" };
     await expect(recordAudit({ action: "auth.login" })).resolves.toBeUndefined();
     expect(console.error).toHaveBeenCalled();
-  });
-
-  it("nunca lança quando a resolução da clínica falha", async () => {
-    const clinics = await import("@/lib/services/clinics");
-    vi.mocked(clinics.getDefaultClinicId).mockRejectedValueOnce(new Error("sem rede"));
-    await expect(recordAudit({ action: "auth.login" })).resolves.toBeUndefined();
-    expect(inserted).toHaveLength(0);
   });
 });
 
@@ -180,13 +169,13 @@ describe("listAuditLogs (Fase 6.3)", () => {
     expect(state.lastLimit).toBe(500);
     expect(state.listCalls).toBe(1);
 
-    await listAuditLogs({ limit: 0 });
+    await listAuditLogs({ clinicId: 2, limit: 0 });
     expect(state.lastLimit).toBe(1);
   });
 
   it("devolve [] e loga quando a consulta falha", async () => {
     state.listError = { message: "timeout" };
-    const rows = await listAuditLogs();
+    const rows = await listAuditLogs({ clinicId: 2 });
     expect(rows).toEqual([]);
     expect(console.error).toHaveBeenCalled();
   });

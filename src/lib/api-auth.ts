@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
+import type { User } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabase";
 import { guardActiveSubscription } from "@/lib/services/plan-limits";
 
@@ -107,6 +108,38 @@ export async function resolveClinicId(request: NextRequest): Promise<number | nu
   if (!user) return null;
 
   return resolveClinicIdByUserId(user.id);
+}
+
+// ── Contexto de clínica para rotas operacionais ─────────────────────────────
+// Autentica (inclui o gate de assinatura) e resolve a clínica do próprio
+// utilizador — fail-closed: sessão ausente → 401, sessão válida sem vínculo
+// ativo em clinic_members → 403. O clinic_id vem SEMPRE do servidor (nunca do
+// corpo do pedido) e nunca cai para a "primeira clínica" da base de dados.
+export interface ClinicContext {
+  user: User;
+  clinicId: number;
+}
+
+export async function requireClinic(
+  request: NextRequest
+): Promise<NextResponse | ClinicContext> {
+  const authError = await requireAuth(request);
+  if (authError) return authError;
+
+  const user = await getUser(request);
+  if (!user) {
+    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  }
+
+  const clinicId = await resolveClinicIdByUserId(user.id);
+  if (clinicId === null) {
+    return NextResponse.json(
+      { error: "Sem clínica vinculada a esta conta." },
+      { status: 403 }
+    );
+  }
+
+  return { user, clinicId };
 }
 
 export async function requireInternalAuth(request: NextRequest): Promise<NextResponse | null> {

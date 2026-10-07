@@ -1,6 +1,9 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import type { Clinic } from "@/lib/types";
 
+// Sem clinicId devolve a primeira clínica da base — caminho legado restrito a
+// contexto sem sessão (webhook/cron). Rotas autenticadas passam sempre o
+// clinic_id resolvido do próprio utilizador (requireClinic).
 export async function getClinic(clinicId?: number): Promise<Clinic | null> {
   const base = supabaseAdmin.from("clinics").select("*");
   const query = clinicId === undefined ? base : base.eq("id", clinicId);
@@ -16,21 +19,19 @@ export async function getClinic(clinicId?: number): Promise<Clinic | null> {
   return (data) ?? null;
 }
 
-export async function getDefaultClinicId(): Promise<number> {
-  const clinic = await getClinic();
-  return clinic?.id ?? 1;
-}
-
-export async function updateClinic(data: {
-  name?: string;
-  address?: string;
-  phone?: string;
-  whatsapp?: string;
-  opening_hours?: string;
-  location?: string;
-  social_media?: string;
-}): Promise<Clinic | null> {
-  const clinic = await getClinic();
+export async function updateClinic(
+  clinicId: number,
+  data: {
+    name?: string;
+    address?: string;
+    phone?: string;
+    whatsapp?: string;
+    opening_hours?: string;
+    location?: string;
+    social_media?: string;
+  }
+): Promise<Clinic | null> {
+  const clinic = await getClinic(clinicId);
   if (!clinic) return null;
 
   const patch = {
@@ -43,10 +44,10 @@ export async function updateClinic(data: {
     social_media: data.social_media ?? clinic.social_media,
   };
 
-  const { error } = await supabaseAdmin.from("clinics").update(patch).eq("id", clinic.id);
+  const { error } = await supabaseAdmin.from("clinics").update(patch).eq("id", clinicId);
   if (error) {
     console.error("[clinics] Falha ao atualizar a clinica:", error.message);
     return null;
   }
-  return getClinic();
+  return getClinic(clinicId);
 }

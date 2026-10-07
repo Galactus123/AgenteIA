@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, resolveClinicId } from "@/lib/api-auth";
+import { requireClinic } from "@/lib/api-auth";
 import { getClinicPlan, getActiveSubscription, getUsageDashboard } from "@/lib/services/plan-limits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
 
   try {
-    const clinicId = (await resolveClinicId(request)) ?? undefined;
+    const clinicId = session.clinicId;
     const plan = await getClinicPlan(clinicId);
     const subscription = await getActiveSubscription(clinicId);
     const usage = await getUsageDashboard(clinicId);

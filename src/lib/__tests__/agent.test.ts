@@ -193,7 +193,7 @@ describe("agente - loop, transferência e quota (Fase 5.3)", () => {
 
     expect(result.reply).toBe(HUMAN_TRANSFER_NOTICE);
     expect(result.transferred).toBe(true);
-    expect(updateConversation).toHaveBeenCalledWith(1, { status: "transferred" });
+    expect(updateConversation).toHaveBeenCalledWith(1, { status: "transferred" }, undefined);
     expect(notifyReceptionTransfer).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), "consulta complexa");
     expect(llmMock).toHaveBeenCalledTimes(1);
     expect(addMessage).toHaveBeenCalledWith(1, "bot", HUMAN_TRANSFER_NOTICE);
@@ -207,7 +207,7 @@ describe("agente - loop, transferência e quota (Fase 5.3)", () => {
     expect(llmMock).not.toHaveBeenCalled();
     expect(result.transferred).toBe(true);
     expect(result.reply).toContain("transferindo sua conversa para a nossa equipe de recepção");
-    expect(updateConversation).toHaveBeenCalledWith(1, { status: "WAITING_HUMAN_INTERVENTION" });
+    expect(updateConversation).toHaveBeenCalledWith(1, { status: "WAITING_HUMAN_INTERVENTION" }, undefined);
     expect(blockForQuota).toHaveBeenCalledWith(PHONE, undefined);
     expect(addMessage).toHaveBeenCalledWith(1, "bot", expect.stringContaining("recepção"));
   });
@@ -231,7 +231,7 @@ describe("agente - loop, transferência e quota (Fase 5.3)", () => {
 
     const result = await handlePatientMessage(PHONE, "ola");
 
-    expect(updateConversation).toHaveBeenCalledWith(1, { status: "open" });
+    expect(updateConversation).toHaveBeenCalledWith(1, { status: "open" }, undefined);
     expect(result.reply).toBe("De volta!");
     expect(llmMock).toHaveBeenCalledTimes(1);
   });

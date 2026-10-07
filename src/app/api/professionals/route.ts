@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, resolveClinicId } from "@/lib/api-auth";
+import { requireClinic } from "@/lib/api-auth";
 import { listDoctors, createDoctor } from "@/lib/services/doctors";
 import type { ScheduleInput } from "@/lib/services/doctors";
 import { auditRequest } from "@/lib/services/audit";
@@ -10,19 +10,20 @@ function message(err: unknown, fallback: string): string {
 }
 
 export async function GET(request: NextRequest) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
 
   try {
-    return NextResponse.json(await listDoctors());
+    return NextResponse.json(await listDoctors(session.clinicId));
   } catch (err) {
     return NextResponse.json({ error: message(err, "Erro ao listar profissionais.") }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
+  const { clinicId, user } = session;
 
   const body = await request.json().catch(() => null);
   if (!body?.name) {
@@ -33,12 +34,11 @@ export async function POST(request: NextRequest) {
   }
 
   // Cota do plano: feature professionals_management + maxProfessionals.
-  const clinicId = await resolveClinicId(request);
-  const denied = await guardProfessionalLimit(clinicId ?? undefined);
+  const denied = await guardProfessionalLimit(clinicId);
   if (denied) return NextResponse.json(denied.body, { status: denied.status });
 
   try {
-    const doctor = await createDoctor({
+    const doctor = await createDoctor(clinicId, {
       name: String(body.name),
       email: body.email !== undefined ? String(body.email) : "",
       specialty_id: Number(body.specialty_id),
@@ -52,6 +52,8 @@ export async function POST(request: NextRequest) {
       action: "professional.create",
       entity: "professionals",
       entityId: doctor.id,
+      clinicId,
+      user,
       meta: { specialty_id: Number(body.specialty_id) },
     });
     return NextResponse.json(doctor, { status: 201 });

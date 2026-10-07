@@ -14,8 +14,10 @@ export async function GET(request: NextRequest) {
   const authError = await requireAuth(request);
   if (authError) return authError;
 
-  const clinicId = (await resolveClinicId(request)) ?? undefined;
-  const subscription = await getSubscription(clinicId);
+  // Fail-closed: sem vínculo de clínica não se consulta a "primeira clínica"
+  // da base — devolve estado nenhum e o guard do cliente bloqueia as páginas.
+  const clinicId = await resolveClinicId(request);
+  const subscription = clinicId === null ? null : await getSubscription(clinicId);
   const gateDisabled = !subscriptionGateEnabled();
 
   return NextResponse.json(

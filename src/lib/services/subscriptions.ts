@@ -157,7 +157,12 @@ export async function createAlert(
   clinicId?: number
 ): Promise<ClinicAlert> {
   const clinic = await getClinic(clinicId);
-  const clinicIdToUse = clinic?.id ?? 1;
+  const clinicIdToUse = clinicId ?? clinic?.id;
+  // Sem clínica resolvida não se grava o alerta na "clínica #1" da base:
+  // preferível falhar a atribuir o evento a outro tenant.
+  if (clinicIdToUse === undefined || clinicIdToUse === null) {
+    throw new Error("Clínica não encontrada para o alerta.");
+  }
 
   const { data, error } = await supabaseAdmin
     .from("clinic_alerts")
@@ -172,10 +177,10 @@ export async function createAlert(
   return data;
 }
 
-export async function listAlerts(limit = 30): Promise<ClinicAlert[]> {
-  const { data, error } = await supabaseAdmin
-    .from("clinic_alerts")
-    .select("*")
+export async function listAlerts(limit = 30, clinicId?: number): Promise<ClinicAlert[]> {
+  let query = supabaseAdmin.from("clinic_alerts").select("*");
+  if (clinicId !== undefined) query = query.eq("clinic_id", clinicId);
+  const { data, error } = await query
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(limit);
@@ -198,8 +203,11 @@ export async function notifyReception(message: string, clinicId?: number): Promi
 }
 
 // Compra de pacote excedente de 50.000 tokens (gestor/admin autenticado).
-export async function buyOveragePack(): Promise<{ clinic: Clinic | null; billingEvent: BillingEvent }> {
-  const clinic = await getClinic();
+// A clínica vem da sessão (requireClinic) — nunca da "primeira da base".
+export async function buyOveragePack(
+  clinicId: number
+): Promise<{ clinic: Clinic | null; billingEvent: BillingEvent }> {
+  const clinic = await getClinic(clinicId);
   if (!clinic) throw new Error("Clínica não encontrada.");
 
   const newTokenLimit = clinic.token_limit + OVERAGE_PACK_TOKENS;
@@ -233,7 +241,8 @@ export async function buyOveragePack(): Promise<{ clinic: Clinic | null; billing
 
   await createAlert(
     "overage_pack",
-    "Pacote excedente de 50.000 tokens adquirido. Atendimento automático por IA reativado."
+    "Pacote excedente de 50.000 tokens adquirido. Atendimento automático por IA reativado.",
+    clinic.id
   );
   console.log(
     `[subscriptions] Pacote excedente adquirido: token_limit=${newTokenLimit.toLocaleString("pt-BR")}, blocos=${clinic.overage_blocks_purchased + 1}`
@@ -241,7 +250,7 @@ export async function buyOveragePack(): Promise<{ clinic: Clinic | null; billing
 
   await sendReceiptByWhatsApp(clinic, billingEvent, newTokenLimit);
 
-  return { clinic: await getClinic(), billingEvent };
+  return { clinic: await getClinic(clinic.id), billingEvent };
 }
 
 async function sendReceiptByWhatsApp(

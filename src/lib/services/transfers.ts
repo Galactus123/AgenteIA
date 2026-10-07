@@ -34,9 +34,14 @@ export async function notifyReceptionTransfer(
       .map((m) => `${m.sender === "patient" ? "Paciente" : "IA"}: ${snippet(m.content)}`)
       .join("\n");
 
+    // clinic_id vem da linha da conversa (SELECT *) — a notificação do sino
+    // nasce na mesma clínica que a conversa, não na "primeira da base".
+    const clinicId = (conversation as { clinic_id?: number }).clinic_id;
+
     await createNotification({
       type: "transfer",
       title: "Conversa transferida para atendimento humano",
+      clinic_id: clinicId,
       message: [
         `Telefone: ${conversation.phone}`,
         reason ? `Motivo: ${snippet(reason)}` : "",

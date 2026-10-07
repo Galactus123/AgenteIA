@@ -13,61 +13,88 @@ export async function createNotification(data: {
   message: string;
   appointment_id?: number | null;
   professional_id?: string | null;
+  clinic_id?: number | null;
 }): Promise<Notification> {
-  const { data: row, error } = await supabaseAdmin
+  const row: Record<string, unknown> = {
+    type: data.type,
+    title: data.title,
+    message: data.message,
+    appointment_id: data.appointment_id ?? null,
+    professional_id: data.professional_id ?? null,
+    read: 0,
+    channel_status: "pending",
+    created_at: nowStr(),
+  };
+  // clinic_id conhecido (agenda/lembrete da própria clínica) grava-se; sem
+  // ele a coluna usa o default da base (caminho inbound legado, Ponto 3/4).
+  if (data.clinic_id !== undefined && data.clinic_id !== null) {
+    row.clinic_id = data.clinic_id;
+  }
+
+  const { data: inserted, error } = await supabaseAdmin
     .from("notifications")
-    .insert({
-      type: data.type,
-      title: data.title,
-      message: data.message,
-      appointment_id: data.appointment_id ?? null,
-      professional_id: data.professional_id ?? null,
-      read: 0,
-      channel_status: "pending",
-      created_at: nowStr(),
-    })
+    .insert(row)
     .select("*")
     .single();
 
   if (error) fail(`[notifications] Falha ao criar notificacao: ${error.message}`);
-  return row;
+  return inserted;
 }
 
-export async function listNotifications(opts?: {
+// Sempre escopada à clínica: notificações de outra clínica nunca aparecem.
+export async function listNotifications(opts: {
+  clinicId: number;
   type?: NotificationType;
   unreadOnly?: boolean;
   limit?: number;
 }): Promise<Notification[]> {
-  let query = supabaseAdmin.from("notifications").select("*");
+  let query = supabaseAdmin
+    .from("notifications")
+    .select("*")
+    .eq("clinic_id", opts.clinicId);
 
-  if (opts?.type) query = query.eq("type", opts.type);
-  if (opts?.unreadOnly) query = query.eq("read", 0);
+  if (opts.type) query = query.eq("type", opts.type);
+  if (opts.unreadOnly) query = query.eq("read", 0);
 
   const { data, error } = await query
     .order("created_at", { ascending: false })
-    .limit(opts?.limit ?? 50);
+    .limit(opts.limit ?? 50);
 
   if (error) fail(`[notifications] Falha ao listar notificacoes: ${error.message}`);
   return data ?? [];
 }
 
-export async function getUnreadCount(): Promise<number> {
+export async function getUnreadCount(clinicId: number): Promise<number> {
   const { count, error } = await supabaseAdmin
     .from("notifications")
     .select("id", { count: "exact", head: true })
+    .eq("clinic_id", clinicId)
     .eq("read", 0);
 
   if (error) fail(`[notifications] Falha ao contar notificacoes: ${error.message}`);
   return count ?? 0;
 }
 
-export async function markAsRead(id: number): Promise<void> {
-  const { error } = await supabaseAdmin.from("notifications").update({ read: 1 }).eq("id", id);
+// Devolve false quando a notificação não pertence a esta clínica — a rota
+// responde 404 em vez de confirmar a existência de um id alheio.
+export async function markAsRead(id: number, clinicId: number): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
+    .from("notifications")
+    .update({ read: 1 })
+    .eq("id", id)
+    .eq("clinic_id", clinicId)
+    .select("id");
+
   if (error) fail(`[notifications] Falha ao marcar como lida: ${error.message}`);
+  return Boolean(data && data.length > 0);
 }
 
-export async function markAllAsRead(): Promise<void> {
-  const { error } = await supabaseAdmin.from("notifications").update({ read: 1 }).eq("read", 0);
+export async function markAllAsRead(clinicId: number): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("notifications")
+    .update({ read: 1 })
+    .eq("clinic_id", clinicId)
+    .eq("read", 0);
   if (error) fail(`[notifications] Falha ao marcar todas como lidas: ${error.message}`);
 }
 
@@ -109,7 +136,8 @@ export async function notifyDoctorNewAppointment(
   patientName: string,
   specialtyName: string,
   startsAt: string,
-  appointmentId: number
+  appointmentId: number,
+  clinicId?: number
 ): Promise<void> {
   const time = startsAt.split(" ")[1] ?? startsAt;
   const date = startsAt.split(" ")[0] ?? "";
@@ -122,6 +150,7 @@ export async function notifyDoctorNewAppointment(
     message,
     appointment_id: appointmentId,
     professional_id: professionalId,
+    clinic_id: clinicId,
   });
 
   await sendDoctorNotification(doctorPhone, notification);
@@ -134,7 +163,8 @@ export async function notifyDoctorCancelled(
   patientName: string,
   specialtyName: string,
   startsAt: string,
-  appointmentId: number
+  appointmentId: number,
+  clinicId?: number
 ): Promise<void> {
   const time = startsAt.split(" ")[1] ?? startsAt;
   const date = startsAt.split(" ")[0] ?? "";
@@ -147,6 +177,7 @@ export async function notifyDoctorCancelled(
     message,
     appointment_id: appointmentId,
     professional_id: professionalId,
+    clinic_id: clinicId,
   });
 
   await sendDoctorNotification(doctorPhone, notification);
@@ -160,7 +191,8 @@ export async function notifyDoctorRescheduled(
   specialtyName: string,
   oldStartsAt: string,
   newStartsAt: string,
-  appointmentId: number
+  appointmentId: number,
+  clinicId?: number
 ): Promise<void> {
   const oldTime = oldStartsAt.split(" ")[1] ?? oldStartsAt;
   const newTime = newStartsAt.split(" ")[1] ?? newStartsAt;
@@ -174,6 +206,7 @@ export async function notifyDoctorRescheduled(
     message,
     appointment_id: appointmentId,
     professional_id: professionalId,
+    clinic_id: clinicId,
   });
 
   await sendDoctorNotification(doctorPhone, notification);
@@ -186,7 +219,8 @@ export async function notifyDoctorReminder(
   patientName: string,
   specialtyName: string,
   startsAt: string,
-  appointmentId: number
+  appointmentId: number,
+  clinicId?: number
 ): Promise<void> {
   const time = startsAt.split(" ")[1] ?? startsAt;
   const title = "Lembrete de consulta";
@@ -198,6 +232,7 @@ export async function notifyDoctorReminder(
     message,
     appointment_id: appointmentId,
     professional_id: professionalId,
+    clinic_id: clinicId,
   });
 
   await sendDoctorNotification(doctorPhone, notification);

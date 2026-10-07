@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, resolveClinicId } from "@/lib/api-auth";
+import { requireClinic } from "@/lib/api-auth";
 import { PlanLimitError } from "@/lib/services/plan-limits";
 import {
   getOrCreateConversation,
@@ -11,14 +11,15 @@ import {
 } from "@/lib/services/conversations";
 
 export async function GET(request: NextRequest) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
+  const { clinicId } = session;
 
   const phone = request.nextUrl.searchParams.get("phone");
   const id = request.nextUrl.searchParams.get("id");
 
   if (phone) {
-    const conversation = await getConversationByPhone(phone);
+    const conversation = await getConversationByPhone(phone, clinicId);
     if (!conversation) {
       return NextResponse.json({ conversation: null, messages: [] });
     }
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (id) {
-    const conversation = await getConversation(Number(id));
+    const conversation = await getConversation(Number(id), clinicId);
     if (!conversation) {
       return NextResponse.json({ error: "Conversa não encontrada." }, { status: 404 });
     }
@@ -39,12 +40,13 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  return NextResponse.json({ conversations: await listConversations() });
+  return NextResponse.json({ conversations: await listConversations(clinicId) });
 }
 
 export async function POST(request: NextRequest) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
+  const { clinicId } = session;
 
   const body = await request.json().catch(() => null);
   if (!body) {
@@ -56,8 +58,6 @@ export async function POST(request: NextRequest) {
   if (!phone) {
     return NextResponse.json({ error: "Número de telefone é obrigatório." }, { status: 400 });
   }
-
-  const clinicId = await resolveClinicId(request);
 
   try {
     if (message !== undefined && message !== null && sender) {

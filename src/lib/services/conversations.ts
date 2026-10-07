@@ -39,27 +39,34 @@ export async function getOrCreateConversation(
 ): Promise<Conversation> {
   const normalized = phone.replace(/\D/g, "");
   const now = nowStr();
+  const scoped = clinicId ?? undefined;
 
-  const { data: existing, error: readError } = await supabaseAdmin
+  let readQuery = supabaseAdmin
     .from("conversations")
     .select("*")
-    .eq("phone", normalized)
-    .maybeSingle();
+    .eq("phone", normalized);
+  if (scoped !== undefined) readQuery = readQuery.eq("clinic_id", scoped);
+  const { data: existing, error: readError } = await readQuery.maybeSingle();
 
   if (readError) fail("conversations", readError.message);
   if (existing) return existing;
 
   await assertConversationAllowed(clinicId);
 
+  const insertRow: Record<string, unknown> = {
+    phone: normalized,
+    patient_name: "",
+    status: "open",
+    created_at: now,
+    updated_at: now,
+  };
+  // Conversa nova sempre nasce na clínica do chamador. Sem clinic_id
+  // (webhook inbound sem clínica resolvida — Ponto 3) a coluna usa o default.
+  if (scoped !== undefined) insertRow.clinic_id = scoped;
+
   const { data: created, error: insertError } = await supabaseAdmin
     .from("conversations")
-    .insert({
-      phone: normalized,
-      patient_name: "",
-      status: "open",
-      created_at: now,
-      updated_at: now,
-    })
+    .insert(insertRow)
     .select("*")
     .single();
 
@@ -72,34 +79,42 @@ export async function getOrCreateConversation(
 
   // 23505 = outra requisicao criou a mesma conversa entre o SELECT e o INSERT.
   if (insertError?.code === "23505") {
-    const { data: concurrent } = await supabaseAdmin
+    let retryQuery = supabaseAdmin
       .from("conversations")
       .select("*")
-      .eq("phone", normalized)
-      .maybeSingle();
+      .eq("phone", normalized);
+    if (scoped !== undefined) retryQuery = retryQuery.eq("clinic_id", scoped);
+    const { data: concurrent } = await retryQuery.maybeSingle();
     if (concurrent) return concurrent;
   }
 
   fail("conversations", insertError?.message ?? "nao foi possivel criar a conversa");
 }
 
-export async function getConversation(id: number): Promise<Conversation | null> {
-  const { data, error } = await supabaseAdmin
-    .from("conversations")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+// clinicId opcional para o agente (contexto inbound pode ainda não ter a
+// clínica resolvida); quando chega, a leitura fica restrita a essa clínica.
+export async function getConversation(
+  id: number,
+  clinicId?: number
+): Promise<Conversation | null> {
+  let query = supabaseAdmin.from("conversations").select("*").eq("id", id);
+  if (clinicId !== undefined) query = query.eq("clinic_id", clinicId);
+  const { data, error } = await query.maybeSingle();
 
   if (error) fail("conversations", error.message);
   return (data) ?? null;
 }
 
-export async function getConversationByPhone(phone: string): Promise<Conversation | null> {
+export async function getConversationByPhone(
+  phone: string,
+  clinicId: number
+): Promise<Conversation | null> {
   const normalized = phone.replace(/\D/g, "");
   const { data, error } = await supabaseAdmin
     .from("conversations")
     .select("*")
     .eq("phone", normalized)
+    .eq("clinic_id", clinicId)
     .maybeSingle();
 
   if (error) fail("conversations", error.message);
@@ -108,12 +123,13 @@ export async function getConversationByPhone(phone: string): Promise<Conversatio
 
 export async function updateConversation(
   id: number,
-  data: { patient_name?: string; status?: string }
+  data: { patient_name?: string; status?: string },
+  clinicId?: number
 ): Promise<void> {
-  const existing = await getConversation(id);
+  const existing = await getConversation(id, clinicId);
   if (!existing) return;
 
-  const { error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("conversations")
     .update({
       patient_name: data.patient_name ?? existing.patient_name,
@@ -121,7 +137,9 @@ export async function updateConversation(
       updated_at: nowStr(),
     })
     .eq("id", id);
+  if (clinicId !== undefined) query = query.eq("clinic_id", clinicId);
 
+  const { error } = await query;
   if (error) fail("conversations", error.message);
 }
 
@@ -165,10 +183,11 @@ export async function getMessages(conversationId: number): Promise<Message[]> {
   return data ?? [];
 }
 
-export async function listConversations(): Promise<Conversation[]> {
+export async function listConversations(clinicId: number): Promise<Conversation[]> {
   const { data, error } = await supabaseAdmin
     .from("conversations")
     .select("*")
+    .eq("clinic_id", clinicId)
     .order("updated_at", { ascending: false });
 
   if (error) fail("conversations", error.message);

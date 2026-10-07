@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, resolveClinicId } from "@/lib/api-auth";
+import { requireClinic } from "@/lib/api-auth";
 import {
   canAddProfessional,
   canAddAdminUser,
@@ -15,13 +15,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
 
   try {
     const url = new URL(request.url);
     const feature = url.searchParams.get("feature") as FeatureId | null;
-    const clinicId = (await resolveClinicId(request)) ?? undefined;
+    const clinicId = session.clinicId;
 
     const limits = {
       professionals: await canAddProfessional(clinicId),

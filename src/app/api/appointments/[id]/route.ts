@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-auth";
+import { requireClinic } from "@/lib/api-auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { auditRequest } from "@/lib/services/audit";
 import {
@@ -20,11 +20,12 @@ export async function GET(
   request: NextRequest,
   ctx: RouteContext
 ) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
 
   const { id } = await ctx.params;
-  const appointment = await getAppointmentView(Number(id));
+  // Leitura restrita à clínica: id de outro tenant responde 404.
+  const appointment = await getAppointmentView(Number(id), session.clinicId);
   if (!appointment) {
     return NextResponse.json(
       { error: "Consulta não encontrada." },
@@ -38,11 +39,12 @@ export async function PATCH(
   request: NextRequest,
   ctx: RouteContext
 ) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
+  const { clinicId, user } = session;
 
   const { id } = await ctx.params;
-  const appointment = await getAppointment(Number(id));
+  const appointment = await getAppointment(Number(id), clinicId);
   if (!appointment) {
     return NextResponse.json(
       { error: "Consulta não encontrada." },
@@ -66,27 +68,31 @@ export async function PATCH(
       if (!check.ok) {
         return NextResponse.json({ error: check.reason }, { status: 400 });
       }
-      await cancelAppointment(Number(id));
+      await cancelAppointment(Number(id), clinicId);
       await auditRequest(request, {
         action: "appointment.cancel",
         entity: "appointments",
         entityId: id,
+        clinicId,
+        user,
         meta: { by: "panel" },
       });
       return NextResponse.json({
         ok: true,
-        appointment: await getAppointmentView(Number(id)),
+        appointment: await getAppointmentView(Number(id), clinicId),
       });
     }
 
     if (status === "no_show") {
       // Fase 3.6: marcar no-show libera o horario na agenda.
       try {
-        const view = await markNoShow(Number(id));
+        const view = await markNoShow(Number(id), clinicId);
         await auditRequest(request, {
           action: "appointment.no_show",
           entity: "appointments",
           entityId: id,
+          clinicId,
+          user,
         });
         return NextResponse.json({ ok: true, appointment: view });
       } catch (err) {
@@ -104,7 +110,8 @@ export async function PATCH(
           status: "completed",
           updated_at: new Date().toISOString().slice(0, 16).replace("T", " "),
         })
-        .eq("id", Number(id));
+        .eq("id", Number(id))
+        .eq("clinic_id", clinicId);
 
       if (error) {
         return NextResponse.json(
@@ -116,10 +123,12 @@ export async function PATCH(
         action: "appointment.completed",
         entity: "appointments",
         entityId: id,
+        clinicId,
+        user,
       });
       return NextResponse.json({
         ok: true,
-        appointment: await getAppointmentView(Number(id)),
+        appointment: await getAppointmentView(Number(id), clinicId),
       });
     }
 
@@ -136,11 +145,12 @@ export async function PUT(
   request: NextRequest,
   ctx: RouteContext
 ) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
+  const { clinicId, user } = session;
 
   const { id } = await ctx.params;
-  const appointment = await getAppointment(Number(id));
+  const appointment = await getAppointment(Number(id), clinicId);
   if (!appointment) {
     return NextResponse.json(
       { error: "Consulta não encontrada." },
@@ -162,11 +172,17 @@ export async function PUT(
   }
 
   try {
-    const updated = await rescheduleAppointment(Number(id), String(body.new_starts_at));
+    const updated = await rescheduleAppointment(
+      Number(id),
+      String(body.new_starts_at),
+      clinicId
+    );
     await auditRequest(request, {
       action: "appointment.reschedule",
       entity: "appointments",
       entityId: id,
+      clinicId,
+      user,
       meta: { new_starts_at: String(body.new_starts_at) },
     });
     return NextResponse.json({ ok: true, appointment: updated });
@@ -190,11 +206,12 @@ export async function DELETE(
   request: NextRequest,
   ctx: RouteContext
 ) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
+  const { clinicId, user } = session;
 
   const { id } = await ctx.params;
-  const appointment = await getAppointment(Number(id));
+  const appointment = await getAppointment(Number(id), clinicId);
   if (!appointment) {
     return NextResponse.json(
       { error: "Consulta não encontrada." },
@@ -207,12 +224,17 @@ export async function DELETE(
     return NextResponse.json({ error: check.reason }, { status: 400 });
   }
 
-  await cancelAppointment(Number(id));
+  await cancelAppointment(Number(id), clinicId);
   await auditRequest(request, {
     action: "appointment.cancel",
     entity: "appointments",
     entityId: id,
+    clinicId,
+    user,
     meta: { by: "panel", method: "delete" },
   });
-  return NextResponse.json({ ok: true, appointment: await getAppointmentView(Number(id)) });
+  return NextResponse.json({
+    ok: true,
+    appointment: await getAppointmentView(Number(id), clinicId),
+  });
 }

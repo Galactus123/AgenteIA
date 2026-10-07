@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { getStats } from "@/lib/services/stats";
+import { resolvePageClinicId } from "@/lib/page-auth";
 import { displayDate } from "@/lib/datetime";
 import { DashboardSkeleton } from "@/components/skeleton";
 import {
@@ -91,7 +92,11 @@ async function DashboardContent() {
   let stats = DEFAULT_STATS;
 
   try {
-    const loaded = await getStats();
+    // Sem clínica vinculada não se carrega nada (nunca a "primeira da base").
+    const clinicId = await resolvePageClinicId();
+    if (!clinicId) throw new Error("Sem clínica vinculada à conta.");
+
+    const loaded = await getStats(clinicId);
     stats = {
       scheduled: loaded?.scheduled ?? 0,
       cancelled: loaded?.cancelled ?? 0,

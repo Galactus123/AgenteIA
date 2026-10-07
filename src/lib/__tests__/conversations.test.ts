@@ -84,7 +84,7 @@ describe("conversations (Fase 8.3)", () => {
   it("getConversation / getConversationByPhone devolvem null sem achado", async () => {
     fakeSupabase.setResolver(() => ({ data: null }));
     expect(await getConversation(99)).toBeNull();
-    expect(await getConversationByPhone("+258 84 000 0000")).toBeNull();
+    expect(await getConversationByPhone("+258 84 000 0000", 1)).toBeNull();
   });
 
   it("updateConversation sem linha existente e um no-op (sem update)", async () => {
@@ -155,11 +155,11 @@ describe("conversations (Fase 8.3)", () => {
 
   it("listConversations ordena por updated_at desc e propaga erro", async () => {
     fakeSupabase.setResolver(() => ({ data: [row] }));
-    expect(await listConversations()).toEqual([row]);
+    expect(await listConversations(1)).toEqual([row]);
     expect(fakeSupabase.last("conversations")?.filters).toContain("order:updated_at:desc");
 
     fakeSupabase.setResolver(() => ({ error: { message: "off" } }));
-    await expect(listConversations()).rejects.toThrow("[conversations] off");
+    await expect(listConversations(1)).rejects.toThrow("[conversations] off");
   });
 
   describe("limites de plano na criação", () => {

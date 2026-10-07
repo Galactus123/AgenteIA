@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-auth";
+import { requireClinic } from "@/lib/api-auth";
 import { getDoctor, updateDoctor, deleteDoctor } from "@/lib/services/doctors";
 import type { ScheduleInput } from "@/lib/services/doctors";
 import { auditRequest } from "@/lib/services/audit";
@@ -11,14 +11,16 @@ function message(err: unknown, fallback: string): string {
 }
 
 async function handleUpdate(request: NextRequest, ctx: RouteContext) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
+  const { clinicId, user } = session;
 
   const { id } = await ctx.params;
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Corpo da requisição inválido." }, { status: 400 });
 
-  const existing = await getDoctor(id);
+  // Ownership: profissional de outra clínica → 404.
+  const existing = await getDoctor(id, clinicId);
   if (!existing) return NextResponse.json({ error: "Profissional não encontrado." }, { status: 404 });
 
   const patch: Parameters<typeof updateDoctor>[1] = {};
@@ -34,12 +36,14 @@ async function handleUpdate(request: NextRequest, ctx: RouteContext) {
   }
 
   try {
-    const doctor = await updateDoctor(id, patch);
+    const doctor = await updateDoctor(id, patch, clinicId);
     // Apenas os campos alterados: valores (nome/e-mail/telefone) nao vao para a trilha.
     await auditRequest(request, {
       action: "professional.update",
       entity: "professionals",
       entityId: id,
+      clinicId,
+      user,
       meta: { fields: Object.keys(patch) },
     });
     return NextResponse.json(doctor);
@@ -57,19 +61,22 @@ export async function PUT(request: NextRequest, ctx: RouteContext) {
 }
 
 export async function DELETE(request: NextRequest, ctx: RouteContext) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
+  const { clinicId, user } = session;
 
   const { id } = await ctx.params;
-  const existing = await getDoctor(id);
+  const existing = await getDoctor(id, clinicId);
   if (!existing) return NextResponse.json({ error: "Profissional não encontrado." }, { status: 404 });
 
   try {
-    await deleteDoctor(id);
+    await deleteDoctor(id, clinicId);
     await auditRequest(request, {
       action: "professional.delete",
       entity: "professionals",
       entityId: id,
+      clinicId,
+      user,
     });
     return NextResponse.json({ ok: true });
   } catch (err) {

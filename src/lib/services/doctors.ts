@@ -1,5 +1,4 @@
 import { supabaseAdmin } from "@/lib/supabase";
-import { getDefaultClinicId } from "@/lib/services/clinics";
 import type { Doctor, DoctorSchedule } from "@/lib/types";
 
 export interface DoctorView extends Doctor {
@@ -60,11 +59,14 @@ function rowToDoctor(row: Record<string, unknown>, specialtyName = ""): DoctorVi
   };
 }
 
-export async function listDoctors(): Promise<DoctorView[]> {
-  const { data, error } = await supabaseAdmin
+// clinicId opcional apenas para o agente (contexto inbound sem clínica
+// resolvida — Ponto 3); rotas autenticadas passam sempre o da sessão.
+export async function listDoctors(clinicId?: number): Promise<DoctorView[]> {
+  let query = supabaseAdmin
     .from("professionals")
-    .select("*, specialties(name)")
-    .order("name", { ascending: true });
+    .select("*, specialties(name)");
+  if (clinicId !== undefined) query = query.eq("clinic_id", clinicId);
+  const { data, error } = await query.order("name", { ascending: true });
 
   if (error) {
     console.error("[doctors] Falha ao listar profissionais:", error.message);
@@ -73,12 +75,13 @@ export async function listDoctors(): Promise<DoctorView[]> {
   return ((data ?? []) as Record<string, unknown>[]).map((row) => rowToDoctor(row));
 }
 
-export async function getDoctor(id: string): Promise<Doctor | null> {
-  const { data, error } = await supabaseAdmin
+export async function getDoctor(id: string, clinicId?: number): Promise<Doctor | null> {
+  let query = supabaseAdmin
     .from("professionals")
     .select("*, specialties(name)")
-    .eq("id", id)
-    .maybeSingle();
+    .eq("id", id);
+  if (clinicId !== undefined) query = query.eq("clinic_id", clinicId);
+  const { data, error } = await query.maybeSingle();
 
   if (error) {
     console.error("[doctors] Falha ao buscar profissional:", error.message);
@@ -113,17 +116,19 @@ export async function getActiveDoctorsBySpecialty(specialtyId: number): Promise<
   return ((data ?? []) as Record<string, unknown>[]).map((row) => rowToDoctor(row));
 }
 
-export async function createDoctor(data: {
-  name: string;
-  email?: string;
-  specialty_id: number | null;
-  consultation_duration?: number;
-  price?: number;
-  status?: string;
-  phone?: string;
-  schedule: ScheduleInput;
-}): Promise<DoctorView> {
-  const clinicId = await getDefaultClinicId();
+export async function createDoctor(
+  clinicId: number,
+  data: {
+    name: string;
+    email?: string;
+    specialty_id: number | null;
+    consultation_duration?: number;
+    price?: number;
+    status?: string;
+    phone?: string;
+    schedule: ScheduleInput;
+  }
+): Promise<DoctorView> {
   const { data: row, error } = await supabaseAdmin
     .from("professionals")
     .insert({
@@ -155,9 +160,10 @@ export async function updateDoctor(
     status?: string;
     phone?: string;
     schedule?: ScheduleInput;
-  }
+  },
+  clinicId?: number
 ): Promise<DoctorView | null> {
-  const existing = await getDoctor(id);
+  const existing = await getDoctor(id, clinicId);
   if (!existing) return null;
 
   const patch: Record<string, unknown> = {};
@@ -170,18 +176,21 @@ export async function updateDoctor(
   if (data.phone !== undefined) patch.phone = data.phone;
   if (data.schedule !== undefined) patch.schedule = data.schedule;
 
-  const { data: row, error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("professionals")
     .update(patch)
-    .eq("id", id)
-    .select("*, specialties(name)")
-    .single();
+    .eq("id", id);
+  if (clinicId !== undefined) query = query.eq("clinic_id", clinicId);
+
+  const { data: row, error } = await query.select("*, specialties(name)").single();
 
   if (error) throw new Error(`[doctors] Falha ao atualizar profissional: ${error.message}`);
   return rowToDoctor(row as Record<string, unknown>);
 }
 
-export async function deleteDoctor(id: string): Promise<void> {
-  const { error } = await supabaseAdmin.from("professionals").delete().eq("id", id);
+export async function deleteDoctor(id: string, clinicId?: number): Promise<void> {
+  let query = supabaseAdmin.from("professionals").delete().eq("id", id);
+  if (clinicId !== undefined) query = query.eq("clinic_id", clinicId);
+  const { error } = await query;
   if (error) throw new Error(`[doctors] Falha ao excluir profissional: ${error.message}`);
 }

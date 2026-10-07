@@ -7,7 +7,6 @@ import type { User } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getUser } from "@/lib/api-auth";
 import { clientIp } from "@/lib/rate-limit";
-import { getDefaultClinicId } from "@/lib/services/clinics";
 import { maskEmail } from "@/lib/lgpd";
 
 export interface AuditEntry {
@@ -37,9 +36,10 @@ export interface AuditRow {
 /** Grava um evento. Nunca lança erro. */
 export async function recordAudit(entry: AuditEntry): Promise<void> {
   try {
-    const clinicId = entry.clinicId ?? (await getDefaultClinicId());
+    // Sem clínica resolvida o evento fica com clinic_id nulo em vez de cair
+    // na "primeira clínica" da base (o que misturaria trilhas de tenants).
     const { error } = await supabaseAdmin.from("audit_logs").insert({
-      clinic_id: clinicId,
+      clinic_id: entry.clinicId ?? null,
       actor_id: entry.actorId ?? null,
       actor_label: entry.actorLabel ?? null,
       action: entry.action,
@@ -80,11 +80,12 @@ export async function auditRequest(
 }
 
 /** Últimos eventos da clínica (limitado; painel de auditoria). */
-export async function listAuditLogs(
-  options: { clinicId?: number; limit?: number } = {}
-): Promise<AuditRow[]> {
+export async function listAuditLogs(options: {
+  clinicId: number;
+  limit?: number;
+}): Promise<AuditRow[]> {
   const limit = Math.min(Math.max(options.limit ?? 100, 1), 500);
-  const clinicId = options.clinicId ?? (await getDefaultClinicId());
+  const clinicId = options.clinicId;
 
   const { data, error } = await supabaseAdmin
     .from("audit_logs")

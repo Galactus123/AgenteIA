@@ -141,15 +141,19 @@ export interface ToolResult {
 
 export interface ToolContext {
   conversationId: number | null;
+  // Clínica da conversa (quando resolvida — Ponto 3/4 no inbound): limita
+  // catálogo, agenda e escritas à clínica do próprio atendimento.
+  clinicId?: number;
 }
 
 async function slotExists(
   specialtyId: number,
   professionalId: string,
-  startsAt: string
+  startsAt: string,
+  clinicId?: number
 ): Promise<boolean> {
   const date = startsAt.split(" ")[0];
-  const slots = await getAvailableSlots(specialtyId, date);
+  const slots = await getAvailableSlots(specialtyId, date, clinicId);
   return slots.some((s) => s.professional_id === professionalId && s.starts_at === startsAt);
 }
 
@@ -160,12 +164,13 @@ async function slotUnavailableResult(
   professionalId: string,
   startsAt: string,
   message: string,
-  hint: string
+  hint: string,
+  clinicId?: number
 ): Promise<ToolResult> {
   let alternatives: AvailableSlot[] = [];
   try {
     const date = startsAt.split(" ")[0];
-    const slots = await getAvailableSlots(specialtyId, date);
+    const slots = await getAvailableSlots(specialtyId, date, clinicId);
     const sameProfessional = slots.filter((s) => s.professional_id === professionalId);
     alternatives = (sameProfessional.length ? sameProfessional : slots).slice(0, 3);
   } catch {
@@ -243,7 +248,7 @@ async function dispatchTool(
     case "list_specialties": {
       let specialties;
       try {
-        specialties = await listSpecialties();
+        specialties = await listSpecialties(ctx.clinicId);
       } catch (err) {
         console.error("[tools:list_specialties] falha ao consultar especialidades no banco:", err);
         return {
@@ -263,9 +268,9 @@ async function dispatchTool(
     case "get_availability": {
       const specialtyId = Number(args.specialty_id);
       const date = String(args.date);
-      const specialty = await getSpecialty(specialtyId);
+      const specialty = await getSpecialty(specialtyId, ctx.clinicId);
       if (!specialty) return { output: "Especialidade não encontrada." };
-      const slots = await getAvailableSlots(specialtyId, date);
+      const slots = await getAvailableSlots(specialtyId, date, ctx.clinicId);
       if (slots.length === 0) {
         return {
           output: `Nenhum horário livre em ${date} para ${specialty.name}. O paciente deve escolher outra data.`,
@@ -288,7 +293,7 @@ async function dispatchTool(
       const specialtyId = Number(args.specialty_id);
       const professionalId = String(args.professional_id);
       const startsAt = String(args.starts_at);
-      if (!(await slotExists(specialtyId, professionalId, startsAt))) {
+      if (!(await slotExists(specialtyId, professionalId, startsAt, ctx.clinicId))) {
         return { output: "Erro: este horário não está mais disponível. Apresente outros horários." };
       }
       let appointment: AppointmentView;
@@ -302,6 +307,7 @@ async function dispatchTool(
           reason: args.reason ? String(args.reason) : "",
           source: "ia",
           conversation_id: ctx.conversationId,
+          clinicId: ctx.clinicId,
         });
       } catch (error) {
         if (error instanceof SlotTakenError) {
@@ -311,7 +317,8 @@ async function dispatchTool(
             professionalId,
             startsAt,
             error.message,
-            "Informe o paciente que o horario acabou de ser ocupado e apresente as alternativas."
+            "Informe o paciente que o horario acabou de ser ocupado e apresente as alternativas.",
+            ctx.clinicId
           );
         }
         if (error instanceof OutsideHoursError) {
@@ -321,7 +328,8 @@ async function dispatchTool(
             professionalId,
             startsAt,
             error.message,
-            "Apresente um dos horários livres retornados, que já respeitam o expediente do profissional."
+            "Apresente um dos horários livres retornados, que já respeitam o expediente do profissional.",
+            ctx.clinicId
           );
         }
         throw error;
@@ -343,7 +351,7 @@ async function dispatchTool(
 
     case "find_appointment": {
       const phone = String(args.phone);
-      const appointment = await findUpcomingAppointmentByPhone(phone);
+      const appointment = await findUpcomingAppointmentByPhone(phone, ctx.clinicId);
       if (!appointment) {
         return { output: "Nenhuma consulta futura encontrada para este número." };
       }
@@ -363,7 +371,7 @@ async function dispatchTool(
       const appointmentId = Number(args.appointment_id);
       const newStartsAt = String(args.new_starts_at);
 
-      const current = await getAppointment(appointmentId);
+      const current = await getAppointment(appointmentId, ctx.clinicId);
       if (!current) {
         return { output: JSON.stringify({ ok: false, error: "Consulta não encontrada." }) };
       }
@@ -389,7 +397,7 @@ async function dispatchTool(
 
       // Etapa 2 — executa.
       try {
-        const appointment = await rescheduleAppointment(appointmentId, newStartsAt);
+        const appointment = await rescheduleAppointment(appointmentId, newStartsAt, ctx.clinicId);
         return {
           output: JSON.stringify({
             ok: true,
@@ -426,7 +434,7 @@ async function dispatchTool(
     case "cancel_appointment": {
       const appointmentId = Number(args.appointment_id);
 
-      const current = await getAppointment(appointmentId);
+      const current = await getAppointment(appointmentId, ctx.clinicId);
       if (!current) {
         return { output: JSON.stringify({ ok: false, error: "Consulta não encontrada." }) };
       }
@@ -450,7 +458,7 @@ async function dispatchTool(
 
       // Etapa 2 — executa.
       try {
-        await cancelAppointment(appointmentId);
+        await cancelAppointment(appointmentId, ctx.clinicId);
         return { output: JSON.stringify({ ok: true, appointment_id: appointmentId }) };
       } catch (error) {
         return {

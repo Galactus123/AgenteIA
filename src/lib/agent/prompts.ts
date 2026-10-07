@@ -5,10 +5,11 @@ import { listDoctors } from "@/lib/services/doctors";
 const DAY_LABELS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
 // Constrói um resumo legível das especialidades e médicos cadastrados na clínica,
-// a partir dos dados reais do banco, e injeta no system prompt.
-async function buildCatalogSummary(): Promise<string> {
-  const specialties = await listSpecialties();
-  const doctors = await listDoctors();
+// a partir dos dados reais do banco, e injeta no system prompt. Sem clinicId
+// (caminho inbound ainda sem clínica resolvida — Ponto 3/4) lista o legado.
+async function buildCatalogSummary(clinicId?: number): Promise<string> {
+  const specialties = await listSpecialties(clinicId);
+  const doctors = await listDoctors(clinicId);
 
   const specLines = specialties.map(
     (s) =>
@@ -41,14 +42,17 @@ async function buildCatalogSummary(): Promise<string> {
   ].join("\n");
 }
 
-export async function buildSystemPrompt(hasHistory: boolean = false): Promise<string> {
-  const clinic = await getClinic();
+export async function buildSystemPrompt(
+  hasHistory: boolean = false,
+  clinicId?: number
+): Promise<string> {
+  const clinic = await getClinic(clinicId);
   const clinicName = clinic?.name ?? "a clínica";
   const clinicInfo = clinic
     ? `A clínica se chama "${clinic.name}".\nEndereço: ${clinic.address}\nHorário de funcionamento: ${clinic.opening_hours}\nWhatsApp: ${clinic.whatsapp}`
     : "";
 
-  const catalog = await buildCatalogSummary();
+  const catalog = await buildCatalogSummary(clinicId);
 
   const contextNote = hasHistory
     ? `\n# IMPORTANTE — Contexto de conversa anterior

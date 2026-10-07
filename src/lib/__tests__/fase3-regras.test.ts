@@ -222,7 +222,7 @@ describe("3.6c — no-show", () => {
 
 // ── 3.7: confirmação em duas etapas ──────────────────────────
 
-const ctx = { conversationId: 7 };
+const ctx = { conversationId: 7, clinicId: 3 };
 
 function futureStart(minutesFromNow: number): string {
   const d = new Date(Date.now() + minutesFromNow * 60_000);
@@ -264,7 +264,8 @@ describe("3.7 — cancel_appointment em duas etapas", () => {
     const body = JSON.parse(result.output);
 
     expect(body.ok).toBe(true);
-    expect(cancelAppointment).toHaveBeenCalledWith(1);
+    expect(getAppointment).toHaveBeenCalledWith(1, 3);
+    expect(cancelAppointment).toHaveBeenCalledWith(1, 3);
   });
 
   it("fora da janela de 4h (sem confirm): exige humano, não pede confirmação", async () => {

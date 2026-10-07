@@ -87,7 +87,7 @@ export async function handlePatientMessage(
   if (conversation.status === "WAITING_HUMAN_INTERVENTION") {
     if (await hasAiQuota(clinic)) {
       log(`Conversa ${conversation.id}: cota restaurada — retomando o atendimento da IA.`);
-      await updateConversation(conversation.id, { status: "open" });
+      await updateConversation(conversation.id, { status: "open" }, clinic);
     } else {
       log(`Conversa ${conversation.id}: cota esgotada — IA continua fora.`);
       await addMessage(conversation.id, "patient", sanitizedText);
@@ -128,7 +128,7 @@ export async function handlePatientMessage(
 
   // Monta o contexto completo: system prompt + historico integral + nova mensagem
   const hasHistory = history.length > 1;
-  const systemPrompt = await buildSystemPrompt(hasHistory);
+  const systemPrompt = await buildSystemPrompt(hasHistory, clinic);
   const messages: LlmMessage[] = [{ role: "system", content: systemPrompt }];
 
   let patientCount = 0;
@@ -192,11 +192,12 @@ export async function handlePatientMessage(
           }
           const result = await executeTool(toolCall.function.name, args, {
             conversationId: conversation.id,
+            clinicId: clinic,
           });
           log(`Tool "${toolCall.function.name}" executada → output=${result.output.slice(0, 200)}${result.transferToHuman ? " [TRANSFER_TO_HUMAN]" : ""}`);
           if (result.transferToHuman) {
             transferred = true;
-            await updateConversation(conversation.id, { status: "transferred" });
+            await updateConversation(conversation.id, { status: "transferred" }, clinic);
             await notifyReceptionTransfer(conversation, result.transferReason ?? "");
             log(`Conversa ${conversation.id} marcada como transferred; recepcao notificada.`);
           }
@@ -250,7 +251,7 @@ async function blockConversationForQuota(
   clinicId?: number
 ): Promise<AgentReply> {
   await addMessage(conversationId, "bot", QUOTA_EXHAUSTED_MESSAGE);
-  await updateConversation(conversationId, { status: "WAITING_HUMAN_INTERVENTION" });
+  await updateConversation(conversationId, { status: "WAITING_HUMAN_INTERVENTION" }, clinicId);
   await blockForQuota(phone, clinicId);
   log(`Conversa ${conversationId} marcada como WAITING_HUMAN_INTERVENTION por cota esgotada.`);
   return { reply: QUOTA_EXHAUSTED_MESSAGE, conversationId, transferred: true };

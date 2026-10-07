@@ -433,13 +433,13 @@ describe("subscriptions (Fase 8.3)", () => {
   describe("buyOveragePack", () => {
     it("sem clinica lança erro", async () => {
       fakeSupabase.setResolver(router({ clinic: null }));
-      await expect(buyOveragePack()).rejects.toThrow("Clínica não encontrada.");
+      await expect(buyOveragePack(1)).rejects.toThrow("Clínica não encontrada.");
     });
 
     it("aumenta a cota, registra a cobranca, cria alerta e envia o recibo", async () => {
       fakeSupabase.setResolver(router({ clinic: { ...clinic, current_token_usage: 1000 } }));
 
-      const result = await buyOveragePack();
+      const result = await buyOveragePack(1);
 
       expect(result.billingEvent).toMatchObject({ id: 42 });
       expect(result.clinic).toMatchObject({ id: 1 });
@@ -470,7 +470,7 @@ describe("subscriptions (Fase 8.3)", () => {
     it("preco configuravel via env sobrepoe o padrao", async () => {
       vi.stubEnv("OVERAGE_PACK_PRICE", "450");
       fakeSupabase.setResolver(router({ clinic }));
-      await buyOveragePack();
+      await buyOveragePack(1);
       expect(fakeSupabase.last("billing_events", "insert")?.payload).toMatchObject({
         amount: 450,
       });
@@ -478,19 +478,19 @@ describe("subscriptions (Fase 8.3)", () => {
 
     it("falha ao atualizar a cota aborta antes da cobranca", async () => {
       fakeSupabase.setResolver(router({ clinic, clinicsUpdateError: { message: "quota off" } }));
-      await expect(buyOveragePack()).rejects.toThrow("Falha ao atualizar a cota: quota off");
+      await expect(buyOveragePack(1)).rejects.toThrow("Falha ao atualizar a cota: quota off");
       expect(fakeSupabase.find("billing_events", "insert")).toHaveLength(0);
     });
 
     it("falha ao registar a cobranca propaga o erro", async () => {
       fakeSupabase.setResolver(router({ clinic, billingError: { message: "lojou off" } }));
-      await expect(buyOveragePack()).rejects.toThrow("Falha ao registar a cobrança: lojou off");
+      await expect(buyOveragePack(1)).rejects.toThrow("Falha ao registar a cobrança: lojou off");
       expect(send).not.toHaveBeenCalled();
     });
 
     it("sem WhatsApp na clinica conclui sem recibo", async () => {
       fakeSupabase.setResolver(router({ clinic: { ...clinic, whatsapp: "" } }));
-      const result = await buyOveragePack();
+      const result = await buyOveragePack(1);
       expect(result.billingEvent).toMatchObject({ id: 42 });
       expect(send).not.toHaveBeenCalled();
     });

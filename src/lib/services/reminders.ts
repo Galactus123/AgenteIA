@@ -61,16 +61,19 @@ async function getProfessionalPhone(professionalId: string | null): Promise<stri
 // Retorna true somente quando este chamado foi quem registrou — corrida
 // entre execucoes concorrentes resolve no banco, nao na aplicacao.
 async function sendReminder(appointment: AppointmentView, type: "24h" | "2h"): Promise<boolean> {
+  // clinic_id da própria consulta (coluna presente no SELECT *) — conversa,
+  // notificação do profissional e lembrete ficam na mesma clínica.
+  const clinicId = (appointment as { clinic_id?: number }).clinic_id;
+  const reminderRow: Record<string, unknown> = {
+    appointment_id: appointment.id,
+    type,
+    sent_at: nowStr(),
+  };
+  if (clinicId !== undefined) reminderRow.clinic_id = clinicId;
+
   const { data: inserted, error } = await supabaseAdmin
     .from("reminders")
-    .upsert(
-      {
-        appointment_id: appointment.id,
-        type,
-        sent_at: nowStr(),
-      },
-      { onConflict: "appointment_id,type", ignoreDuplicates: true }
-    )
+    .upsert(reminderRow, { onConflict: "appointment_id,type", ignoreDuplicates: true })
     .select("id");
 
   if (error) {
@@ -84,10 +87,9 @@ async function sendReminder(appointment: AppointmentView, type: "24h" | "2h"): P
 
   let conversationId = appointment.conversation_id;
   if (!conversationId) {
-    const conversation = await getOrCreateConversation(appointment.patient_phone);
+    const conversation = await getOrCreateConversation(appointment.patient_phone, clinicId);
     conversationId = conversation.id;
   }
-
   const outboxId = await enqueueOutboxMessage({
     phone: appointment.patient_phone,
     text,
@@ -118,7 +120,8 @@ async function sendReminder(appointment: AppointmentView, type: "24h" | "2h"): P
         appointment.patient_name,
         appointment.specialty_name,
         appointment.starts_at,
-        appointment.id
+        appointment.id,
+        clinicId
       );
     }
   } catch (err) {

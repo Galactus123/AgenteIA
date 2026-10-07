@@ -15,7 +15,6 @@ import {
   notifyDoctorCancelled,
   notifyDoctorRescheduled,
 } from "@/lib/services/notifications";
-import { getDefaultClinicId } from "@/lib/services/clinics";
 import { getDoctorSchedule, normalizeSchedule } from "@/lib/services/doctors";
 import type { DoctorSchedule } from "@/lib/types";
 
@@ -130,19 +129,24 @@ async function resolveViews(response: {
   return ((response.data ?? []) as unknown as AppointmentRow[]).map(toView);
 }
 
-export async function listAppointments(): Promise<AppointmentView[]> {
+export async function listAppointments(clinicId: number): Promise<AppointmentView[]> {
   const query = supabaseAdmin
     .from("appointments")
     .select(VIEW_SELECT)
+    .eq("clinic_id", clinicId)
     .order("starts_at", { ascending: false });
   return resolveViews(await query);
 }
 
 export async function listAppointmentsFiltered(opts: {
+  clinicId: number;
   date?: string;
   status?: string;
 }): Promise<AppointmentView[]> {
-  let query = supabaseAdmin.from("appointments").select(VIEW_SELECT);
+  let query = supabaseAdmin
+    .from("appointments")
+    .select(VIEW_SELECT)
+    .eq("clinic_id", opts.clinicId);
 
   if (opts.date) {
     query = query
@@ -154,46 +158,55 @@ export async function listAppointmentsFiltered(opts: {
   return resolveViews(await query.order("starts_at", { ascending: false }));
 }
 
-export async function listAppointmentsByDate(dateStr: string): Promise<AppointmentView[]> {
-  const query = supabaseAdmin
+export async function listAppointmentsByDate(
+  dateStr: string,
+  clinicId?: number
+): Promise<AppointmentView[]> {
+  let query = supabaseAdmin
     .from("appointments")
     .select(VIEW_SELECT)
     .gte("starts_at", `${dateStr} 00:00`)
-    .lt("starts_at", `${addDays(dateStr, 1)} 00:00`)
-    .order("starts_at", { ascending: true });
+    .lt("starts_at", `${addDays(dateStr, 1)} 00:00`);
+  if (clinicId !== undefined) query = query.eq("clinic_id", clinicId);
 
-  return resolveViews(await query);
+  return resolveViews(await query.order("starts_at", { ascending: true }));
 }
 
-export async function upcomingAppointments(): Promise<AppointmentView[]> {
-  const query = supabaseAdmin
+export async function upcomingAppointments(clinicId?: number): Promise<AppointmentView[]> {
+  let query = supabaseAdmin
     .from("appointments")
     .select(VIEW_SELECT)
     .eq("status", "scheduled")
-    .gte("starts_at", `${todayStr()} 00:00`)
-    .order("starts_at", { ascending: true });
+    .gte("starts_at", `${todayStr()} 00:00`);
+  if (clinicId !== undefined) query = query.eq("clinic_id", clinicId);
 
-  return resolveViews(await query);
+  return resolveViews(await query.order("starts_at", { ascending: true }));
 }
 
-export async function getAppointment(id: number): Promise<Appointment | null> {
-  const { data, error } = await supabaseAdmin
-    .from("appointments")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+// Com clinicId a leitura é restrita à clínica: uma consulta de outro tenant
+// devolve null (a rota responde 404 e não confirma a existência do id).
+export async function getAppointment(
+  id: number,
+  clinicId?: number
+): Promise<Appointment | null> {
+  let query = supabaseAdmin.from("appointments").select("*").eq("id", id);
+  if (clinicId !== undefined) query = query.eq("clinic_id", clinicId);
+  const { data, error } = await query.maybeSingle();
 
   if (error) fail(`[appointments] Falha ao consultar a consulta: ${error.message}`);
   return (data) ?? null;
 }
 
-export async function getAppointmentView(id: number): Promise<AppointmentView | null> {
-  const query = supabaseAdmin
+export async function getAppointmentView(
+  id: number,
+  clinicId?: number
+): Promise<AppointmentView | null> {
+  let query = supabaseAdmin
     .from("appointments")
     .select(VIEW_SELECT)
-    .eq("id", id)
-    .limit(1);
-  const views = await resolveViews(await query);
+    .eq("id", id);
+  if (clinicId !== undefined) query = query.eq("clinic_id", clinicId);
+  const views = await resolveViews(await query.limit(1));
   return views[0] ?? null;
 }
 
@@ -211,15 +224,19 @@ export async function getAppointmentByConversation(
   return views[0] ?? null;
 }
 
-export async function findUpcomingAppointmentByPhone(phone: string): Promise<AppointmentView | null> {
-  const query = supabaseAdmin
+export async function findUpcomingAppointmentByPhone(
+  phone: string,
+  clinicId?: number
+): Promise<AppointmentView | null> {
+  let query = supabaseAdmin
     .from("appointments")
     .select(VIEW_SELECT)
     .eq("patient_phone", phone)
-    .eq("status", "scheduled")
-    .order("starts_at", { ascending: true })
-    .limit(1);
-  const views = await resolveViews(await query);
+    .eq("status", "scheduled");
+  if (clinicId !== undefined) query = query.eq("clinic_id", clinicId);
+  const views = await resolveViews(
+    await query.order("starts_at", { ascending: true }).limit(1)
+  );
   return views[0] ?? null;
 }
 
@@ -359,7 +376,8 @@ export function enumerateSlots(input: SlotEnumerationInput): AvailableSlot[] {
 
 export async function getAvailableSlots(
   specialtyId: number,
-  dateStr: string
+  dateStr: string,
+  clinicId?: number
 ): Promise<AvailableSlot[]> {
   const weekday = weekdayOf(dateStr);
   const dayStart = dateFromStr(dateStr);
@@ -367,16 +385,18 @@ export async function getAvailableSlots(
   const now = new Date();
   const minStart = addMinutes(now, 2 * 60);
 
+  let professionalQuery = supabaseAdmin
+    .from("professionals")
+    .select("id, name, consultation_duration, price, schedule")
+    .eq("specialty_id", specialtyId)
+    .eq("status", "active");
+  if (clinicId !== undefined) professionalQuery = professionalQuery.eq("clinic_id", clinicId);
+
   const [{ data: professionals, error: profError }, { data: specialty, error: specError }, busy] =
     await Promise.all([
-      supabaseAdmin
-        .from("professionals")
-        .select("id, name, consultation_duration, price, schedule")
-        .eq("specialty_id", specialtyId)
-        .eq("status", "active")
-        .order("name", { ascending: true }),
+      professionalQuery.order("name", { ascending: true }),
       supabaseAdmin.from("specialties").select("name").eq("id", specialtyId).maybeSingle(),
-      loadBusyWindows(dateStr, nextDayStr),
+      loadBusyWindows(dateStr, nextDayStr, clinicId),
     ]);
 
   if (profError) fail(`[appointments] Falha ao consultar profissionais: ${profError.message}`);
@@ -408,13 +428,19 @@ export async function getAvailableSlots(
 }
 
 // Carrega de uma so vez todas as janelas ocupadas do dia (evita N+1 por slot).
-async function loadBusyWindows(fromDate: string, toDate: string): Promise<BusyWindow[]> {
-  const { data, error } = await supabaseAdmin
+async function loadBusyWindows(
+  fromDate: string,
+  toDate: string,
+  clinicId?: number
+): Promise<BusyWindow[]> {
+  let query = supabaseAdmin
     .from("appointments")
     .select("professional_id, starts_at, ends_at")
     .eq("status", "scheduled")
     .lt("starts_at", `${toDate} 00:00`)
     .gt("ends_at", `${fromDate} 00:00`);
+  if (clinicId !== undefined) query = query.eq("clinic_id", clinicId);
+  const { data, error } = await query;
 
   if (error) fail(`[appointments] Falha ao consultar a agenda: ${error.message}`);
 
@@ -436,6 +462,19 @@ export async function getSpecialtyNames(): Promise<Record<number, string>> {
   return map;
 }
 
+// ÚNICO fallback de clínica do serviço, restrito ao caminho inbound do
+// WhatsApp (webhook ainda não resolve a clínica da instância — Ponto 3/4).
+// Toda rota autenticada passa clinicId via requireClinic e nunca cai aqui.
+async function legacyFallbackClinicId(): Promise<number> {
+  const { data, error } = await supabaseAdmin
+    .from("clinics")
+    .select("id")
+    .order("id", { ascending: true })
+    .limit(1);
+  if (error) console.error("[appointments] Falha ao resolver a clínica:", error.message);
+  return data?.[0]?.id ?? 1;
+}
+
 export async function createAppointment(data: {
   patient_name: string;
   patient_phone: string;
@@ -445,6 +484,9 @@ export async function createAppointment(data: {
   reason?: string;
   source?: string;
   conversation_id?: number | null;
+  // Clínica da sessão (rotas do painel). Sem ela — só o caminho inbound do
+  // WhatsApp, ainda sem clínica resolvida (Ponto 3/4) — usa o legado #1.
+  clinicId?: number;
 }): Promise<AppointmentView> {
   const duration = await getProfessionalDuration(data.professional_id);
   if (duration === null) fail("Profissional não encontrado.");
@@ -452,7 +494,7 @@ export async function createAppointment(data: {
   const startsAt = parseDatetime(data.starts_at);
   const endsAt = addMinutes(startsAt, duration);
   await assertWithinWorkingHours(data.professional_id, startsAt, endsAt);
-  const clinicId = await getDefaultClinicId();
+  const clinicId = data.clinicId ?? (await legacyFallbackClinicId());
   const now = nowStr();
 
   const { data: row, error } = await supabaseAdmin
@@ -480,10 +522,10 @@ export async function createAppointment(data: {
     fail(`[appointments] Falha ao criar a consulta: ${error.message}`);
   }
 
-  const view = await getAppointmentView((row).id);
+  const view = await getAppointmentView((row).id, clinicId);
   if (!view) fail("Consulta criada mas não encontrada.");
 
-  await triggerNewAppointmentNotification(view);
+  await triggerNewAppointmentNotification(view, clinicId);
   return view;
 }
 
@@ -497,7 +539,10 @@ async function getDoctorPhone(professionalId: string | null): Promise<string> {
   return (data as { phone?: string } | null)?.phone ?? "";
 }
 
-async function triggerNewAppointmentNotification(appointment: AppointmentView): Promise<void> {
+async function triggerNewAppointmentNotification(
+  appointment: AppointmentView,
+  clinicId?: number
+): Promise<void> {
   try {
     const phone = await getDoctorPhone(appointment.professional_id);
     if (phone) {
@@ -508,7 +553,8 @@ async function triggerNewAppointmentNotification(appointment: AppointmentView): 
         appointment.patient_name,
         appointment.specialty_name,
         appointment.starts_at,
-        appointment.id
+        appointment.id,
+        clinicId
       );
     }
   } catch (err) {
@@ -540,22 +586,24 @@ export function canCancel(appointment: Appointment): RuleCheck {
   return { ok: true };
 }
 
-export async function cancelAppointment(id: number): Promise<AppointmentView> {
-  const appointment = await getAppointment(id);
+export async function cancelAppointment(id: number, clinicId?: number): Promise<AppointmentView> {
+  const appointment = await getAppointment(id, clinicId);
   if (!appointment) fail("Consulta não encontrada.");
 
   const check = canCancel(appointment);
   if (!check.ok) fail(check.reason ?? "Operação não permitida.");
 
   const now = nowStr();
-  const { error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("appointments")
     .update({ status: "cancelled", cancelled_at: now, updated_at: now })
     .eq("id", id);
+  if (clinicId !== undefined) query = query.eq("clinic_id", clinicId);
+  const { error } = await query;
 
   if (error) fail(`[appointments] Falha ao cancelar: ${error.message}`);
 
-  const view = await getAppointmentView(id);
+  const view = await getAppointmentView(id, clinicId);
   if (!view) fail("Consulta não encontrada.");
 
   try {
@@ -568,7 +616,8 @@ export async function cancelAppointment(id: number): Promise<AppointmentView> {
         view.patient_name,
         view.specialty_name,
         view.starts_at,
-        view.id
+        view.id,
+        clinicId
       );
     }
   } catch (err) {
@@ -594,23 +643,25 @@ export function isNoShowDue(
 }
 
 // Marcacao manual (recepcao via API/PATCH).
-export async function markNoShow(id: number): Promise<AppointmentView> {
-  const appointment = await getAppointment(id);
+export async function markNoShow(id: number, clinicId?: number): Promise<AppointmentView> {
+  const appointment = await getAppointment(id, clinicId);
   if (!appointment) fail("Consulta não encontrada.");
   if (appointment.status !== "scheduled") {
     fail("Esta consulta já não está ativa.");
   }
 
   const now = nowStr();
-  const { error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("appointments")
     .update({ status: "no_show", updated_at: now })
     .eq("id", id)
     .eq("status", "scheduled");
+  if (clinicId !== undefined) query = query.eq("clinic_id", clinicId);
+  const { error } = await query;
 
   if (error) fail(`[appointments] Falha ao registrar no-show: ${error.message}`);
 
-  const view = await getAppointmentView(id);
+  const view = await getAppointmentView(id, clinicId);
   if (!view) fail("Consulta não encontrada.");
   return view;
 }
@@ -657,9 +708,10 @@ export function canReschedule(appointment: Appointment): RuleCheck {
 
 export async function rescheduleAppointment(
   id: number,
-  newStartsAt: string
+  newStartsAt: string,
+  clinicId?: number
 ): Promise<AppointmentView> {
-  const appointment = await getAppointment(id);
+  const appointment = await getAppointment(id, clinicId);
   if (!appointment) fail("Consulta não encontrada.");
 
   const check = canReschedule(appointment);
@@ -681,7 +733,7 @@ export async function rescheduleAppointment(
     throw new SlotTakenError("Este horário já não está disponível. Escolha outro horário.");
   }
 
-  const { error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("appointments")
     .update({
       starts_at: newStartsAt,
@@ -691,13 +743,15 @@ export async function rescheduleAppointment(
       updated_at: nowStr(),
     })
     .eq("id", id);
+  if (clinicId !== undefined) query = query.eq("clinic_id", clinicId);
+  const { error } = await query;
 
   if (error) {
     if (isUniqueViolation(error)) throw new SlotTakenError();
     fail(`[appointments] Falha ao remarcar: ${error.message}`);
   }
 
-  const view = await getAppointmentView(id);
+  const view = await getAppointmentView(id, clinicId);
   if (!view) fail("Consulta não encontrada.");
 
   try {
@@ -711,7 +765,8 @@ export async function rescheduleAppointment(
         view.specialty_name,
         appointment.starts_at,
         newStartsAt,
-        view.id
+        view.id,
+        clinicId
       );
     }
   } catch (err) {

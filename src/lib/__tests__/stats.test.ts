@@ -91,7 +91,7 @@ describe("getStats (Fase 4)", () => {
       return { count: 0, data: [], error: null };
     });
 
-    const stats = await getStats();
+    const stats = await getStats(1);
     const today = todayStr();
     const tomorrow = addDays(today, 1);
 
@@ -130,7 +130,7 @@ describe("getStats (Fase 4)", () => {
       return { count: 12, data: [], error: null };
     });
 
-    const stats = await getStats();
+    const stats = await getStats(1);
 
     expect(stats.pendingRequests).toEqual([
       {
@@ -168,7 +168,7 @@ describe("getStats (Fase 4)", () => {
       return { count: 5, data: [], error: null };
     });
 
-    const stats = await getStats();
+    const stats = await getStats(1);
 
     expect(stats.totalPatients).toBe(0);
     expect(stats.pendingRequests).toEqual([]);

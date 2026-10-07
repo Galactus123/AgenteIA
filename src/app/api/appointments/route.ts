@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-auth";
+import { requireClinic } from "@/lib/api-auth";
 import { auditRequest } from "@/lib/services/audit";
 import {
   listAppointmentsFiltered,
@@ -8,26 +8,29 @@ import {
   SlotTakenError,
   OutsideHoursError,
 } from "@/lib/services/appointments";
+import { getSpecialty } from "@/lib/services/specialties";
+import { getDoctor } from "@/lib/services/doctors";
 import { MAX_PATIENT_NAME_LENGTH } from "@/lib/agent/security";
 
 const MAX_REASON_LENGTH = 500;
 
 export async function GET(request: NextRequest) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
 
   const searchParams = request.nextUrl.searchParams;
   const date = searchParams.get("date") ?? undefined;
   const status = searchParams.get("status") ?? undefined;
 
   return NextResponse.json(
-    await listAppointmentsFiltered({ date, status })
+    await listAppointmentsFiltered({ clinicId: session.clinicId, date, status })
   );
 }
 
 export async function POST(request: NextRequest) {
-  const authError = await requireAuth(request);
-  if (authError) return authError;
+  const session = await requireClinic(request);
+  if (session instanceof NextResponse) return session;
+  const { clinicId, user } = session;
 
   const body = await request.json().catch(() => null);
   if (!body) {
@@ -81,6 +84,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Ownership: especialidade e profissional precisam pertencer à clínica da
+  // sessão — ids de outra clínica não agendam (404, sem vazar existência).
+  const specialty = await getSpecialty(specialtyId, clinicId);
+  if (!specialty) {
+    return NextResponse.json({ error: "Especialidade não encontrada." }, { status: 404 });
+  }
+  const professional = await getDoctor(professionalId, clinicId);
+  if (!professional) {
+    return NextResponse.json({ error: "Médico não encontrado." }, { status: 404 });
+  }
+
   if (!(await isSlotAvailable(professionalId, startsAt))) {
     return NextResponse.json(
       { error: "Este horario ja esta ocupado.", code: "SLOT_TAKEN" },
@@ -97,11 +111,14 @@ export async function POST(request: NextRequest) {
       starts_at: startsAt,
       reason,
       source: body.source ?? "api",
+      clinicId,
     });
     await auditRequest(request, {
       action: "appointment.create",
       entity: "appointments",
       entityId: appointment.id,
+      clinicId,
+      user,
       meta: { professional_id: professionalId, starts_at: startsAt },
     });
     return NextResponse.json({ ok: true, appointment }, { status: 201 });
