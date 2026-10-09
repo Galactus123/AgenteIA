@@ -1,7 +1,10 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { getClinic } from "@/lib/services/clinics";
 import { nowStr } from "@/lib/datetime";
-import { sendKomunikaMessage } from "@/lib/services/komunika";
+import {
+  getKomunikaInstanceIdForClinic,
+  sendKomunikaMessage,
+} from "@/lib/services/komunika";
 import { renderOverageReceiptText, type OverageReceiptData } from "@/lib/email-templates/overage-receipt";
 import { getPlan, type PlanId } from "@/lib/plans";
 import type { BillingEvent, Clinic, ClinicAlert, SubscriptionInfo } from "@/lib/types";
@@ -196,7 +199,9 @@ export async function notifyReception(message: string, clinicId?: number): Promi
   const clinic = await getClinic(clinicId);
   if (!clinic?.whatsapp) return;
   try {
-    await sendKomunikaMessage(clinic.whatsapp, message, { type: "text" });
+    // Instancia WhatsApp da propria clinica (fallback: global do ambiente).
+    const { instanceId } = await getKomunikaInstanceIdForClinic(clinic.id);
+    await sendKomunikaMessage(clinic.whatsapp, message, { type: "text", instanceId });
   } catch (err) {
     console.error("[subscriptions] Falha ao notificar a recepção:", err);
   }
@@ -269,10 +274,12 @@ async function sendReceiptByWhatsApp(
     newTokenLimit,
   };
   try {
+    // Instancia WhatsApp da propria clinica (fallback: global do ambiente).
+    const { instanceId } = await getKomunikaInstanceIdForClinic(clinic.id);
     await sendKomunikaMessage(
       clinic.whatsapp,
       renderOverageReceiptText(receiptData),
-      { type: "text" }
+      { type: "text", instanceId }
     );
   } catch (err) {
     console.error("[subscriptions] Falha ao enviar o recibo:", err);

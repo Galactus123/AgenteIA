@@ -313,7 +313,7 @@ describe("subscriptions (Fase 8.3)", () => {
       expect(send).toHaveBeenCalledWith(
         clinic.whatsapp,
         expect.stringContaining("849998877"),
-        { type: "text" }
+        { type: "text", instanceId: "inst-clinica-1" }
       );
     });
 
@@ -365,7 +365,10 @@ describe("subscriptions (Fase 8.3)", () => {
     it("manda para o WhatsApp da recepcao e engole falhas de envio", async () => {
       fakeSupabase.setResolver(router({ clinic }));
       await notifyReception("aviso");
-      expect(send).toHaveBeenCalledWith(clinic.whatsapp, "aviso", { type: "text" });
+      expect(send).toHaveBeenCalledWith(clinic.whatsapp, "aviso", {
+        type: "text",
+        instanceId: "inst-clinica-1",
+      });
 
       send.mockRejectedValueOnce(new Error("api caiu"));
       await expect(notifyReception("aviso 2")).resolves.toBeUndefined();
@@ -464,7 +467,10 @@ describe("subscriptions (Fase 8.3)", () => {
         type: "overage_pack",
       });
       expect(send).toHaveBeenCalledTimes(1);
-      expect(send).toHaveBeenCalledWith(clinic.whatsapp, expect.any(String), { type: "text" });
+      expect(send).toHaveBeenCalledWith(clinic.whatsapp, expect.any(String), {
+        type: "text",
+        instanceId: "inst-clinica-1",
+      });
     });
 
     it("preco configuravel via env sobrepoe o padrao", async () => {

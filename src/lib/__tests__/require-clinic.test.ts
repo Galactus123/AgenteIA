@@ -23,8 +23,9 @@ import { requireClinic } from "@/lib/api-auth";
 
 // ── requireClinic — contexto de clínica das rotas operacionais ──────────────
 //
-// fail-closed em três camadas: sessão ausente → 401, sessão sem linha ativa
-// em subscriptions → 402 (gate), sessão válida sem vínculo ativo em
+// fail-closed em três camadas: sessão ausente → 401, sessão sem clínica
+// resolvida ou sem linha ativa em subscriptions → 402 (gate por clínica),
+// e — só com o gate desativado — sessão válida sem vínculo ativo em
 // clinic_members → 403. O clinic_id devolvido vem SEMPRE do vínculo do
 // próprio utilizador — nunca de um fallback "primeira clínica da base".
 
@@ -104,18 +105,22 @@ describe("requireClinic", () => {
     expect(res).toMatchObject({ clinicId: 12 });
   });
 
-  it("sessão sem vínculo ativo devolve 403 (nunca a clínica #1)", async () => {
+  it("sessão sem vínculo ativo responde 402 do gate (nunca a clínica #1)", async () => {
     setScenario({ member: null });
 
     const res = await requireClinic(apiRequest());
 
     expect(res).toBeInstanceOf(NextResponse);
     const response = res as NextResponse;
-    expect(response.status).toBe(403);
-    expect((await response.json()).error).toContain("clínica");
+    // Sem clinic_id o gate por clínica é fail-closed com 402 — o 403 do
+    // requireClinic só é alcançável com o gate desativado (kill switch).
+    expect(response.status).toBe(402);
+    expect((await response.json()).code).toBe("SUBSCRIPTION_REQUIRED");
+    // Nunca cai na "primeira clínica" da base.
+    expect(fakeSupabase.find("clinics")).toHaveLength(0);
   });
 
-  it("erro na resolução do vínculo também responde 403 (fail-closed)", async () => {
+  it("erro na resolução do vínculo também responde 402 fail-closed", async () => {
     fakeSupabase.setResolver((q) => {
       if (q.table === "clinic_members") return { error: { message: "timeout" } };
       if (q.table === "subscriptions") {
@@ -127,8 +132,25 @@ describe("requireClinic", () => {
     const res = await requireClinic(apiRequest());
 
     expect(res).toBeInstanceOf(NextResponse);
-    expect((res as NextResponse).status).toBe(403);
+    expect((res as NextResponse).status).toBe(402);
     expect(console.error).toHaveBeenCalled();
+    expect(fakeSupabase.find("subscriptions", "select")).toHaveLength(0);
+  });
+
+  it("com o gate desativado, sem vínculo devolve 403 (defesa em profundidade)", async () => {
+    process.env.SUBSCRIPTION_GATE_DISABLED = "1";
+    setScenario({ member: null });
+
+    try {
+      const res = await requireClinic(apiRequest());
+
+      expect(res).toBeInstanceOf(NextResponse);
+      const response = res as NextResponse;
+      expect(response.status).toBe(403);
+      expect((await response.json()).error).toContain("clínica");
+    } finally {
+      delete process.env.SUBSCRIPTION_GATE_DISABLED;
+    }
   });
 
   it("sem assinatura ativa o gate responde 402 antes de entregar o contexto", async () => {

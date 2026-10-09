@@ -462,9 +462,11 @@ export async function getSpecialtyNames(): Promise<Record<number, string>> {
   return map;
 }
 
-// ÚNICO fallback de clínica do serviço, restrito ao caminho inbound do
-// WhatsApp (webhook ainda não resolve a clínica da instância — Ponto 3/4).
-// Toda rota autenticada passa clinicId via requireClinic e nunca cai aqui.
+// ÚNICO fallback de clínica do serviço. O webhook do WhatsApp resolve a
+// clínica dona da instância de entrada (getClinicIdByInstanceId) e passa-a
+// ao agente; este fallback cobre só o caso residual de instância global/
+// desconhecida (clinicId null). Toda rota autenticada passa clinicId via
+// requireClinic e nunca cai aqui.
 async function legacyFallbackClinicId(): Promise<number> {
   const { data, error } = await supabaseAdmin
     .from("clinics")

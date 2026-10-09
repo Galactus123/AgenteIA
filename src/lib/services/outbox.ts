@@ -3,7 +3,9 @@ import { addMinutes, formatDateTime, nowStr, parseDatetime } from "@/lib/datetim
 import {
   checkKomunikaNumber,
   cleanResponseText,
+  getKomunikaInstanceIdForClinic,
   isKomunikaConfigured,
+  resolveKomunikaInstanceId,
   sendKomunikaMessage,
 } from "@/lib/services/komunika";
 
@@ -24,6 +26,10 @@ export interface EnqueueMessageInput {
   text: string;
   kind: OutboxKind;
   conversationId?: number | null;
+  // Clinica dona da mensagem: a entrega usa a instancia WhatsApp propria
+  // desta linha (clinics.komunika_instance_id). Sem clinic_id (null) a
+  // outbox cai na instancia global do ambiente (legado single-tenant).
+  clinicId?: number | null;
 }
 
 // Grava a mensagem na fila (status pending). Retorna null quando a
@@ -46,6 +52,7 @@ export async function enqueueOutboxMessage(input: EnqueueMessageInput): Promise<
       text,
       kind: input.kind,
       conversation_id: input.conversationId ?? null,
+      clinic_id: input.clinicId ?? null,
       status: "pending",
       attempts: 0,
       next_attempt_at: now,
@@ -78,17 +85,32 @@ type DeliverOutcome =
 // numero invalido): nao adianta reenviar. 5xx/timeout/rede = transitorio.
 const PERMANENT_HTTP_STATUS = new Set([400, 401, 403, 404, 422]);
 
-async function deliver(phone: string, text: string): Promise<DeliverOutcome> {
+async function deliver(
+  phone: string,
+  text: string,
+  clinicId?: number | null
+): Promise<DeliverOutcome> {
+  // Komunika sem configurar é um problema transitório do ambiente (env em
+  // falta, deploy antes das chaves): reagenda com backoff em vez de matar a
+  // mensagem à 1ª tentativa. Se persistir até OUTBOX_MAX_ATTEMPTS, acaba
+  // mesmo em failed.
   if (!isKomunikaConfigured()) {
-    return { outcome: "failed", error: "Komunika nao configurado." };
+    return { outcome: "retry", error: "Komunika nao configurado." };
   }
 
-  const check = await checkKomunikaNumber(phone);
+  // Instancia WhatsApp da entrega: a propria da clinica (linha gravada na
+  // outbox) com fallback para a global do ambiente quando nao ha clinic_id
+  // (linhas legadas / fluxos single-tenant).
+  const { instanceId } = clinicId
+    ? await getKomunikaInstanceIdForClinic(clinicId)
+    : { instanceId: resolveKomunikaInstanceId() };
+
+  const check = await checkKomunikaNumber(phone, instanceId);
   if (check.ok && check.exists === false) {
     return { outcome: "failed", error: "Numero sem WhatsApp." };
   }
 
-  const result = await sendKomunikaMessage(phone, text, { type: "text" });
+  const result = await sendKomunikaMessage(phone, text, { type: "text", instanceId });
   if (result.ok) return { outcome: "sent" };
 
   const error = `status=${result.status ?? "?"} ${result.error ?? "erro desconhecido"}`.trim();
@@ -127,7 +149,7 @@ export async function processOutbox(limit = 20): Promise<OutboxRunResult> {
     .update({ status: "sending", updated_at: now })
     .in("id", candidates.map((row) => row.id))
     .or(claimable)
-    .select("id, phone, text, attempts");
+    .select("id, phone, text, attempts, clinic_id");
 
   if (claimError) {
     console.error("[outbox] Falha ao reclamar pendentes:", claimError.message);
@@ -137,8 +159,14 @@ export async function processOutbox(limit = 20): Promise<OutboxRunResult> {
 
   const result: OutboxRunResult = { claimed: claimed.length, sent: 0, retried: 0, failed: 0 };
 
-  for (const row of claimed as { id: number; phone: string; text: string; attempts: number }[]) {
-    const outcome = await deliver(row.phone, row.text);
+  for (const row of claimed as {
+    id: number;
+    phone: string;
+    text: string;
+    attempts: number;
+    clinic_id: number | null;
+  }[]) {
+    const outcome = await deliver(row.phone, row.text, row.clinic_id);
     const attempts = row.attempts + 1;
 
     if (outcome.outcome === "sent") {

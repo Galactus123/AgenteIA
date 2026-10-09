@@ -95,6 +95,7 @@ async function sendReminder(appointment: AppointmentView, type: "24h" | "2h"): P
     text,
     kind: "reminder",
     conversationId,
+    clinicId,
   });
   if (!outboxId) {
     // Sem fila nao ha entrega garantida: desfaz o registro para a

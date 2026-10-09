@@ -1,24 +1,36 @@
-import { describe, it, expect } from "vitest";
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { createHmac, randomBytes } from "node:crypto";
+
+vi.mock("@/lib/supabase", async () => {
+  const { fakeSupabase } = await import("./helpers/supabase-fake");
+  return { supabaseAdmin: fakeSupabase.admin };
+});
+
+import { verifyKomunikaSignature } from "@/lib/services/komunika";
+import { isValidPayloadSize as realIsValidPayloadSize, MAX_WEBHOOK_BODY_BYTES } from "@/lib/agent/security";
 
 // ── Testes de verificacao de assinatura de webhook ─────────────────────
+//
+// Usa a implementação real (verifyKomunikaSignature), não um espelho:
+// um espelho pode passar ao mesmo tempo que o código de produção está errado.
 
 describe("Webhook — HMAC-SHA256 Signature Verification", () => {
   const SECRET = "whsec-test-" + randomBytes(8).toString("hex");
+  const originalSecret = process.env.KOMUNIKA_WEBHOOK_SECRET;
 
   function computeSignature(body: string): string {
     return createHmac("sha256", SECRET).update(body).digest("hex");
   }
 
-  function verify(rawBody: string, signature: string | null | undefined): boolean {
-    if (!SECRET) return true;
-    if (!signature) return false;
-    const expected = computeSignature(rawBody);
-    const a = Buffer.from(signature);
-    const b = Buffer.from(expected);
-    if (a.length !== b.length) return false;
-    return timingSafeEqual(a, b);
-  }
+  const verify = (rawBody: string, signature: string | null | undefined) => {
+    process.env.KOMUNIKA_WEBHOOK_SECRET = SECRET;
+    return verifyKomunikaSignature(rawBody, signature);
+  };
+
+  afterEach(() => {
+    if (originalSecret === undefined) delete process.env.KOMUNIKA_WEBHOOK_SECRET;
+    else process.env.KOMUNIKA_WEBHOOK_SECRET = originalSecret;
+  });
 
   it("deve aceitar assinatura valida", () => {
     const body = '{"event":"message.received","data":{"text":"oi"}}';
@@ -67,31 +79,37 @@ describe("Webhook — HMAC-SHA256 Signature Verification", () => {
     expect(sig).toMatch(/^[a-f0-9]{64}$/);
     expect(verify(body, sig)).toBe(true);
   });
+
+  it("deve rejeitar tudo quando o secret do webhook nao esta configurado (fail-closed)", () => {
+    const body = '{"event":"message.received"}';
+    const sig = computeSignature(body);
+    const saved = process.env.KOMUNIKA_WEBHOOK_SECRET;
+    delete process.env.KOMUNIKA_WEBHOOK_SECRET;
+
+    expect(verifyKomunikaSignature(body, sig)).toBe(false);
+
+    if (saved === undefined) delete process.env.KOMUNIKA_WEBHOOK_SECRET;
+    else process.env.KOMUNIKA_WEBHOOK_SECRET = saved;
+  });
 });
 
 describe("Webhook — Payload Size Validation", () => {
-  const MAX_SIZE = 100_000; // 100KB
-
-  function isValidPayloadSize(body: string): boolean {
-    return Buffer.byteLength(body, "utf-8") <= MAX_SIZE;
-  }
-
   it("deve aceitar payload pequeno", () => {
-    expect(isValidPayloadSize('{"event":"test"}')).toBe(true);
+    expect(realIsValidPayloadSize('{"event":"test"}')).toBe(true);
   });
 
   it("deve aceitar payload de 100KB exato", () => {
-    const body = "x".repeat(MAX_SIZE);
-    expect(isValidPayloadSize(body)).toBe(true);
+    const body = "x".repeat(MAX_WEBHOOK_BODY_BYTES);
+    expect(realIsValidPayloadSize(body)).toBe(true);
   });
 
   it("deve rejeitar payload de 100KB + 1", () => {
-    const body = "x".repeat(MAX_SIZE + 1);
-    expect(isValidPayloadSize(body)).toBe(false);
+    const body = "x".repeat(MAX_WEBHOOK_BODY_BYTES + 1);
+    expect(realIsValidPayloadSize(body)).toBe(false);
   });
 
   it("deve aceitar payload vazio", () => {
-    expect(isValidPayloadSize("")).toBe(true);
+    expect(realIsValidPayloadSize("")).toBe(true);
   });
 });
 

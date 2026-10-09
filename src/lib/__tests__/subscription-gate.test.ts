@@ -117,6 +117,21 @@ describe("guardActiveSubscription", () => {
       expect(gate?.body.subscriptionStatus, status).toBe(status);
     }
   });
+
+  it("sem clinic_id bloqueia com 402 sem consultar a \"primeira clínica\" da BD", async () => {
+    setScenario(sub("active"));
+
+    const gate = await guardActiveSubscription(null);
+
+    expect(gate?.status).toBe(402);
+    expect(gate?.body).toMatchObject({
+      code: "SUBSCRIPTION_REQUIRED",
+      subscriptionStatus: "none",
+      redirectTo: BILLING_PATH,
+    });
+    // Nenhuma consulta a subscriptions: o gate por clínica é fail-closed.
+    expect(fakeSupabase.find("subscriptions")).toHaveLength(0);
+  });
 });
 
 describe("requireAuth — gate de assinatura", () => {
@@ -173,6 +188,24 @@ describe("requireAuth — gate de assinatura", () => {
     const res = await requireAuth(apiRequest("/api/pacientes"));
 
     expect(res?.status).toBe(401);
+    expect(fakeSupabase.find("subscriptions")).toHaveLength(0);
+  });
+
+  it("utilizador sem clínica vinculada recebe 402 (não herda a assinatura de outra clínica)", async () => {
+    setScenario(sub("active"));
+    fakeSupabase.setResolver((q) => {
+      if (q.table === "clinic_members") return { data: null };
+      if (q.table === "subscriptions") return { data: [sub("active")] };
+      return { data: q.opts.maybeSingle || q.opts.single ? null : [], count: 0, error: null };
+    });
+
+    const res = await requireAuth(apiRequest("/api/pacientes"));
+
+    expect(res?.status).toBe(402);
+    await expect(res?.json()).resolves.toMatchObject({
+      code: "SUBSCRIPTION_REQUIRED",
+      subscriptionStatus: "none",
+    });
     expect(fakeSupabase.find("subscriptions")).toHaveLength(0);
   });
 });

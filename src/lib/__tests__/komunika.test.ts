@@ -1,9 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { createHmac } from "node:crypto";
 import {
+  assignGlobalInstanceToClinicIfEmpty,
+  checkKomunikaNumber,
   connectKomunikaInstance,
   connectKomunikaInstanceForClinic,
+  getClinicIdByInstanceId,
   getKomunikaInstanceIdForClinic,
   isKomunikaConfigured,
+  isKomunikaWebhookSecretConfigured,
+  resolveKomunikaInstanceId,
+  sendKomunikaMessage,
+  sendKomunikaTyping,
+  verifyKomunikaSignature,
 } from "@/lib/services/komunika";
 import { fakeSupabase } from "./helpers/supabase-fake";
 
@@ -224,5 +233,313 @@ describe("instância Komunika por clínica", () => {
       instanceId: "inst-natal",
       source: "clinica",
     });
+  });
+});
+
+// ── Atribuição da instância global quando a clínica está vazia ─────────────
+
+describe("assignGlobalInstanceToClinicIfEmpty", () => {
+  beforeEach(() => {
+    fakeSupabase.reset();
+    process.env.KOMUNIKA_INSTANCE_ID = "inst-global";
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fakeSupabase.reset();
+    if (originalInstance === undefined) delete process.env.KOMUNIKA_INSTANCE_ID;
+    else process.env.KOMUNIKA_INSTANCE_ID = originalInstance;
+  });
+
+  it("coluna vazia → grava a global e devolve o id", async () => {
+    fakeSupabase.setResolver((q) => {
+      if (q.table === "clinics" && q.op === "select") {
+        return { data: { komunika_instance_id: "" } };
+      }
+      if (q.table === "clinics" && q.op === "update") return { data: {} };
+      return { data: null };
+    });
+
+    await expect(assignGlobalInstanceToClinicIfEmpty(7)).resolves.toBe("inst-global");
+
+    const update = fakeSupabase.last("clinics", "update");
+    expect(update?.payload).toEqual({ komunika_instance_id: "inst-global" });
+    expect(update?.filters).toContain("id=7");
+    expect(update?.filters).toContain("komunika_instance_id=");
+  });
+
+  it("coluna já preenchida → devolve o id existente sem escrever", async () => {
+    fakeSupabase.setResolver((q) => {
+      if (q.table === "clinics" && q.op === "select") {
+        return { data: { komunika_instance_id: "inst-beira" } };
+      }
+      return { data: null };
+    });
+
+    await expect(assignGlobalInstanceToClinicIfEmpty(7)).resolves.toBe("inst-beira");
+    expect(fakeSupabase.find("clinics", "update")).toHaveLength(0);
+  });
+
+  it("sem KOMUNIKA_INSTANCE_ID configurado devolve null sem escrever", async () => {
+    delete process.env.KOMUNIKA_INSTANCE_ID;
+
+    await expect(assignGlobalInstanceToClinicIfEmpty(7)).resolves.toBeNull();
+    expect(fakeSupabase.find("clinics", "update")).toHaveLength(0);
+  });
+
+  it("erro ao ler devolve null e é registado", async () => {
+    fakeSupabase.setResolver((q) => {
+      if (q.table === "clinics" && q.op === "select") {
+        return { data: null, error: { message: "coluna off" } };
+      }
+      return { data: null };
+    });
+
+    await expect(assignGlobalInstanceToClinicIfEmpty(7)).resolves.toBeNull();
+    expect(console.error).toHaveBeenCalled();
+    expect(fakeSupabase.find("clinics", "update")).toHaveLength(0);
+  });
+
+  it("erro ao escrever devolve null e é registado", async () => {
+    fakeSupabase.setResolver((q) => {
+      if (q.table === "clinics" && q.op === "select") {
+        return { data: { komunika_instance_id: "" } };
+      }
+      if (q.table === "clinics" && q.op === "update") {
+        return { data: null, error: { message: "42501" } };
+      }
+      return { data: null };
+    });
+
+    await expect(assignGlobalInstanceToClinicIfEmpty(7)).resolves.toBeNull();
+    expect(console.error).toHaveBeenCalled();
+  });
+});
+
+// ── Envio por instância (instanceId explícito) ─────────────────────────────
+
+describe("resolveKomunikaInstanceId", () => {
+  const saved = process.env.KOMUNIKA_INSTANCE_ID;
+
+  afterEach(() => {
+    if (saved === undefined) delete process.env.KOMUNIKA_INSTANCE_ID;
+    else process.env.KOMUNIKA_INSTANCE_ID = saved;
+  });
+
+  it("prefere a explícita, depois a global, depois string vazia", () => {
+    process.env.KOMUNIKA_INSTANCE_ID = "inst-global";
+
+    expect(resolveKomunikaInstanceId("inst-clinica-9")).toBe("inst-clinica-9");
+    expect(resolveKomunikaInstanceId(null)).toBe("inst-global");
+    expect(resolveKomunikaInstanceId("   ")).toBe("inst-global");
+
+    delete process.env.KOMUNIKA_INSTANCE_ID;
+    expect(resolveKomunikaInstanceId()).toBe("");
+  });
+});
+
+describe("envio por instância (instanceId explícito)", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockReset();
+    fakeSupabase.reset();
+    process.env.KOMUNIKA_API_TOKEN = "token-teste";
+    process.env.KOMUNIKA_INSTANCE_ID = "inst-global";
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    fakeSupabase.reset();
+    if (originalToken === undefined) delete process.env.KOMUNIKA_API_TOKEN;
+    else process.env.KOMUNIKA_API_TOKEN = originalToken;
+    if (originalInstance === undefined) delete process.env.KOMUNIKA_INSTANCE_ID;
+    else process.env.KOMUNIKA_INSTANCE_ID = originalInstance;
+  });
+
+  function fetchOk(payload: Record<string, unknown> = { success: true }) {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      json: async () => payload,
+      text: async () => JSON.stringify(payload),
+    });
+  }
+
+  function bodyOf(call = 0): Record<string, unknown> {
+    const [, init] = fetchMock.mock.calls[call] as [string, RequestInit];
+    return JSON.parse(String(init.body));
+  }
+
+  it("sendKomunikaMessage usa a instância explícita e ignora a global", async () => {
+    fetchOk();
+
+    const result = await sendKomunikaMessage("841234567", "oi", {
+      type: "text",
+      instanceId: "inst-clinica-9",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/messages/send");
+    expect(bodyOf()).toMatchObject({ instanceId: "inst-clinica-9", to: "841234567" });
+  });
+
+  it("sendKomunikaMessage sem instância explícita cai para a global", async () => {
+    fetchOk();
+
+    await sendKomunikaMessage("841234567", "oi", { type: "text" });
+
+    expect(bodyOf().instanceId).toBe("inst-global");
+  });
+
+  it("checkKomunikaNumber envia a instância explícita no pedido", async () => {
+    fetchOk({ success: true, data: [{ exists: true, number: "841234567" }] });
+
+    const result = await checkKomunikaNumber("841234567", "inst-clinica-9");
+
+    expect(result).toEqual({ ok: true, exists: true });
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/messages/check-number");
+    expect(bodyOf()).toMatchObject({ instanceId: "inst-clinica-9", phone: "841234567" });
+  });
+
+  it("sendKomunikaTyping envia a instância explícita no pedido", async () => {
+    fetchOk();
+
+    await sendKomunikaTyping("841234567", {
+      type: "composing",
+      instanceId: "inst-clinica-9",
+    });
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain("/messages/typing");
+    expect(bodyOf()).toMatchObject({
+      instanceId: "inst-clinica-9",
+      to: "841234567",
+      type: "composing",
+    });
+  });
+});
+
+// ── Lookup inverso: instanceId de entrada → clínica dona ───────────────────
+
+describe("getClinicIdByInstanceId", () => {
+  const savedInstance = process.env.KOMUNIKA_INSTANCE_ID;
+
+  beforeEach(() => {
+    fakeSupabase.reset();
+    process.env.KOMUNIKA_INSTANCE_ID = "inst-global";
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    fakeSupabase.reset();
+    if (savedInstance === undefined) delete process.env.KOMUNIKA_INSTANCE_ID;
+    else process.env.KOMUNIKA_INSTANCE_ID = savedInstance;
+  });
+
+  it("sem instanceId ou igual à global devolve null sem consultar", async () => {
+    await expect(getClinicIdByInstanceId(undefined)).resolves.toBeNull();
+    await expect(getClinicIdByInstanceId("")).resolves.toBeNull();
+    await expect(getClinicIdByInstanceId("   ")).resolves.toBeNull();
+    await expect(getClinicIdByInstanceId("inst-global")).resolves.toBeNull();
+    expect(fakeSupabase.find("clinics")).toHaveLength(0);
+  });
+
+  it("resolve a clínica dona da instância", async () => {
+    fakeSupabase.setResolver((q) =>
+      q.table === "clinics" ? { data: { id: 7 } } : undefined
+    );
+
+    await expect(getClinicIdByInstanceId("inst-clinica-9")).resolves.toBe(7);
+
+    const sel = fakeSupabase.last("clinics", "select");
+    expect(sel?.filters).toContain("komunika_instance_id=inst-clinica-9");
+  });
+
+  it("id vindo como string é convertido para number", async () => {
+    fakeSupabase.setResolver((q) =>
+      q.table === "clinics" ? { data: { id: "42" } } : undefined
+    );
+
+    await expect(getClinicIdByInstanceId("inst-x")).resolves.toBe(42);
+  });
+
+  it("instância desconhecida devolve null", async () => {
+    fakeSupabase.setResolver((q) =>
+      q.table === "clinics" ? { data: null, error: null } : undefined
+    );
+
+    await expect(getClinicIdByInstanceId("inst-x")).resolves.toBeNull();
+  });
+
+  it("erro de banco devolve null e é registado", async () => {
+    fakeSupabase.setResolver((q) =>
+      q.table === "clinics" ? { data: null, error: { message: "coluna off" } } : undefined
+    );
+
+    await expect(getClinicIdByInstanceId("inst-x")).resolves.toBeNull();
+    expect(console.error).toHaveBeenCalled();
+  });
+});
+
+// ── Assinatura do webhook de entrada (fail-closed) ─────────────────────────
+
+describe("verifyKomunikaSignature", () => {
+  const SECRET = "whsec-komunika-teste";
+  const BODY = JSON.stringify({ event: "message.received", data: { text: "oi" } });
+  const originalSecret = process.env.KOMUNIKA_WEBHOOK_SECRET;
+
+  function hmac(body = BODY, secret = SECRET): string {
+    return createHmac("sha256", secret).update(body).digest("hex");
+  }
+
+  afterEach(() => {
+    if (originalSecret === undefined) delete process.env.KOMUNIKA_WEBHOOK_SECRET;
+    else process.env.KOMUNIKA_WEBHOOK_SECRET = originalSecret;
+  });
+
+  it("sem KOMUNIKA_WEBHOOK_SECRET rejeita até com assinatura válida (fail-closed)", () => {
+    delete process.env.KOMUNIKA_WEBHOOK_SECRET;
+
+    expect(isKomunikaWebhookSecretConfigured()).toBe(false);
+    expect(verifyKomunikaSignature(BODY, hmac())).toBe(false);
+  });
+
+  it("secret vazio também é fail-closed", () => {
+    process.env.KOMUNIKA_WEBHOOK_SECRET = "";
+
+    expect(isKomunikaWebhookSecretConfigured()).toBe(false);
+    expect(verifyKomunikaSignature(BODY, hmac())).toBe(false);
+  });
+
+  it("com secret configurado aceita assinatura HMAC válida", () => {
+    process.env.KOMUNIKA_WEBHOOK_SECRET = SECRET;
+
+    expect(isKomunikaWebhookSecretConfigured()).toBe(true);
+    expect(verifyKomunikaSignature(BODY, hmac())).toBe(true);
+  });
+
+  it("rejeita assinatura gerada com outro secret", () => {
+    process.env.KOMUNIKA_WEBHOOK_SECRET = SECRET;
+
+    expect(verifyKomunikaSignature(BODY, hmac(BODY, "outro"))).toBe(false);
+  });
+
+  it("rejeita body adulterado após a assinatura", () => {
+    process.env.KOMUNIKA_WEBHOOK_SECRET = SECRET;
+
+    expect(verifyKomunikaSignature('{"event":"message.sent"}', hmac())).toBe(false);
+  });
+
+  it("rejeita assinatura ausente (null/undefined)", () => {
+    process.env.KOMUNIKA_WEBHOOK_SECRET = SECRET;
+
+    expect(verifyKomunikaSignature(BODY, null)).toBe(false);
+    expect(verifyKomunikaSignature(BODY, undefined)).toBe(false);
   });
 });

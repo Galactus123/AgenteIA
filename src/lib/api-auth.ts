@@ -49,8 +49,10 @@ export async function requireAuth(request: NextRequest): Promise<NextResponse | 
 
   // Gate de subscrição: clínica sem linha ativa em subscriptions não acede
   // às rotas operacionais (a de faturação é isenta para poder cobrar).
+  // Sem vínculo em clinic_members o gate responde 402 (nunca consulta a
+  // "primeira clínica" da base — seria um fail-open multi-tenant).
   if (!isSubscriptionExemptApi(request.nextUrl.pathname)) {
-    const clinicId = (await resolveClinicIdByUserId(user.id)) ?? undefined;
+    const clinicId = await resolveClinicIdByUserId(user.id);
     const gate = await guardActiveSubscription(clinicId);
     if (gate) {
       return NextResponse.json(gate.body, { status: gate.status });

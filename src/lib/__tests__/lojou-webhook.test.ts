@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { createHmac } from "node:crypto";
 import { fakeSupabase } from "./helpers/supabase-fake";
 
 vi.mock("@/lib/supabase", async () => {
@@ -250,13 +251,19 @@ describe("Webhook Lojou — pagamento confirmado", () => {
     expect(captured.subscriptionUpdates).toHaveLength(0);
   });
 
-  it("sem id próprio na clínica usa a instância global do ambiente", async () => {
-    setScenario({ clinicRow: { ...CLINIC_ROW, komunika_instance_id: "" } });
+  it("sem id próprio na clínica usa a instância global do ambiente e grava-a na clínica", async () => {
+    const captured = setScenario({ clinicRow: { ...CLINIC_ROW, komunika_instance_id: "" } });
 
     const res = await POST(makeRequest(approvedPayload()));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ success: true });
+
+    // Atribuição: a global KOMUNIKA_INSTANCE_ID fica registada na linha da
+    // clínica (coluna vazia → preenchida; nunca sobrescreve).
+    expect(captured.clinicUpdates).toContainEqual(
+      expect.objectContaining({ komunika_instance_id: "inst-global" })
+    );
 
     const connects = instanceConnectCalls();
     expect(connects).toHaveLength(1);
@@ -266,7 +273,20 @@ describe("Webhook Lojou — pagamento confirmado", () => {
       .mock.calls.flat()
       .join(" ");
     expect(logged).toContain("inst-global");
-    expect(logged).toContain("global do ambiente");
+    expect(logged).toContain("atribuida a clinica 7");
+  });
+
+  it("clínica com instância própria não tem a coluna sobrescrita pela global", async () => {
+    const captured = setScenario();
+
+    const res = await POST(makeRequest(approvedPayload()));
+
+    expect(res.status).toBe(200);
+    expect(
+      captured.clinicUpdates.filter((u) => "komunika_instance_id" in u)
+    ).toHaveLength(0);
+    const connects = instanceConnectCalls();
+    expect(String(connects[0][0])).toContain("/instances/inst-clinica-1/connect");
   });
 
   it("cliente já registado: não recria o utilizador mas ativa plano e instância", async () => {
@@ -437,5 +457,120 @@ describe("Webhook Lojou — pagamento confirmado", () => {
 
     expect(res.status).toBe(401);
     expect(instanceConnectCalls()).toHaveLength(0);
+  });
+});
+
+// ── Autenticação fail-closed: header HMAC + fallback query ──────────────────
+
+describe("Webhook Lojou — autenticação fail-closed", () => {
+  beforeEach(() => {
+    fakeSupabase.reset();
+    vi.clearAllMocks();
+    fetchMock.mockClear();
+    connectMode = "ok";
+    vi.stubGlobal("fetch", fetchMock);
+    process.env.LOJOU_WEBHOOK_SECRET = SECRET;
+    process.env.KOMUNIKA_INSTANCE_ID = "inst-global";
+    process.env.KOMUNIKA_API_TOKEN = "token-teste";
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    fakeSupabase.reset();
+    if (originalSecret === undefined) delete process.env.LOJOU_WEBHOOK_SECRET;
+    else process.env.LOJOU_WEBHOOK_SECRET = originalSecret;
+    if (originalInstance === undefined) delete process.env.KOMUNIKA_INSTANCE_ID;
+    else process.env.KOMUNIKA_INSTANCE_ID = originalInstance;
+    if (originalToken === undefined) delete process.env.KOMUNIKA_API_TOKEN;
+    else process.env.KOMUNIKA_API_TOKEN = originalToken;
+  });
+
+  const RAW_BODY = JSON.stringify(approvedPayload());
+
+  function hmac(secret = SECRET, body = RAW_BODY): string {
+    return createHmac("sha256", secret).update(body).digest("hex");
+  }
+
+  function authRequest(
+    opts: { querySecret?: string; signature?: string | null; body?: string } = {}
+  ): NextRequest {
+    const body = opts.body ?? RAW_BODY;
+    const url = new URL("https://syncbot.test/api/webhooks/lojou");
+    if (opts.querySecret !== undefined) url.searchParams.set("secret", opts.querySecret);
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (opts.signature !== null && opts.signature !== undefined) {
+      headers["x-lojou-signature"] = opts.signature;
+    }
+    return new NextRequest(url, { method: "POST", headers, body });
+  }
+
+  it("sem LOJOU_WEBHOOK_SECRET configurado rejeita tudo com 503 (fail-closed)", async () => {
+    setScenario();
+    delete process.env.LOJOU_WEBHOOK_SECRET;
+
+    const res = await POST(authRequest({ querySecret: SECRET }));
+
+    expect(res.status).toBe(503);
+    expect(instanceConnectCalls()).toHaveLength(0);
+    expect(fakeSupabase.find("subscriptions", "insert")).toHaveLength(0);
+  });
+
+  it("aceita assinatura HMAC válida no header x-lojou-signature sem query secret", async () => {
+    setScenario();
+
+    const res = await POST(authRequest({ signature: hmac() }));
+
+    expect(res.status).toBe(200);
+    expect(instanceConnectCalls()).toHaveLength(1);
+  });
+
+  it("aceita assinatura com prefixo sha256= no header", async () => {
+    setScenario();
+
+    const res = await POST(authRequest({ signature: `sha256=${hmac()}` }));
+
+    expect(res.status).toBe(200);
+  });
+
+  it("rejeita assinatura HMAC inválida com 401", async () => {
+    setScenario();
+
+    const res = await POST(authRequest({ signature: hmac("outro-secret") }));
+
+    expect(res.status).toBe(401);
+    expect(instanceConnectCalls()).toHaveLength(0);
+  });
+
+  it("rejeita assinatura calculada sobre outro corpo (body adulterado)", async () => {
+    setScenario();
+
+    const res = await POST(
+      authRequest({ signature: hmac(SECRET, '{"event":"order_approved"}') })
+    );
+
+    expect(res.status).toBe(401);
+    expect(instanceConnectCalls()).toHaveLength(0);
+  });
+
+  it("rejeita sem header e sem query secret", async () => {
+    setScenario();
+
+    const res = await POST(authRequest());
+
+    expect(res.status).toBe(401);
+    expect(instanceConnectCalls()).toHaveLength(0);
+  });
+
+  it("header válido tem prioridade sobre query secret errado", async () => {
+    setScenario();
+
+    const res = await POST(authRequest({ querySecret: "errado", signature: hmac() }));
+
+    expect(res.status).toBe(200);
+    expect(instanceConnectCalls()).toHaveLength(1);
   });
 });

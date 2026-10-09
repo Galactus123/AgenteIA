@@ -1,6 +1,11 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { nowStr } from "@/lib/datetime";
-import { isKomunikaConfigured, sendKomunikaMessage } from "@/lib/services/komunika";
+import {
+  getKomunikaInstanceIdForClinic,
+  isKomunikaConfigured,
+  resolveKomunikaInstanceId,
+  sendKomunikaMessage,
+} from "@/lib/services/komunika";
 import type { Notification, NotificationType, NotificationChannelStatus } from "@/lib/types";
 
 function fail(message: string): never {
@@ -112,7 +117,8 @@ export async function updateChannelStatus(
 
 export async function sendDoctorNotification(
   doctorPhone: string,
-  notification: Notification
+  notification: Notification,
+  clinicId?: number
 ): Promise<void> {
   if (!doctorPhone || !isKomunikaConfigured()) {
     await updateChannelStatus(notification.id, "failed");
@@ -122,7 +128,11 @@ export async function sendDoctorNotification(
   const text = `[SaúdeSync] ${notification.title}\n\n${notification.message}`;
 
   try {
-    const result = await sendKomunikaMessage(doctorPhone, text, { type: "text" });
+    // Instancia WhatsApp da propria clinica (fallback: global do ambiente).
+    const { instanceId } = clinicId
+      ? await getKomunikaInstanceIdForClinic(clinicId)
+      : { instanceId: resolveKomunikaInstanceId() };
+    const result = await sendKomunikaMessage(doctorPhone, text, { type: "text", instanceId });
     await updateChannelStatus(notification.id, result.ok ? "sent" : "failed");
   } catch {
     await updateChannelStatus(notification.id, "failed");
@@ -153,7 +163,7 @@ export async function notifyDoctorNewAppointment(
     clinic_id: clinicId,
   });
 
-  await sendDoctorNotification(doctorPhone, notification);
+  await sendDoctorNotification(doctorPhone, notification, clinicId);
 }
 
 export async function notifyDoctorCancelled(
@@ -180,7 +190,7 @@ export async function notifyDoctorCancelled(
     clinic_id: clinicId,
   });
 
-  await sendDoctorNotification(doctorPhone, notification);
+  await sendDoctorNotification(doctorPhone, notification, clinicId);
 }
 
 export async function notifyDoctorRescheduled(
@@ -209,7 +219,7 @@ export async function notifyDoctorRescheduled(
     clinic_id: clinicId,
   });
 
-  await sendDoctorNotification(doctorPhone, notification);
+  await sendDoctorNotification(doctorPhone, notification, clinicId);
 }
 
 export async function notifyDoctorReminder(
@@ -235,5 +245,5 @@ export async function notifyDoctorReminder(
     clinic_id: clinicId,
   });
 
-  await sendDoctorNotification(doctorPhone, notification);
+  await sendDoctorNotification(doctorPhone, notification, clinicId);
 }

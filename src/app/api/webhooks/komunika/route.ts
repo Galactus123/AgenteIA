@@ -2,6 +2,8 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { handlePatientMessage } from "@/lib/agent/agent";
 import {
+  getClinicIdByInstanceId,
+  isKomunikaWebhookSecretConfigured,
   parseKomunikaInbound,
   sendKomunikaTyping,
   verifyKomunikaSignature,
@@ -52,6 +54,18 @@ export async function POST(request: NextRequest) {
     if (!isValidPayloadSize(rawBody)) {
       console.error("[webhook] Payload excede tamanho maximo (100KB)");
       return NextResponse.json({ error: "Payload muito grande." }, { status: 413 });
+    }
+
+    // Fail-closed: secret do webhook não configurado = erro de configuração
+    // do servidor (não do remetente) → 503, sem aceitar nenhum payload.
+    if (!isKomunikaWebhookSecretConfigured()) {
+      console.error(
+        "[webhook] KOMUNIKA_WEBHOOK_SECRET não configurado — rejeitando (fail-closed)"
+      );
+      return NextResponse.json(
+        { error: "Webhook não configurado." },
+        { status: 503 }
+      );
     }
 
     const signature = request.headers.get("x-komunika-signature");
@@ -116,9 +130,19 @@ export async function POST(request: NextRequest) {
 
 async function processInboundMessage(inbound: KomunikaInboundMessage): Promise<void> {
   try {
+    // Clinica dona da instancia de entrada: a partir dai typing, agente e
+    // fila outbox trabalham na clinica certa (e respondem pela instancia
+    // propria dela). Instancia global / desconhecida -> clinicId null
+    // (caminho single-tenant legado, fallback global).
+    const clinicId = await getClinicIdByInstanceId(inbound.instanceId);
+    console.log("[webhook] Clinica resolvida pela instancia:", clinicId ?? "global");
+
     // Envia o indicador "digitando..." e AGUARDA a confirmação antes de chamar a OpenAI.
     console.log("[webhook] Enviando indicador de typing...");
-    const typingResult = await sendKomunikaTyping(inbound.phone, { type: "composing" });
+    const typingResult = await sendKomunikaTyping(inbound.phone, {
+      type: "composing",
+      instanceId: inbound.instanceId,
+    });
     console.log("[webhook] Typing status:", typingResult.ok ? "ok" : "falhou");
     if (!typingResult.ok) {
       console.error(
@@ -127,7 +151,7 @@ async function processInboundMessage(inbound: KomunikaInboundMessage): Promise<v
     }
 
     console.log("[webhook] Processando mensagem via IA...");
-    const result = await handlePatientMessage(inbound.phone, inbound.text);
+    const result = await handlePatientMessage(inbound.phone, inbound.text, clinicId);
     console.log("[webhook] IA respondeu: transferred=", result.transferred, "reply_len=", result.reply?.length ?? 0);
 
     let enqueued = false;
@@ -140,6 +164,7 @@ async function processInboundMessage(inbound: KomunikaInboundMessage): Promise<v
         text: result.reply,
         kind: result.transferred ? "transfer_notice" : "chat_reply",
         conversationId: result.conversationId,
+        clinicId,
       });
       enqueued ||= outboxId !== null;
       if (!outboxId) {
@@ -155,6 +180,7 @@ async function processInboundMessage(inbound: KomunikaInboundMessage): Promise<v
         text: HUMAN_TRANSFER_NOTICE,
         kind: "transfer_notice",
         conversationId: result.conversationId,
+        clinicId,
       });
       enqueued ||= outboxId !== null;
       if (!outboxId) {

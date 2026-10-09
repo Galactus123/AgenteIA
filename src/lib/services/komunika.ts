@@ -51,10 +51,21 @@ export interface KomunikaNumberCheckResult {
   error?: string;
 }
 
+// Resolve o instanceId a usar num envio: o explicito (instância da clínica)
+// tem prioridade; sem ele cai para a global KOMUNIKA_INSTANCE_ID.
+export function resolveKomunikaInstanceId(instanceId?: string | null): string {
+  const explicit = String(instanceId ?? "").trim();
+  if (explicit) return explicit;
+  return (process.env.KOMUNIKA_INSTANCE_ID ?? "").trim();
+}
+
 // Verifica se o número existe no WhatsApp antes de enviar. A API da Komunika
 // devolve 500 quando tenta enviar para um número inexistente, então essa
 // verificação prévia evita o erro e mensagens desperdiçadas.
-export async function checkKomunikaNumber(phone: string): Promise<KomunikaNumberCheckResult> {
+export async function checkKomunikaNumber(
+  phone: string,
+  instanceId?: string | null
+): Promise<KomunikaNumberCheckResult> {
   if (!isKomunikaConfigured()) {
     return { ok: false, error: "Komunika não configurado." };
   }
@@ -66,7 +77,7 @@ export async function checkKomunikaNumber(phone: string): Promise<KomunikaNumber
         Authorization: `Bearer ${apiToken()}`,
       },
       body: JSON.stringify({
-        instanceId: process.env.KOMUNIKA_INSTANCE_ID,
+        instanceId: resolveKomunikaInstanceId(instanceId),
         phone,
       }),
     });
@@ -102,7 +113,7 @@ export interface KomunikaTypingResult {
 // Envia o indicador "digitando..." (typing) para o WhatsApp antes de processar a IA.
 export async function sendKomunikaTyping(
   to: string,
-  opts: { type?: string } = {}
+  opts: { type?: string; instanceId?: string | null } = {}
 ): Promise<KomunikaTypingResult> {
   if (!isKomunikaConfigured()) {
     return { ok: false, error: "Komunika não configurado." };
@@ -115,7 +126,7 @@ export async function sendKomunikaTyping(
         Authorization: `Bearer ${apiToken()}`,
       },
       body: JSON.stringify({
-        instanceId: process.env.KOMUNIKA_INSTANCE_ID,
+        instanceId: resolveKomunikaInstanceId(opts.instanceId),
         to,
         type: opts.type ?? "composing",
       }),
@@ -141,7 +152,7 @@ export async function sendKomunikaTyping(
 export async function sendKomunikaMessage(
   to: string,
   content: string,
-  opts: { type?: string } = {}
+  opts: { type?: string; instanceId?: string | null } = {}
 ): Promise<KomunikaSendResult> {
   if (!isKomunikaConfigured()) {
     return { ok: false, error: "Komunika não configurado." };
@@ -155,7 +166,7 @@ export async function sendKomunikaMessage(
 
   try {
     const bodyPayload = {
-      instanceId: process.env.KOMUNIKA_INSTANCE_ID,
+      instanceId: resolveKomunikaInstanceId(opts.instanceId),
       to: normalizedTo,
       phone: normalizedTo,
       type: opts.type ?? "text",
@@ -299,6 +310,61 @@ export interface KomunikaClinicConnectResult extends KomunikaConnectResult {
   source: "clinica" | "ambiente";
 }
 
+// Atribuição da instancia no webhook da Lojou (modelo pos-pagamento): quando
+// a subscricao fica ativa e a clinica ainda nao tem instancia propria
+// (clinics.komunika_instance_id vazio), grava a global KOMUNIKA_INSTANCE_ID
+// na linha da clinica para que a partir dai a atribuicao seja explicita e
+// auditavel. Uma instancia ja registada NUNCA e sobrescrita. Best-effort:
+// devolve o id efetivamente atribuido, sem lancar excecao.
+export async function assignGlobalInstanceToClinicIfEmpty(
+  clinicId: number
+): Promise<string | null> {
+  const globalId = (process.env.KOMUNIKA_INSTANCE_ID ?? "").trim();
+  if (!globalId) return null;
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("clinics")
+      .select("komunika_instance_id")
+      .eq("id", clinicId)
+      .maybeSingle();
+    if (error) {
+      console.error(
+        "[komunika] Falha ao ler komunika_instance_id para atribuicao:",
+        error.message
+      );
+      return null;
+    }
+    const current = String(
+      (data as { komunika_instance_id?: string | null } | null)?.komunika_instance_id ?? ""
+    ).trim();
+    if (current) return current;
+
+    const { error: updateError } = await supabaseAdmin
+      .from("clinics")
+      .update({ komunika_instance_id: globalId })
+      .eq("id", clinicId)
+      .eq("komunika_instance_id", "");
+    if (updateError) {
+      console.error(
+        "[komunika] Falha ao atribuir a instancia global a clinica:",
+        updateError.message
+      );
+      return null;
+    }
+    console.log(
+      `[komunika] Instancia global ${globalId} atribuida a clinica ${clinicId} (coluna vazia).`
+    );
+    return globalId;
+  } catch (err) {
+    console.error(
+      "[komunika] Erro ao atribuir a instancia global a clinica:",
+      err instanceof Error ? err.message : String(err)
+    );
+    return null;
+  }
+}
+
 // Ativa a instancia WhatsApp da clinica usando o ID registado na linha dela
 // (fallback: variavel global). Best-effort: qualquer erro fica nos logs e o
 // resultado devolvido e apenas para diagnostico do chamador.
@@ -310,9 +376,14 @@ export async function connectKomunikaInstanceForClinic(
   return { ...result, instanceId, source };
 }
 
+// Fail-closed: sem KOMUNIKA_WEBHOOK_SECRET o webhook NAO pode aceitar nada.
+export function isKomunikaWebhookSecretConfigured(): boolean {
+  return Boolean(process.env.KOMUNIKA_WEBHOOK_SECRET);
+}
+
 export function verifyKomunikaSignature(rawBody: Buffer | string, signature?: string | null): boolean {
   const secret = process.env.KOMUNIKA_WEBHOOK_SECRET ?? "";
-  if (!secret) return true;
+  if (!secret) return false;
   if (!signature) return false;
   const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
   const a = Buffer.from(signature);
@@ -325,6 +396,38 @@ export interface KomunikaInboundMessage {
   phone: string;
   text: string;
   instanceId?: string;
+}
+
+// Resolve a clinica DONA de uma instancia WhatsApp (lookup inverso de
+// clinics.komunika_instance_id). Usado pelo webhook de entrada para saber
+// em que clinica criar a conversa e por que instancia responder. A
+// instancia global do ambiente devolve null (caminho single-tenant legado:
+// sem clinic_id a outbox e o agente caem para o fallback global).
+export async function getClinicIdByInstanceId(instanceId?: string | null): Promise<number | null> {
+  const id = String(instanceId ?? "").trim();
+  if (!id) return null;
+  const globalId = (process.env.KOMUNIKA_INSTANCE_ID ?? "").trim();
+  if (globalId && id === globalId) return null;
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("clinics")
+      .select("id")
+      .eq("komunika_instance_id", id)
+      .maybeSingle();
+    if (error) {
+      console.error("[komunika] Falha ao resolver clinica pela instancia:", error.message);
+      return null;
+    }
+    const clinicId = (data as { id?: number | string } | null)?.id;
+    return clinicId === undefined || clinicId === null ? null : Number(clinicId);
+  } catch (err) {
+    console.error(
+      "[komunika] Erro ao resolver clinica pela instancia:",
+      err instanceof Error ? err.message : String(err)
+    );
+    return null;
+  }
 }
 
 // Aceita os formatos de payload mais comuns (`data.text` / `data.message.content`,

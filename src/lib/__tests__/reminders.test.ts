@@ -98,7 +98,12 @@ describe("runReminderCheck (Fase 8.3)", () => {
     expect(upsert?.opts).toMatchObject({ onConflict: "appointment_id,type", ignoreDuplicates: true });
 
     const enqueue = fakeSupabase.last("outbox", "insert");
-    expect(enqueue?.payload).toMatchObject({ kind: "reminder", conversation_id: 77, phone: "841234567" });
+    expect(enqueue?.payload).toMatchObject({
+      kind: "reminder",
+      conversation_id: 77,
+      phone: "841234567",
+      clinic_id: 4,
+    });
     expect(String((enqueue?.payload as { text: string }).text)).toContain("amanhã");
     expect(String((enqueue?.payload as { text: string }).text)).toContain("às 10:00");
 

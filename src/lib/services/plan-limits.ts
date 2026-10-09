@@ -171,9 +171,26 @@ export function subscriptionGateEnabled(): boolean {
 }
 
 export async function guardActiveSubscription(
-  clinicId?: number
+  clinicId?: number | null
 ): Promise<SubscriptionGateFailure | null> {
   if (!subscriptionGateEnabled()) return null;
+
+  // Gate por clínica: sem clinic_id resolvido não há assinatura que
+  // justifique acesso — nunca se consulta a "primeira clínica" da BD
+  // (isso seria um fail-open multi-tenant). Responde 402 como uma clínica
+  // sem linha em subscriptions.
+  if (clinicId === undefined || clinicId === null) {
+    return {
+      status: 402,
+      body: {
+        error:
+          "Assinatura inativa. Ative o seu plano para continuar a usar as funcionalidades da plataforma.",
+        code: "SUBSCRIPTION_REQUIRED",
+        subscriptionStatus: "none",
+        redirectTo: BILLING_PATH,
+      },
+    };
+  }
 
   const sub = await getSubscription(clinicId);
   if (sub && isActiveSubscriptionStatus(sub.status)) return null;

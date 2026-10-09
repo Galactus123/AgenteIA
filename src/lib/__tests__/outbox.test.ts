@@ -15,6 +15,7 @@ vi.mock("@/lib/services/komunika", async (importOriginal) => {
     isKomunikaConfigured: vi.fn(),
     checkKomunikaNumber: vi.fn(),
     sendKomunikaMessage: vi.fn(),
+    getKomunikaInstanceIdForClinic: vi.fn(),
   };
 });
 
@@ -25,11 +26,17 @@ import {
   processOutbox,
   OUTBOX_MAX_ATTEMPTS,
 } from "@/lib/services/outbox";
-import { isKomunikaConfigured, checkKomunikaNumber, sendKomunikaMessage } from "@/lib/services/komunika";
+import {
+  isKomunikaConfigured,
+  checkKomunikaNumber,
+  sendKomunikaMessage,
+  getKomunikaInstanceIdForClinic,
+} from "@/lib/services/komunika";
 
 const cfg = vi.mocked(isKomunikaConfigured);
 const chk = vi.mocked(checkKomunikaNumber);
 const send = vi.mocked(sendKomunikaMessage);
+const instanceFor = vi.mocked(getKomunikaInstanceIdForClinic);
 
 const pending = { id: 1, phone: "841234567", text: "oi", attempts: 0 };
 
@@ -60,6 +67,7 @@ describe("outbox (Fase 8.3)", () => {
     cfg.mockReset();
     chk.mockReset();
     send.mockReset();
+    instanceFor.mockReset();
     cfg.mockReturnValue(true);
     chk.mockResolvedValue({ ok: true, exists: true });
     send.mockResolvedValue({ ok: true, status: 200 });
@@ -119,6 +127,21 @@ describe("outbox (Fase 8.3)", () => {
         attempts: 0,
       });
     });
+
+    it("grava clinic_id explicito e usa null quando ausente (sem DEFAULT na tabela)", async () => {
+      fakeSupabase.setResolver(outboxResolver({}));
+
+      await enqueueOutboxMessage({ phone: "841", text: "oi", kind: "chat_reply" });
+      expect(fakeSupabase.last("outbox", "insert")?.payload).toMatchObject({ clinic_id: null });
+
+      await enqueueOutboxMessage({
+        phone: "841",
+        text: "oi",
+        kind: "reminder",
+        clinicId: 7,
+      });
+      expect(fakeSupabase.last("outbox", "insert")?.payload).toMatchObject({ clinic_id: 7 });
+    });
   });
 
   describe("processOutbox", () => {
@@ -168,11 +191,47 @@ describe("outbox (Fase 8.3)", () => {
     it("entrega ok marca sent e conta 1", async () => {
       fakeSupabase.setResolver(outboxResolver({ candidates: [pending], claimRows: [pending] }));
       expect(await processOutbox()).toEqual({ claimed: 1, sent: 1, retried: 0, failed: 0 });
-      expect(send).toHaveBeenCalledWith("841234567", "oi", { type: "text" });
+      expect(send).toHaveBeenCalledWith("841234567", "oi", {
+        type: "text",
+        instanceId: expect.any(String),
+      });
+      expect(instanceFor).not.toHaveBeenCalled();
       const finalize = fakeSupabase
         .find("outbox", "update")
         .filter((q) => (q.payload as { status?: string }).status !== "sending");
       expect(finalize[0]?.payload).toMatchObject({ status: "sent", last_error: null });
+    });
+
+    it("entrega pela instancia da clinica da linha (clinic_id no claim)", async () => {
+      instanceFor.mockResolvedValue({ instanceId: "inst-clinica-9", source: "clinica" });
+      const row = { ...pending, clinic_id: 9 };
+      fakeSupabase.setResolver(outboxResolver({ candidates: [row], claimRows: [row] }));
+
+      expect(await processOutbox()).toMatchObject({ sent: 1 });
+
+      expect(instanceFor).toHaveBeenCalledWith(9);
+      expect(chk).toHaveBeenCalledWith("841234567", "inst-clinica-9");
+      expect(send).toHaveBeenCalledWith("841234567", "oi", {
+        type: "text",
+        instanceId: "inst-clinica-9",
+      });
+      const claim = fakeSupabase
+        .find("outbox", "update")
+        .find((q) => (q.payload as { status?: string }).status === "sending");
+      expect(claim?.columns).toContain("clinic_id");
+    });
+
+    it("linha sem clinic_id entrega pela global sem consultar a clinica", async () => {
+      fakeSupabase.setResolver(outboxResolver({ candidates: [pending], claimRows: [pending] }));
+
+      expect(await processOutbox()).toMatchObject({ sent: 1 });
+
+      expect(instanceFor).not.toHaveBeenCalled();
+      expect(chk).toHaveBeenCalledWith("841234567", expect.any(String));
+      expect(send).toHaveBeenCalledWith("841234567", "oi", {
+        type: "text",
+        instanceId: expect.any(String),
+      });
     });
 
     it("falha transitoria (5xx) reagenda com backoff e conta retried", async () => {
@@ -217,13 +276,35 @@ describe("outbox (Fase 8.3)", () => {
       expect(send).toHaveBeenCalledTimes(1);
     });
 
-    it("Komunika nao configurada marca failed sem consultar numero", async () => {
+    it("Komunika nao configurada reagenda com backoff sem consultar numero", async () => {
       cfg.mockReturnValue(false);
       fakeSupabase.setResolver(outboxResolver({ candidates: [pending], claimRows: [pending] }));
 
-      expect(await processOutbox()).toMatchObject({ failed: 1 });
+      expect(await processOutbox()).toMatchObject({ claimed: 1, retried: 1, failed: 0 });
       expect(chk).not.toHaveBeenCalled();
       expect(send).not.toHaveBeenCalled();
+
+      const finalize = fakeSupabase
+        .find("outbox", "update")
+        .filter((q) => (q.payload as { status?: string }).status !== "sending")[0];
+      expect(finalize?.payload).toMatchObject({ status: "pending", attempts: 1 });
+      expect(finalize?.payload).toHaveProperty("next_attempt_at");
+    });
+
+    it(`Komunika nao configurada no teto de ${OUTBOX_MAX_ATTEMPTS} tentativas vira failed`, async () => {
+      cfg.mockReturnValue(false);
+      const row = { ...pending, attempts: OUTBOX_MAX_ATTEMPTS - 1 };
+      fakeSupabase.setResolver(outboxResolver({ candidates: [row], claimRows: [row] }));
+
+      expect(await processOutbox()).toMatchObject({ claimed: 1, retried: 0, failed: 1 });
+
+      const finalize = fakeSupabase
+        .find("outbox", "update")
+        .filter((q) => (q.payload as { status?: string }).status !== "sending")[0];
+      expect(finalize?.payload).toMatchObject({
+        status: "failed",
+        attempts: OUTBOX_MAX_ATTEMPTS,
+      });
     });
 
     it(`atinge o teto de ${OUTBOX_MAX_ATTEMPTS} tentativas e vira failed mesmo com 5xx`, async () => {

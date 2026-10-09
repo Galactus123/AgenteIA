@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { hashSync } from "bcryptjs";
 import { supabaseAdmin } from "@/lib/supabase";
 import { nowStr } from "@/lib/datetime";
-import { isKomunikaConfigured, sendKomunikaMessage, connectKomunikaInstanceForClinic } from "@/lib/services/komunika";
+import { isKomunikaConfigured, sendKomunikaMessage, connectKomunikaInstanceForClinic, assignGlobalInstanceToClinicIfEmpty } from "@/lib/services/komunika";
 import { isValidPayloadSize } from "@/lib/agent/security";
 import { getPlanByLojouId } from "@/lib/plans";
 import {
@@ -73,6 +73,26 @@ function generateTempPassword(): string {
 function extractSecret(request: NextRequest): string | null {
   const url = new URL(request.url);
   return url.searchParams.get("secret");
+}
+
+// Comparação em tempo constante via hash (digests têm tamanho fixo, ao
+// contrário de timingSafeEqual direto sobre strings de tamanhos diferentes).
+function constantTimeEquals(a: string, b: string): boolean {
+  const ha = createHash("sha256").update(a).digest();
+  const hb = createHash("sha256").update(b).digest();
+  return timingSafeEqual(ha, hb);
+}
+
+// HMAC-SHA256 hex do corpo bruto, comparado em tempo constante.
+// Aceita o prefixo opcional "sha256=" (formato Stripe-style).
+function isValidLojouSignature(
+  rawBody: string,
+  signature: string,
+  secret: string
+): boolean {
+  const provided = signature.startsWith("sha256=") ? signature.slice(7) : signature;
+  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+  return constantTimeEquals(provided.trim(), expected);
 }
 
 function resolveEventName(payload: LojouWebhookPayload): string {
@@ -190,7 +210,7 @@ export async function OPTIONS() {
     headers: {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
+      "Access-Control-Allow-Headers": "Content-Type, x-lojou-signature",
     },
   });
 }
@@ -208,11 +228,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Payload too large" }, { status: 413 });
     }
 
-    // 1. Validar secret via query string
-    const secret = extractSecret(request);
+    // 1. Fail-closed: sem LOJOU_WEBHOOK_SECRET configurado o webhook nao
+    //    aceita nenhum payload (503 = erro de configuração do servidor,
+    //    não do remetente).
     const expectedSecret = process.env.LOJOU_WEBHOOK_SECRET ?? "";
-    if (expectedSecret && secret !== expectedSecret) {
-      console.error("[lojou-webhook] Secret inválido — rejeitando requisição");
+    if (!expectedSecret) {
+      console.error(
+        "[lojou-webhook] LOJOU_WEBHOOK_SECRET não configurado — rejeitando (fail-closed)"
+      );
+      return NextResponse.json(
+        { error: "Webhook não configurado." },
+        { status: 503 }
+      );
+    }
+
+    // 2. Verificar assinatura: header HMAC (x-lojou-signature) quando a
+    //    Lojou enviar; fallback ao secret na query string enquanto ela
+    //    não assina os webhooks (docs.lojou.app/pt/webhooks).
+    const headerSignature = request.headers.get("x-lojou-signature");
+    let authorized: boolean;
+    if (headerSignature) {
+      authorized = isValidLojouSignature(rawBody, headerSignature, expectedSecret);
+      if (!authorized) {
+        console.error("[lojou-webhook] Assinatura HMAC inválida — rejeitando requisição");
+      }
+    } else {
+      authorized = constantTimeEquals(extractSecret(request) ?? "", expectedSecret);
+      if (!authorized) {
+        console.error("[lojou-webhook] Secret inválido — rejeitando requisição");
+      }
+    }
+    if (!authorized) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -481,12 +527,15 @@ async function resolveClinicForSubscriber(
 }
 
 // Ativa/conecta a instância WhatsApp da clínica após o pagamento confirmado.
-// Usa clinics.komunika_instance_id (instância própria da clínica) com
-// fallback para KOMUNIKA_INSTANCE_ID global. Best-effort: qualquer falha é
-// REGISTADA nos logs e nunca se propaga — o webhook tem de responder 200 à
-// Lojou, senão ela reenvia o evento.
+// Primeiro atribui a instância global à clínica se a coluna estiver vazia
+// (a partir daí a atribuição fica explícita na BD); depois usa
+// clinics.komunika_instance_id com fallback para KOMUNIKA_INSTANCE_ID
+// global. Best-effort: qualquer falha é REGISTADA nos logs e nunca se
+// propaga — o webhook tem de responder 200 à Lojou, senão ela reenvia o
+// evento.
 async function activateClinicWhatsAppInstance(clinicId: number): Promise<void> {
   try {
+    await assignGlobalInstanceToClinicIfEmpty(clinicId);
     const result = await connectKomunikaInstanceForClinic(clinicId);
     const origem = result.source === "clinica" ? "própria da clínica" : "global do ambiente";
     if (result.ok) {
