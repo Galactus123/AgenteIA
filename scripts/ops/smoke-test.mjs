@@ -134,9 +134,8 @@ console.log(
 
 console.log(`
 Pendencias MANUAIS do go-live (nao cobertas pelo smoke):
-  [ ] migrations aplicadas no SQL Editor (19, inclusive 20261005000001_audit_logs.sql,
-      20261005000002_grants_audit_outbox.sql e 20261009000001_outbox_clinic_id_sem_default.sql
-      — sem as de grants audit_logs/outbox dao 42501)
+  [ ] migrations aplicadas no SQL Editor (20 — as 5 pendentes estao no script
+      scripts/ops/pending-migrations.sql; sem as de grants audit_logs/outbox dao 42501)
   [ ] seed: node scripts/setup-supabase.mjs
   [ ] env vars da Vercel completas (OPENAI_API_KEY, KOMUNIKA_*, LOJOU_*, CRON_SECRET, INTERNAL_API_TOKEN)
   [ ] Vault/pg_cron: scripts/ops/setup-cron-secrets.sql + SELECT jobname FROM cron.job;

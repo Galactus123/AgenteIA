@@ -400,14 +400,15 @@ export interface KomunikaInboundMessage {
 
 // Resolve a clinica DONA de uma instancia WhatsApp (lookup inverso de
 // clinics.komunika_instance_id). Usado pelo webhook de entrada para saber
-// em que clinica criar a conversa e por que instancia responder. A
-// instancia global do ambiente devolve null (caminho single-tenant legado:
-// sem clinic_id a outbox e o agente caem para o fallback global).
+// em que clinica criar a conversa e por que instancia responder.
+// A instancia global TAMBEM e consultada: ela so e atribuida a uma clinica
+// apos a confirmacao do pagamento (assignGlobalInstanceToClinicIfEmpty) e o
+// gate de assinatura exige um tenant resolvido. Sem dono na BD (nunca
+// provisionada / pre-pagamento) devolve null → o webhook bloqueia a mensagem
+// (fail-closed).
 export async function getClinicIdByInstanceId(instanceId?: string | null): Promise<number | null> {
   const id = String(instanceId ?? "").trim();
   if (!id) return null;
-  const globalId = (process.env.KOMUNIKA_INSTANCE_ID ?? "").trim();
-  if (globalId && id === globalId) return null;
 
   try {
     const { data, error } = await supabaseAdmin

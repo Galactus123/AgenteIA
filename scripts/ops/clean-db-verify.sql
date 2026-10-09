@@ -222,6 +222,15 @@ BEGIN
   RAISE NOTICE 'CHECK 11 ok: funcoes auxiliares presentes';
 END $$;
 
+-- CHECK 12: funil trial removido (20261009000002_drop_trial_leads)
+DO $$
+BEGIN
+  IF to_regclass('public.trial_leads') IS NOT NULL THEN
+    RAISE EXCEPTION 'CHECK 12 falhou: trial_leads ainda existe (drop 20261009000002 nao aplicado)';
+  END IF;
+  RAISE NOTICE 'CHECK 12 ok: trial_leads removida (acesso estrito pos-pagamento)';
+END $$;
+
 
 -- ============================================================
 -- REGISTRO (inventario para o log)

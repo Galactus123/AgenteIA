@@ -442,12 +442,22 @@ describe("getClinicIdByInstanceId", () => {
     else process.env.KOMUNIKA_INSTANCE_ID = savedInstance;
   });
 
-  it("sem instanceId ou igual à global devolve null sem consultar", async () => {
+  it("sem instanceId devolve null sem consultar", async () => {
     await expect(getClinicIdByInstanceId(undefined)).resolves.toBeNull();
     await expect(getClinicIdByInstanceId("")).resolves.toBeNull();
     await expect(getClinicIdByInstanceId("   ")).resolves.toBeNull();
-    await expect(getClinicIdByInstanceId("inst-global")).resolves.toBeNull();
     expect(fakeSupabase.find("clinics")).toHaveLength(0);
+  });
+
+  it("a instancia global tambem e consultada (so tem dona pos-pagamento)", async () => {
+    fakeSupabase.setResolver((q) =>
+      q.table === "clinics" ? { data: { id: 7 } } : undefined
+    );
+
+    await expect(getClinicIdByInstanceId("inst-global")).resolves.toBe(7);
+
+    const sel = fakeSupabase.last("clinics", "select");
+    expect(sel?.filters).toContain("komunika_instance_id=inst-global");
   });
 
   it("resolve a clínica dona da instância", async () => {

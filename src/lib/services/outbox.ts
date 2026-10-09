@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { addMinutes, formatDateTime, nowStr, parseDatetime } from "@/lib/datetime";
+import { guardActiveSubscription } from "@/lib/services/plan-limits";
 import {
   checkKomunikaNumber,
   cleanResponseText,
@@ -27,8 +28,9 @@ export interface EnqueueMessageInput {
   kind: OutboxKind;
   conversationId?: number | null;
   // Clinica dona da mensagem: a entrega usa a instancia WhatsApp propria
-  // desta linha (clinics.komunika_instance_id). Sem clinic_id (null) a
-  // outbox cai na instancia global do ambiente (legado single-tenant).
+  // desta linha (clinics.komunika_instance_id) e so acontece com assinatura
+  // ativa dessa clinica. Sem clinic_id (null) nao ha tenant — o gate de
+  // assinatura bloqueia a entrega (fail-closed).
   clinicId?: number | null;
 }
 
@@ -90,6 +92,19 @@ async function deliver(
   text: string,
   clinicId?: number | null
 ): Promise<DeliverOutcome> {
+  // Acesso estrito pos-pagamento: sem assinatura PAGA ativa para a clínica
+  // dona da mensagem (webhook da LOJOU) nada é enviado. Falha definitiva —
+  // sem retry, porque o estado só muda com um novo evento de pagamento e a
+  // mensagem antiga já perdeu a utilidade (lembrete/aviso datado).
+  // clinicId null (linha sem tenant) também bloqueia: fail-closed.
+  const gate = await guardActiveSubscription(clinicId);
+  if (gate) {
+    return {
+      outcome: "failed",
+      error: `Assinatura inativa (${gate.body.subscriptionStatus}).`,
+    };
+  }
+
   // Komunika sem configurar é um problema transitório do ambiente (env em
   // falta, deploy antes das chaves): reagenda com backoff em vez de matar a
   // mensagem à 1ª tentativa. Se persistir até OUTBOX_MAX_ATTEMPTS, acaba
@@ -99,8 +114,8 @@ async function deliver(
   }
 
   // Instancia WhatsApp da entrega: a propria da clinica (linha gravada na
-  // outbox) com fallback para a global do ambiente quando nao ha clinic_id
-  // (linhas legadas / fluxos single-tenant).
+  // outbox). clinic_id null so chega aqui com o kill switch
+  // SUBSCRIPTION_GATE_DISABLED ligado — nesse caso cai na global do ambiente.
   const { instanceId } = clinicId
     ? await getKomunikaInstanceIdForClinic(clinicId)
     : { instanceId: resolveKomunikaInstanceId() };

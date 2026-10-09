@@ -19,6 +19,14 @@ vi.mock("@/lib/services/komunika", async (importOriginal) => {
   };
 });
 
+// Gate de assinatura ativa (acesso estrito pos-pagamento): o comportamento
+// do guard em si e testado em subscription-gate.test.ts; aqui importa a
+// ordem — bloqueado ANTES de qualquer chamada a Komunika.
+vi.mock("@/lib/services/plan-limits", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/services/plan-limits")>();
+  return { ...actual, guardActiveSubscription: vi.fn() };
+});
+
 import { fakeSupabase, type FakeQuery, type FakeResult } from "./helpers/supabase-fake";
 import {
   backoffMinutes,
@@ -32,13 +40,27 @@ import {
   sendKomunikaMessage,
   getKomunikaInstanceIdForClinic,
 } from "@/lib/services/komunika";
+import { guardActiveSubscription } from "@/lib/services/plan-limits";
+import { BILLING_PATH } from "@/lib/subscription-access";
 
 const cfg = vi.mocked(isKomunikaConfigured);
 const chk = vi.mocked(checkKomunikaNumber);
 const send = vi.mocked(sendKomunikaMessage);
 const instanceFor = vi.mocked(getKomunikaInstanceIdForClinic);
+const guard = vi.mocked(guardActiveSubscription);
 
-const pending = { id: 1, phone: "841234567", text: "oi", attempts: 0 };
+const gateNone = {
+  status: 402,
+  body: {
+    error: "Assinatura inativa.",
+    code: "SUBSCRIPTION_REQUIRED",
+    subscriptionStatus: "none",
+    redirectTo: BILLING_PATH,
+  },
+} as const;
+
+// Linha "sem dona": o SELECT do claim devolve clinic_id NULL da coluna.
+const pending = { id: 1, phone: "841234567", text: "oi", attempts: 0, clinic_id: null };
 
 function outboxResolver(opts: {
   candidates?: Record<string, unknown>[];
@@ -68,6 +90,8 @@ describe("outbox (Fase 8.3)", () => {
     chk.mockReset();
     send.mockReset();
     instanceFor.mockReset();
+    guard.mockReset();
+    guard.mockResolvedValue(null);
     cfg.mockReturnValue(true);
     chk.mockResolvedValue({ ok: true, exists: true });
     send.mockResolvedValue({ ok: true, status: 200 });
@@ -232,6 +256,44 @@ describe("outbox (Fase 8.3)", () => {
         type: "text",
         instanceId: expect.any(String),
       });
+    });
+
+    it("sem assinatura paga ativa a entrega e bloqueada (failed definitivo, sem retry)", async () => {
+      guard.mockResolvedValue(gateNone);
+      const row = { ...pending, clinic_id: 9 };
+      fakeSupabase.setResolver(outboxResolver({ candidates: [row], claimRows: [row] }));
+
+      expect(await processOutbox()).toEqual({ claimed: 1, sent: 0, retried: 0, failed: 1 });
+
+      expect(guard).toHaveBeenCalledWith(9);
+      expect(chk).not.toHaveBeenCalled();
+      expect(send).not.toHaveBeenCalled();
+      const finalize = fakeSupabase
+        .find("outbox", "update")
+        .filter((q) => (q.payload as { status?: string }).status !== "sending")[0];
+      expect(finalize?.payload).toMatchObject({ status: "failed", attempts: 1 });
+      expect(String((finalize?.payload as { last_error: string }).last_error)).toContain(
+        "Assinatura inativa"
+      );
+    });
+
+    it("linha sem clinic_id tambem bloqueia (sem tenant nao ha envio)", async () => {
+      guard.mockResolvedValue(gateNone);
+      fakeSupabase.setResolver(outboxResolver({ candidates: [pending], claimRows: [pending] }));
+
+      expect(await processOutbox()).toMatchObject({ claimed: 1, sent: 0, retried: 0, failed: 1 });
+      expect(guard).toHaveBeenCalledWith(null);
+      expect(send).not.toHaveBeenCalled();
+    });
+
+    it("gate bloqueia ANTES de consultar a configuracao da Komunika", async () => {
+      guard.mockResolvedValue(gateNone);
+      cfg.mockReturnValue(false);
+      fakeSupabase.setResolver(outboxResolver({ candidates: [pending], claimRows: [pending] }));
+
+      expect(await processOutbox()).toMatchObject({ claimed: 1, retried: 0, failed: 1 });
+      expect(cfg).not.toHaveBeenCalled();
+      expect(send).not.toHaveBeenCalled();
     });
 
     it("falha transitoria (5xx) reagenda com backoff e conta retried", async () => {

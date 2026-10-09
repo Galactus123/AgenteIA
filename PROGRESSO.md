@@ -551,6 +551,21 @@ SELECT jobname, schedule FROM cron.job ORDER BY jobname;
 - **9.4:** `scripts/ops/rotation-checklist.mjs` executado: **5/5 ok** (valor atual de nenhuma das 5 chaves aparece no histórico do Git) — mesmo resultado do varredão da sessão 8; a rotação permanece manual/recomendada pelo lembrete e o script é o verificador pós-rotação. README ganhou a seção **"Segurança operacional"** (checklist de rotação + passo a passo da branch protection exigindo `quality`).
 - **9.5:** validação completa da sessão: `tsc` exit 0 · `lint` 0/0 · **220/220 (18 arquivos)** · `coverage` exit 0 (**49.58/38.72/49.31/51.40**, gates `46/35/45/47`) · `build` exit 0 (7 páginas estáticas preservadas) · **smoke 15/15** contra `node next start -p 3999` (build de produção com os headers novos e os rate limits ativos). Commit/push autorizados pelo usuário em 05/10/2026: **`dd62ef6`** (12 arquivos, +608/−211) — deploy automático na Vercel a seguir.
 
+### Fase 10 — Acesso estrito pós-pagamento & fim do funil trial (09/10/2026) — 6 de 6 concluídas
+
+- [x] **10.1** **Remoção do módulo trial/leads:** página pública `/teste-gratis`, `POST /api/leads`, serviço `src/lib/services/leads.ts` e testes apagados; `ctaUrl()` do landing passou a apontar para `/precos` (checkout LOJOU pós-login, com retoma pós-401); FAQ do landing e de `/precos`, badge do hero ("Pagamento seguro"), `/privacidade` (sem formulário de teste), comentário do `next.config.ts` e `proxy.test.ts` reescritos.
+- [x] **10.2** **Gate estrito de assinatura ativa:** `ACTIVE_SUBSCRIPTION_STATUSES = {"active"}` — `trialing` sai do gate (mantido só no type por paridade com o CHECK da BD); `getActiveSubscription` valida via `isActiveSubscriptionStatus`.
+- [x] **10.3** **Agente inbound gated:** `processInboundMessage` (agora exportado) chama `guardActiveSubscription(clinicId)` logo após resolver a clínica dona da instância — sem `active` → mensagem ignorada antes de typing/LLM/enqueue; fail-closed (`clinicId` null bloqueia), kill switch `SUBSCRIPTION_GATE_DISABLED` preservado.
+- [x] **10.4** **Outbox gated:** `deliver()` começa com o mesmo guard — assinatura inativa = `failed` **definitivo** (sem retry; mensagem datada perde utilidade), com prioridade sobre `isKomunikaConfigured`.
+- [x] **10.5** **`getClinicIdByInstanceId` sem early-return global:** a instância global passa a ser consultada na BD em todas as chamadas; sem dona → null → bloqueada (sem esta correção, clientes pagantes com a instância global ficariam bloqueados).
+- [x] **10.6** **Migration `20261009000002_drop_trial_leads`** + consolidação: `scripts/ops/pending-migrations.sql` com **5** pendentes (verificação "5/5" testada em Docker), `clean-db-verify.sql` ganhou **CHECK 12** (trial_leads ausente), README e `smoke-test.mjs` atualizados para **20 migrations**.
+
+### Log — Fase 10 (sessão 13, 09/10/2026)
+
+- **10.1–10.5:** testes novos/atualizados — `route.test.ts` do webhook Komunika (4 casos do gate: bloqueado, ativo, instância sem dona, kill switch), `outbox.test.ts` (+3 casos de entrega bloqueada antes de Komunika + mock do guard), `subscription-gate.test.ts`/`plan-limits.test.ts` (só `active`), `komunika.test.ts` (global consultada) → **354/354 (25 arquivos)**.
+- **10.6:** Docker — `pending-mig-test.mjs` **0 falhas** (upgrade 5/5, idempotência, verify 12/12, grants `false/true`) e `clean-db-test.mjs` **cadeia integral de 20 migrations** exit 0.
+- **Validação:** `tsc` exit 0 · `lint` 0/0 · `npm test` 354/354 · `coverage` exit 0 (**61.65/51.82/65.34/64.29**, gates `46/35/45/47`) · `build` exit 0 (sem `/teste-gratis` nem `/api/leads`; `/precos` e `/privacidade` estáticas). **Não commitado** — aguarda pedido do usuário.
+
 
 ### Critérios de aceite do PRD que ainda estão abertos
 

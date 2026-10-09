@@ -27,15 +27,14 @@ export default function PrivacidadePage() {
               1. Coleta de Dados
             </h2>
             <p className="mt-3">
-              O SaúdeSync coleta os seguintes dados quando você utiliza nossos
-              serviços ou preenche o formulário de teste grátis:
+              O SaúdeSync coleta os seguintes dados quando você cria a sua
+              conta e utiliza nossos serviços:
             </p>
             <ul className="mt-3 list-disc pl-5 space-y-1">
               <li>Nome da clínica ou do responsável</li>
               <li>Nome completo do contato</li>
               <li>Número de WhatsApp</li>
-              <li>E-mail (opcional)</li>
-              <li>Especialidade principal da clínica</li>
+              <li>E-mail</li>
               <li>País de atuação (Brasil ou Moçambique)</li>
             </ul>
             <p className="mt-3">

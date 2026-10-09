@@ -120,15 +120,17 @@ describe("plan-limits (Fase 8.3)", () => {
       expect(console.error).toHaveBeenCalled();
     });
 
-    it("getActiveSubscription so aceita active/trialing", async () => {
+    it("getActiveSubscription so aceita active (trialing legado nao da acesso)", async () => {
       fakeSupabase.setResolver(router({ sub: { ...activeSub, status: "canceled" } }));
       expect(await getActiveSubscription()).toBeNull();
       fakeSupabase.setResolver(router({ sub: { ...activeSub, status: "trialing" } }));
+      expect(await getActiveSubscription()).toBeNull();
+      fakeSupabase.setResolver(router({ sub: activeSub }));
       expect(await getActiveSubscription()).toEqual(
-        expect.objectContaining({ status: "trialing" })
+        expect.objectContaining({ status: "active" })
       );
       expect(await getActiveSubscription(99)).toEqual(
-        expect.objectContaining({ status: "trialing" })
+        expect.objectContaining({ status: "active" })
       );
     });
 

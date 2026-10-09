@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { handlePatientMessage } from "@/lib/agent/agent";
+import { guardActiveSubscription } from "@/lib/services/plan-limits";
 import {
   getClinicIdByInstanceId,
   isKomunikaWebhookSecretConfigured,
@@ -128,14 +129,29 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function processInboundMessage(inbound: KomunikaInboundMessage): Promise<void> {
+// Processa uma mensagem recebida (chamada em background apos o ack).
+// Exportado para teste: o gate de assinatura e o fluxo do agente sao
+// verificados sem depender do protocolo de assinatura HMAC.
+export async function processInboundMessage(inbound: KomunikaInboundMessage): Promise<void> {
   try {
     // Clinica dona da instancia de entrada: a partir dai typing, agente e
     // fila outbox trabalham na clinica certa (e respondem pela instancia
     // propria dela). Instancia global / desconhecida -> clinicId null
-    // (caminho single-tenant legado, fallback global).
+    // (sem tenant resolvido = bloqueado logo abaixo).
     const clinicId = await getClinicIdByInstanceId(inbound.instanceId);
     console.log("[webhook] Clinica resolvida pela instancia:", clinicId ?? "global");
+
+    // Acesso estrito pos-pagamento: sem assinatura PAGA ativa confirmada
+    // pelo webhook da LOJOU nao ha agente — a mensagem e ignorada antes de
+    // qualquer custo (typing, LLM, enqueue). Fail-closed: clinicId null
+    // (instancia nao provisionada / global sem dona) tambem bloqueia.
+    const gate = await guardActiveSubscription(clinicId);
+    if (gate) {
+      console.warn(
+        `[webhook] Mensagem ignorada (assinatura inativa): clinic=${clinicId ?? "sem-clinica"} status=${gate.body.subscriptionStatus}`
+      );
+      return;
+    }
 
     // Envia o indicador "digitando..." e AGUARDA a confirmação antes de chamar a OpenAI.
     console.log("[webhook] Enviando indicador de typing...");

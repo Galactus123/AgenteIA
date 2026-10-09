@@ -5,8 +5,8 @@ const isProd = process.env.NODE_ENV === "production";
 // ── Content-Security-Policy (9.1) ───────────────────────────────────────────
 // Estratégia: CSP estática no config (sem nonce), porque nonce por request
 // só é possível no proxy e força render dinâmico em TODAS as rotas —
-// desligaria o pré-render das 7 páginas públicas (login, landing, precos,
-// teste-gratis...). O browser só chama a própria origem (/api/*; todo acesso
+// desligaria o pré-render das páginas públicas (login, landing, precos...).
+// O browser só chama a própria origem (/api/*; todo acesso
 // à Supabase é server-side), então `connect-src 'self'` é suficiente: se um
 // cliente Supabase/terceiro for usado no browser no futuro, adicionar a
 // origem aqui (quebrará em dev se esquecer — é proposital).

@@ -17,14 +17,18 @@
 --   [?] N/D   20261002000004_cron_supabase
 --        (estado do pg_cron nao verificavel via REST; idempotente,
 --         seguro reexecutar; em banco sem extensoes so emite NOTICE)
+--   [x] FALTA 20261009000002_drop_trial_leads
+--        (tabela trial_leads — criada em 20261007000001, aplicada
+--         em producao — ainda existe; o funil de teste gratis foi
+--         removido do codigo nesta sessao)
 --
--- As 4 sao idempotentes: seguras quer o objeto ja exista quer nao
+-- As 5 sao idempotentes: seguras quer o objeto ja exista quer nao
 -- (reexecucao = no-op).
 --
 -- COMO USAR (SQL Editor do Supabase, ambiente de PRODUCAO):
 --   1. Colar TODO o ficheiro e executar UMA vez.
 --   2. Ler os NOTICEs: tem de terminar com
---      "VERIFICACAO: 4/4 migrations pendentes aplicadas".
+--      "VERIFICACAO: 5/5 migrations pendentes aplicadas".
 --   3. Um EXCEPTION "FALTA: ..." significa falha acima — nao
 --      confiar no estado, reexecutar.
 --
@@ -36,10 +40,9 @@
 --     (ver cabecalho da 20261002000004) — sem eles os jobs pg_cron
 --     ficam agendados mas nao chamam o app (os 3 crons diarios da
 --     Vercel continuam como rede de seguranca).
---
 -- Validado em banco limpo (Docker postgres:16): 15 migrations
 -- pre-existentes (estado tipo producao) + este script => 1a
--- execucao "VERIFICACAO: 4/4", 2a execucao idempotente, 11/11
+-- execucao "VERIFICACAO: 5/5", 2a execucao idempotente, 12/12
 -- CHECKs do clean-db-verify.sql ok e grants da RPC anon=false /
 -- service_role=true.
 -- ============================================================
@@ -359,6 +362,36 @@ BEGIN
 END $$;
 -- >>>>>>>>>>>> END supabase/migrations/20261009000001_outbox_clinic_id_sem_default.sql <<<<<<<<<<<<
 
+-- >>>>>>>>>>>> BEGIN supabase/migrations/20261009000002_drop_trial_leads.sql (batim) <<<<<<<<<<<<
+
+-- ============================================================
+-- 20261009000002_drop_trial_leads.sql
+-- Remove o funil de teste gratis da plataforma.
+--
+-- Motivo: o acesso passa a ser estritamente condicionado a uma
+-- assinatura PAGA ativa, confirmada pelo webhook da LOJOU — sem
+-- trial, sem leads publicos. Nesta mesma sessao foram removidos do
+-- codigo:
+--   * pagina publica /teste-gratis (formulario de captacao)
+--   * POST /api/leads (gravava em trial_leads)
+--   * servico src/lib/services/leads.ts (parse/save de leads)
+--
+-- A tabela trial_leads (criada em 20261007000001, RLS deny-all)
+-- deixa de ter escritores e e removida aqui.
+-- Idempotente: DROP IF EXISTS pode ser reexecutado.
+-- ============================================================
+
+DROP TABLE IF EXISTS public.trial_leads;
+
+DO $$
+BEGIN
+  IF to_regclass('public.trial_leads') IS NOT NULL THEN
+    RAISE EXCEPTION 'trial_leads ainda existe (drop falhou)';
+  END IF;
+  RAISE NOTICE 'trial_leads removida (funil de teste gratis eliminado)';
+END $$;
+-- >>>>>>>>>>>> END supabase/migrations/20261009000002_drop_trial_leads.sql <<<<<<<<<<<<
+
 -- ============================================================
 -- VERIFICACAO FINAL — falha (EXCEPTION) se algo faltar
 -- ============================================================
@@ -391,7 +424,11 @@ BEGIN
     RAISE EXCEPTION 'FALHA: outbox.clinic_id ainda tem DEFAULT (20261009000001)';
   END IF;
 
-  RAISE NOTICE 'VERIFICACAO: 4/4 migrations pendentes aplicadas';
+  IF to_regclass('public.trial_leads') IS NOT NULL THEN
+    RAISE EXCEPTION 'FALTA: drop de public.trial_leads (20261009000002)';
+  END IF;
+
+  RAISE NOTICE 'VERIFICACAO: 5/5 migrations pendentes aplicadas';
 END $$;
 
 -- Inventario do cron (informativo; NOTICEs na caixa de mensagens)

@@ -21,7 +21,6 @@ describe("proxy — rotas protegidas", () => {
       "/sobre-nos",
       "/termos",
       "/privacidade",
-      "/teste-gratis",
       "/agendamento-clinica-geral",
     ];
     for (const route of publicRoutes) {

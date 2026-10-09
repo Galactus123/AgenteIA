@@ -88,12 +88,18 @@ describe("guardActiveSubscription", () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
   });
 
-  it("active e trialing não bloqueiam", async () => {
+  it("active (pagamento confirmado) não bloqueia", async () => {
     setScenario(sub("active"));
     await expect(guardActiveSubscription(7)).resolves.toBeNull();
+  });
 
+  it("trialing legado bloqueia (acesso exige assinatura paga ativa)", async () => {
     setScenario(sub("trialing"));
-    await expect(guardActiveSubscription(7)).resolves.toBeNull();
+
+    const gate = await guardActiveSubscription(7);
+
+    expect(gate?.status).toBe(402);
+    expect(gate?.body.subscriptionStatus).toBe("trialing");
   });
 
   it("sem linha em subscriptions bloqueia com 402 e estado none", async () => {
@@ -259,9 +265,9 @@ describe("regras de acesso por subscrição", () => {
     expect(canBrowseWithoutSubscription("/configuracoes/auditoria")).toBe(false);
   });
 
-  it("isActiveSubscriptionStatus aceita apenas active e trialing", () => {
+  it("isActiveSubscriptionStatus aceita apenas active", () => {
     expect(isActiveSubscriptionStatus("active")).toBe(true);
-    expect(isActiveSubscriptionStatus("trialing")).toBe(true);
+    expect(isActiveSubscriptionStatus("trialing")).toBe(false);
     expect(isActiveSubscriptionStatus("past_due")).toBe(false);
     expect(isActiveSubscriptionStatus("cancelled")).toBe(false);
     expect(isActiveSubscriptionStatus(null)).toBe(false);

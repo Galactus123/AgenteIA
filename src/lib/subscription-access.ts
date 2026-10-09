@@ -7,8 +7,11 @@
 export const BILLING_PATH = "/configuracoes/assinatura";
 
 // subscriptions.status que dão acesso às funcionalidades operacionais.
-// Espelha o CHECK da BD: ('none','trialing','active','past_due','cancelled','expired').
-const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing"]);
+// Acesso estrito pós-pagamento: SOMENTE "active" — linha confirmada pelo
+// webhook da LOJOU. "trialing" (valor legado do CHECK da BD, nunca gravado
+// pelo código) NÃO dá acesso.
+// CHECK da BD: ('none','trialing','active','past_due','cancelled','expired').
+const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active"]);
 
 // Sem linha em subscriptions o estado é tratado como "none" → bloqueado.
 export function isActiveSubscriptionStatus(status: string | null | undefined): boolean {

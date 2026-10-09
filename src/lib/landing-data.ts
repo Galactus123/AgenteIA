@@ -177,9 +177,9 @@ export const FAQ_ITEMS: FaqItem[] = [
       "Sim. O SaúdeSync é preparado para integração com Google Calendar, Outlook Calendar, KOMUNIKA e outros sistemas de gestão clínica.",
   },
   {
-    question: "Tem teste grátis?",
+    question: "Preciso pagar para usar?",
     answer:
-      "Sim. Você pode testar o SaúdeSync gratuitamente e ver a IA agendando consultas reais pelo WhatsApp antes de contratar.",
+      "Sim. O acesso à plataforma — incluindo o agente de WhatsApp — é liberado assim que o pagamento da assinatura é confirmado, sem período gratuito.",
   },
 ];
 
@@ -189,5 +189,7 @@ export function ctaUrl(campaign: string, medium = "landing") {
     utm_medium: medium,
     utm_campaign: campaign,
   });
-  return `/teste-gratis?${params.toString()}`;
+  // Sem funil de teste gratis: o CTA publico leva direto às planos, onde o
+  // checkout da LOJOU so e aberto apos login (acesso = assinatura paga ativa).
+  return `/precos?${params.toString()}`;
 }

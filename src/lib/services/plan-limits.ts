@@ -128,8 +128,7 @@ export async function getSubscription(clinicId?: number): Promise<Subscription |
 
 export async function getActiveSubscription(clinicId?: number): Promise<Subscription | null> {
   const sub = await getSubscription(clinicId);
-  if (!sub) return null;
-  if (sub.status === "active" || sub.status === "trialing") return sub;
+  if (sub && isActiveSubscriptionStatus(sub.status)) return sub;
   return null;
 }
 
@@ -148,10 +147,11 @@ export async function getSubscriptionStatus(clinicId?: number): Promise<Subscrip
 }
 
 // ── Gate de subscrição ativa ───────────────────────────────────────────
-// Exige uma linha em subscriptions com estado ativo (active/trialing) para a
-// clínica. Sem linha (nunca pagou) ou com estado pendente/cancelado →
-// bloqueio 402. Usado pelo requireAuth (rotas operacionais) e pelo layout do
-// app (redirect para a página de faturação).
+// Exige uma linha em subscriptions com estado ativo (SOMENTE "active" —
+// pagamento confirmado pelo webhook da LOJOU) para a clínica. Sem linha
+// (nunca pagou), "trialing" legado ou com estado pendente/cancelado →
+// bloqueio 402. Usado pelo requireAuth (rotas operacionais), pelo layout
+// do app, pelo webhook inbound da Komunika e pela entrega da outbox.
 export interface SubscriptionGateFailure {
   status: number;
   body: {

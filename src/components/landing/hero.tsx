@@ -69,7 +69,7 @@ export default function Hero() {
             </span>
             <span className="flex items-center gap-1.5">
               <CheckIcon />
-              Teste grátis
+              Pagamento seguro
             </span>
             <span className="flex items-center gap-1.5">
               <CheckIcon />

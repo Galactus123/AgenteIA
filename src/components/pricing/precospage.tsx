@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, X, ArrowRight, MessageCircle, Sparkles, Zap } from "lucide-react";
 import { PLANS, FEATURE_CATEGORIES, formatLimit, type PlanId, type FeatureId } from "@/lib/plans";
@@ -396,8 +395,8 @@ export default function PrecosPage({ resumePlan = null }: PrecosPageProps) {
                 r: "O pagamento é processado de forma segura pela LOJOU. Após a confirmação do pagamento, sua assinatura é ativada automaticamente e os recursos do plano são liberados.",
               },
               {
-                q: "Tem teste grátis?",
-                r: "Sim. Você pode testar o SaúdeSync gratuitamente antes de contratar qualquer plano.",
+                q: "Preciso pagar para usar?",
+                r: "Sim. O acesso à plataforma — incluindo o agente de WhatsApp — é liberado assim que o pagamento da assinatura é confirmado, sem período gratuito.",
               },
             ].map((item) => (
               <details key={item.q} className="group rounded-xl border border-slate-200 dark:border-[rgba(99,102,241,0.12)] bg-white dark:bg-[#161926] overflow-hidden">
@@ -418,13 +417,22 @@ export default function PrecosPage({ resumePlan = null }: PrecosPageProps) {
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
             Sem taxa de setup. Cancele quando quiser.
           </p>
-          <Link
-            href="/teste-gratis?utm_source=precos-footer"
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 shadow-sm"
+          {/* Bottom CTA: checkout do plano destacado (sem funil de trial —
+              401 leva ao login e retoma o checkout aqui após autenticar). */}
+          <button
+            type="button"
+            onClick={() =>
+              void startCheckout(
+                PLANS.find((p) => p.highlighted)?.id ?? "start",
+                false
+              )
+            }
+            disabled={loadingPlan !== null}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 shadow-sm disabled:opacity-60 disabled:cursor-wait"
           >
-            Começar agora
+            {loadingPlan !== null ? "Abrindo checkout..." : "Começar agora"}
             <ArrowRight size={16} />
-          </Link>
+          </button>
         </div>
       </div>
     </div>

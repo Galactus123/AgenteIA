@@ -1,11 +1,11 @@
-=== clean-db-test (Fase 2.5) — 2026-10-09T19:59:16.004Z ===
+=== clean-db-test (Fase 2.5) — 2026-10-09T20:48:59.710Z ===
 Docker OK (engine 29.6.1)
 Container saudesync-migtest (postgres:16) iniciado
 Postgres pronto
 
 --- Bootstrap ---
 
---- Migrations (19) ---
+--- Migrations (20) ---
 > 20260911000001_schema_base.sql
 psql:<stdin>:345: NOTICE:  policy "clinics_isolation" for relation "clinics" does not exist, skipping
 psql:<stdin>:345: NOTICE:  policy "clinic_alerts_isolation" for relation "clinic_alerts" does not exist, skipping
@@ -26,7 +26,7 @@ psql:<stdin>:345: NOTICE:  policy "clinic_units_isolation" for relation "clinic_
 psql:<stdin>:345: NOTICE:  policy "usage_isolation" for relation "usage" does not exist, skipping
 psql:<stdin>:345: NOTICE:  Policies de isolamento criadas para todas as tabelas
 psql:<stdin>:356: NOTICE:  Permissoes anon revogadas
-  ok (436ms)
+  ok (368ms)
 > 20260911000002_rls_fix.sql
 psql:<stdin>:52: NOTICE:  admins: clinic_id ja existe
 psql:<stdin>:66: NOTICE:  doctors: clinic_id ja existe
@@ -40,7 +40,7 @@ psql:<stdin>:182: NOTICE:  clinic_id populado com default_id=1
 psql:<stdin>:231: NOTICE:  clinic_members: coluna admin_id nao existe (shape definitivo) - bridge legado pulado
 psql:<stdin>:257: NOTICE:  idx_clinic_members_admin_id pulado: coluna admin_id nao existe (shape definitivo)
 psql:<stdin>:433: NOTICE:  policy "api_access_log_block" for relation "api_access_log" does not exist, skipping
-  ok (307ms)
+  ok (276ms)
 > 20260911000003_schema_definitivo.sql
 psql:<stdin>:127: NOTICE:  column "clinic_id" of relation "specialties" already exists, skipping
 psql:<stdin>:155: NOTICE:  column "clinic_id" of relation "doctors" already exists, skipping
@@ -69,26 +69,26 @@ psql:<stdin>:679: NOTICE:  relation "especialidades" does not exist, skipping
 psql:<stdin>:680: NOTICE:  relation "medicos" does not exist, skipping
 psql:<stdin>:681: NOTICE:  relation "pacientes" does not exist, skipping
 psql:<stdin>:682: NOTICE:  relation "consultas" does not exist, skipping
-  ok (645ms)
+  ok (533ms)
 > 20260911000004_grant_permissions.sql
 psql:<stdin>:37: NOTICE:  GRANT pulado (tabela inexistente): doctors
 psql:<stdin>:37: NOTICE:  GRANT pulado (tabela inexistente): especialidades_legacy
 psql:<stdin>:37: NOTICE:  GRANT pulado (tabela inexistente): medicos_legacy
 psql:<stdin>:37: NOTICE:  GRANT pulado (tabela inexistente): pacientes_legacy
 psql:<stdin>:37: NOTICE:  GRANT pulado (tabela inexistente): consultas_legacy
-  ok (145ms)
+  ok (120ms)
 > 20260911000005_auth_rls.sql
-  ok (228ms)
+  ok (224ms)
 > 20260930000006_professionals_unification.sql
 psql:<stdin>:203: NOTICE:  relation "idx_appointments_starts_at" already exists, skipping
-  ok (198ms)
+  ok (192ms)
 > 20260930000007_appointments_clinic_fk.sql
-  ok (162ms)
+  ok (153ms)
 > 20260930000008_appointments_patient_fk.sql
-  ok (162ms)
+  ok (131ms)
 > 20260930000009_admins_auth_link.sql
 psql:<stdin>:89: NOTICE:  Resultado: 0 vinculados, 0 pendentes (sem auth.users), 0 ja vinculados.
-  ok (169ms)
+  ok (124ms)
 > 20261002000001_revoke_anon_grants.sql
 schema | relname | relacl 
 --------+---------+--------
@@ -101,7 +101,7 @@ schema | relname | relacl
  sequence_com_grant_para_anon 
 ------------------------------
 (0 rows)
-  ok (192ms)
+  ok (130ms)
 > 20261002000002_drop_dead_policies.sql
 schemaname | tablename | policyname 
 ------------+-----------+------------
@@ -215,24 +215,24 @@ psql:<stdin>:67: NOTICE:  policy morta removida: admin_profiles.anon_blocked
 psql:<stdin>:67: NOTICE:  policy morta removida: units.anon_blocked
 psql:<stdin>:67: NOTICE:  policy morta removida: medical_records.anon_blocked
 psql:<stdin>:67: NOTICE:  total de policies mortas removidas: 24
-  ok (165ms)
+  ok (130ms)
 > 20261002000003_outbox.sql
-  ok (165ms)
+  ok (161ms)
 > 20261002000004_cron_supabase.sql
 psql:<stdin>:64: NOTICE:  vault indisponivel neste banco — segredos do cron nao configuraveis aqui
 psql:<stdin>:64: NOTICE:  pg_cron indisponivel neste banco — jobs do Supabase nao agendados
 psql:<stdin>:64: NOTICE:  pg_net indisponivel neste banco — HTTP do cron nao agendado
 psql:<stdin>:129: NOTICE:  cron.schedule indisponivel — nenhum job agendado
-  ok (147ms)
+  ok (123ms)
 > 20261005000001_audit_logs.sql
-  ok (174ms)
+  ok (155ms)
 > 20261005000002_grants_audit_outbox.sql
 psql:<stdin>:32: NOTICE:  grants: service_role com SELECT/INSERT em audit_logs e outbox
-  ok (176ms)
+  ok (120ms)
 > 20261006000001_quota_counters_atomicos.sql
-  ok (158ms)
+  ok (133ms)
 > 20261006000002_komunika_instance_por_clinica.sql
-  ok (164ms)
+  ok (132ms)
 > 20261007000001_trial_leads.sql
 tabela    | polname 
 -------------+---------
@@ -244,15 +244,18 @@ tabela    | polname
 (0 rows)
 
 psql:<stdin>:95: NOTICE:  trial_leads: deny-all para anon/authenticated, service_role com CRUD
-  ok (173ms)
+  ok (154ms)
 > 20261009000001_outbox_clinic_id_sem_default.sql
 psql:<stdin>:35: NOTICE:  outbox.clinic_id sem DEFAULT: NULL = instancia global, numero = instancia da clinica
-  ok (141ms)
+  ok (122ms)
+> 20261009000002_drop_trial_leads.sql
+psql:<stdin>:26: NOTICE:  trial_leads removida (funil de teste gratis eliminado)
+  ok (133ms)
 
 --- Verificacao (clean-db-verify.sql) ---
 item         | valor 
 ----------------------+-------
- tabelas              | 27
+ tabelas              | 26
  tabelas_sem_rls      | 0
  policies_total       | 71
  policies_using_false | 0
@@ -359,11 +362,10 @@ item         | valor
  reminders
  specialties
  subscriptions
- trial_leads
  units
  usage
  users
-(27 rows)
+(26 rows)
 
 psql:<stdin>:18: NOTICE:  CHECK 1 ok: 1 clinica(s) seed
 psql:<stdin>:36: NOTICE:  CHECK 2 ok: todas as tabelas do public com RLS
@@ -376,6 +378,7 @@ psql:<stdin>:166: NOTICE:  CHECK 8 ok: indices de unicidade presentes
 psql:<stdin>:199: NOTICE:  CHECK 9 ok: shape definitivo de clinic_members/usage/subscriptions
 psql:<stdin>:211: NOTICE:  CHECK 10 ok: doctors -> doctors_legacy
 psql:<stdin>:223: NOTICE:  CHECK 11 ok: funcoes auxiliares presentes
+psql:<stdin>:232: NOTICE:  CHECK 12 ok: trial_leads removida (acesso estrito pos-pagamento)
 
 --- Testes de papel ---
 ok: anon NEGADO em clinics (permission denied)
@@ -383,8 +386,8 @@ ok: authenticated = 0 linhas em clinics/patients/admin_profiles (RLS)
 ok: service_role BYPASSRLS (1 clinica seed visivel)
 
 === RESULTADO: CADEIA INTEGR — banco limpo validado (Fase 2.5) ===
-Migrations executadas: 19
+Migrations executadas: 20
 Tabelas/log acima; ver CHECKs e inventario em clean-db-verify.sql.
 Container saudesync-migtest removido (--rm). Use --keep para manter.
 
---- Fim: 2026-10-09T19:59:24.943Z (inicio 2026-10-09T19:59:16.004Z) ---
+--- Fim: 2026-10-09T20:49:07.442Z (inicio 2026-10-09T20:48:59.710Z) ---
