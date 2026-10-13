@@ -135,54 +135,6 @@ export const ADDONS: Addon[] = [
   },
 ];
 
-export type FaqItem = {
-  question: string;
-  answer: string;
-};
-
-export const FAQ_ITEMS: FaqItem[] = [
-  {
-    question: "O que é o SaúdeSync?",
-    answer:
-      "O SaúdeSync é um SaaS de agendamento com Inteligência Artificial que atende seus pacientes pelo WhatsApp 24 horas por dia. Ele entende o que o paciente sente, sugere a especialidade certa e marca a consulta sozinho.",
-  },
-  {
-    question: "Como a IA entende os sintomas do paciente?",
-    answer:
-      "A IA compreende linguagem natural e o contexto da conversa — não apenas palavras-chave. Ela interpreta os sintomas descritos, tira dúvidas quando necessário e recomenda a especialidade mais adequada, de forma humanizada.",
-  },
-  {
-    question: "O sistema funciona em Moçambique?",
-    answer:
-      "Sim. O SaúdeSync foi feito para o Brasil 🇧🇷 e Moçambique 🇲🇿. Em Moçambique os pagamentos podem ser feitos via M-pesa e E-mola (através da LOJOU) e os preços são exibidos em metical.",
-  },
-  {
-    question: "Quais formas de pagamento vocês aceitam em cada país?",
-    answer:
-      "No Brasil 🇧🇷: Mercado Pago e cartão de crédito. Em Moçambique 🇲🇿: M-pesa e E-mola, processados através da LOJOU.",
-  },
-  {
-    question: "Meus dados estão seguros e em conformidade com a LGPD?",
-    answer:
-      "Sim. Seus dados são protegidos com criptografia e o sistema está em conformidade com a LGPD no Brasil e com a legislação de proteção de dados de Moçambique.",
-  },
-  {
-    question: "Preciso instalar algo?",
-    answer:
-      "Não. O SaúdeSync é um sistema na nuvem. Basta conectar seu número de WhatsApp e começar a agendar — sem instalação e sem hardware.",
-  },
-  {
-    question: "Posso integrar com meu sistema de gestão atual?",
-    answer:
-      "Sim. O SaúdeSync é preparado para integração com Google Calendar, Outlook Calendar, KOMUNIKA e outros sistemas de gestão clínica.",
-  },
-  {
-    question: "Preciso pagar para usar?",
-    answer:
-      "Sim. O acesso à plataforma — incluindo o agente de WhatsApp — é liberado assim que o pagamento da assinatura é confirmado, sem período gratuito.",
-  },
-];
-
 export function ctaUrl(campaign: string, medium = "landing") {
   const params = new URLSearchParams({
     utm_source: "saudesync",

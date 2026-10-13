@@ -2,6 +2,7 @@
 
 import { useState, FormEvent, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Inter } from "next/font/google";
 import { Activity } from "lucide-react";
 
@@ -391,7 +392,7 @@ export default function AuthPage() {
 
           {/* ── Footer links ────────────────────────────────────────── */}
           <p className="text-xs text-slate-500 text-center mt-4">
-            <a href="/landing" className="hover:text-primary transition-colors">Voltar para o site</a>
+            <Link href="/" className="hover:text-primary transition-colors">Voltar para o site</Link>
             <span className="mx-2">·</span>
             <a href="/termos" className="hover:text-primary transition-colors">Termos</a>
             <span className="mx-2">·</span>
@@ -767,7 +768,7 @@ export default function AuthPage() {
 
         {/* ── Footer links ────────────────────────────────────────── */}
         <p className="text-xs text-slate-500 text-center mt-6">
-          <a href="/landing" className="hover:text-primary transition-colors">Voltar para o site</a>
+          <Link href="/" className="hover:text-primary transition-colors">Voltar para o site</Link>
           <span className="mx-2">·</span>
           <a href="/termos" className="hover:text-primary transition-colors">Termos</a>
           <span className="mx-2">·</span>

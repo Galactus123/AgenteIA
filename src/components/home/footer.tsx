@@ -15,7 +15,7 @@ const COLUMNS = [
     links: [
       { label: "Como funciona", href: "#servicos" },
       { label: "Depoimentos", href: "#depoimentos" },
-      { label: "Perguntas frequentes", href: "/landing#faq" },
+      { label: "Preços completos", href: "/precos" },
     ],
   },
   {

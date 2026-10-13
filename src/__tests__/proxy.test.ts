@@ -16,7 +16,6 @@ describe("proxy — rotas protegidas", () => {
     const publicRoutes = [
       "/",
       "/login",
-      "/landing",
       "/precos",
       "/sobre-nos",
       "/termos",
