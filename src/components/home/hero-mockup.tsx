@@ -102,7 +102,7 @@ export default function HeroMockup() {
         </span>
       </div>
 
-      <span className="absolute -top-8 right-6 z-20 hidden items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur sm:flex">
+      <span className="absolute -top-8 right-6 z-20 hidden items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-md sm:flex">
         <Sparkles size={13} />
         Agendamento com IA
       </span>
