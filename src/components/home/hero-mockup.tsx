@@ -19,45 +19,45 @@ const MESSAGES = [
   },
 ];
 
-const GLASS_BADGE =
-  "border border-white/20 bg-white/10 text-white shadow-xl backdrop-blur-md";
+const GLASS_CARD =
+  "bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl text-white";
 
 export default function HeroMockup() {
   return (
     <div className="relative mx-auto w-full max-w-[460px] pb-10 sm:pb-14">
       <span
-        className={`absolute -left-1 top-0 z-20 flex items-center gap-2 rounded-2xl px-3.5 py-2.5 text-xs font-semibold sm:-left-6 sm:text-sm ${GLASS_BADGE}`}
+        className={`absolute -left-1 top-0 z-20 flex items-center gap-2 rounded-2xl px-3.5 py-2.5 text-xs font-semibold sm:-left-6 sm:text-sm ${GLASS_CARD}`}
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 text-blue-300">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-white">
           <Clock size={15} />
         </span>
         Serviço 24h
       </span>
 
       <span
-        className={`absolute -right-1 top-24 z-20 flex items-center gap-2 rounded-2xl px-3.5 py-2.5 text-xs font-semibold sm:-right-6 sm:text-sm ${GLASS_BADGE}`}
+        className={`absolute -right-1 top-24 z-20 flex items-center gap-2 rounded-2xl px-3.5 py-2.5 text-xs font-semibold sm:-right-6 sm:text-sm ${GLASS_CARD}`}
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 text-emerald-300">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-white">
           <Wifi size={15} />
         </span>
         WhatsApp Ativo
       </span>
 
-      <div className="relative z-10 overflow-hidden rounded-[28px] border border-white/20 bg-slate-900/40 shadow-xl backdrop-blur-lg">
-        <div className="flex items-center gap-3 border-b border-white/15 bg-white/10 px-4 py-3.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#4f6df5] to-[#8b5cf6] text-sm font-bold text-white">
+      <div className="relative z-10 overflow-hidden rounded-[28px] bg-white/20 text-white shadow-2xl backdrop-blur-xl border border-white/30">
+        <div className="flex items-center gap-3 border-b border-white/30 bg-white/10 px-4 py-3.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/25 text-sm font-bold text-white">
             S
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-white">
               SaúdeSync · Recepção IA
             </p>
-            <p className="flex items-center gap-1.5 text-xs text-emerald-300">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            <p className="flex items-center gap-1.5 text-xs text-white">
+              <span className="h-1.5 w-1.5 rounded-full bg-white" />
               Online agora
             </p>
           </div>
-          <BadgeCheck size={18} className="text-blue-300" />
+          <BadgeCheck size={18} className="text-white" />
         </div>
 
         <div className="space-y-3 px-4 py-4">
@@ -67,10 +67,10 @@ export default function HeroMockup() {
               className={`flex ${message.from === "bot" ? "justify-end" : "justify-start"}`}
             >
               <p
-                className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-snug ${
+                className={`max-w-[82%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-snug text-white ${
                   message.from === "bot"
-                    ? "rounded-br-md bg-gradient-to-br from-[#4f6df5] to-[#6366f1] font-medium text-white"
-                    : "rounded-bl-md border border-white/15 bg-white/15 text-slate-100"
+                    ? "rounded-br-md bg-white/30 font-medium"
+                    : "rounded-bl-md border border-white/30 bg-white/10"
                 }`}
               >
                 {message.text}
@@ -79,34 +79,34 @@ export default function HeroMockup() {
           ))}
         </div>
 
-        <div className="flex items-center gap-2 border-t border-white/15 bg-white/10 px-4 py-3">
-          <span className="flex-1 rounded-full border border-white/15 bg-white/10 px-4 py-2.5 text-[13px] text-white/60">
+        <div className="flex items-center gap-2 border-t border-white/30 bg-white/10 px-4 py-3">
+          <span className="flex-1 rounded-full border border-white/30 bg-white/10 px-4 py-2.5 text-[13px] text-white">
             Escreva uma mensagem...
           </span>
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#4f46e5] text-white">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/30 text-white">
             <Send size={15} />
           </span>
         </div>
       </div>
 
       <span
-        className={`absolute bottom-0 left-0 z-20 flex items-center gap-2 rounded-2xl px-3.5 py-2.5 text-xs font-semibold sm:left-4 sm:text-sm ${GLASS_BADGE}`}
+        className={`absolute bottom-0 left-0 z-20 flex items-center gap-2 rounded-2xl px-3.5 py-2.5 text-xs font-semibold sm:left-4 sm:text-sm ${GLASS_CARD}`}
       >
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 text-emerald-300">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-white">
           <CircleCheck size={15} />
         </span>
         Consulta confirmada
       </span>
 
       <div
-        className={`absolute bottom-0 right-0 z-20 flex items-center gap-3 rounded-2xl px-3 py-2.5 sm:right-2 ${GLASS_BADGE}`}
+        className={`absolute bottom-0 right-0 z-20 flex items-center gap-3 rounded-2xl px-3 py-2.5 sm:right-2 ${GLASS_CARD}`}
       >
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#4f6df5] to-[#8b5cf6] text-xs font-bold text-white">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/25 text-xs font-bold text-white">
           AR
         </span>
         <div className="leading-tight">
           <p className="text-[13px] font-semibold text-white">Chamada em curso</p>
-          <p className="text-[11px] text-white/70">Atendimento ao paciente</p>
+          <p className="text-[11px] text-white">Atendimento ao paciente</p>
         </div>
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -115,7 +115,7 @@ export default function HeroMockup() {
         </span>
       </div>
 
-      <span className="absolute -top-8 right-6 z-20 hidden items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white shadow-xl backdrop-blur-md sm:flex">
+      <span className="absolute -top-8 right-6 z-20 hidden items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white shadow-2xl backdrop-blur-md sm:flex border border-white/20">
         <Sparkles size={13} />
         Agendamento com IA
       </span>

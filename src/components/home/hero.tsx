@@ -33,7 +33,7 @@ export default function Hero() {
 
           <div className="grid gap-12 px-5 pb-14 pt-10 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-6 lg:px-14 lg:pb-20 lg:pt-14">
             <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold text-white shadow-xl backdrop-blur-md sm:text-sm">
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl px-4 py-2 text-xs font-semibold text-white sm:text-sm">
                 <Sparkles size={14} />
                 #1 Plataforma de gestão clínica
               </span>
