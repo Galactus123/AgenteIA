@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { SPECIALTIES, ctaUrl } from "@/lib/landing-data";
 
 const NAV_LINKS = [
-  { label: "Como funciona", href: "#como-funciona" },
-  { label: "Preços", href: "#precos" },
+  { label: "Sobre nós", href: "/sobre-nos" },
+  { label: "Preços", href: "/#precos" },
 ];
 
 export default function Header() {
@@ -41,7 +41,7 @@ export default function Header() {
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:h-20 lg:px-8">
         <Link
-          href="#inicio"
+          href="/#inicio"
           className="flex items-center gap-2.5"
           aria-label="SaúdeSync - página inicial"
         >
@@ -60,7 +60,7 @@ export default function Header() {
               <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />
             </svg>
           </span>
-          <span className="text-lg font-bold tracking-tight text-sidebar">
+          <span className="text-lg font-bold tracking-tight text-slate-900">
             SaúdeSync
           </span>
         </Link>
@@ -70,7 +70,7 @@ export default function Header() {
           aria-label="Navegação principal"
         >
           <Link
-            href="#como-funciona"
+            href="/#servicos"
             className="text-sm font-medium text-slate-700 transition hover:text-primary-dark"
           >
             Como funciona
@@ -128,7 +128,7 @@ export default function Header() {
         <div className="hidden items-center gap-3 lg:flex">
           <Link
             href="/login"
-            className="rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-sidebar transition hover:border-primary hover:text-primary-dark"
+            className="rounded-full border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary-dark"
           >
             Entrar
           </Link>
@@ -190,7 +190,7 @@ export default function Header() {
         >
           <nav className="flex flex-col gap-1" aria-label="Navegação móvel">
             <Link
-              href="#como-funciona"
+              href="/#servicos"
               onClick={closeMobile}
               className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-primary/5"
             >
@@ -224,7 +224,7 @@ export default function Header() {
             <Link
               href="/login"
               onClick={closeMobile}
-              className="rounded-full border border-slate-300 px-5 py-2.5 text-center text-sm font-semibold text-sidebar transition hover:border-primary hover:text-primary-dark"
+              className="rounded-full border border-slate-300 px-5 py-2.5 text-center text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary-dark"
             >
               Entrar
             </Link>

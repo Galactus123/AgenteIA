@@ -8,7 +8,7 @@ const CLINIC_INITIALS = ["CV", "SM", "BE", "JP"];
 
 export default function Hero() {
   return (
-    <section id="inicio" className="px-3 pt-3 sm:px-5 sm:pt-5">
+    <section id="inicio" className="px-3 pb-3 pt-3 sm:px-5 sm:pb-5 sm:pt-5">
       <div className="relative mx-auto max-w-[1400px] overflow-hidden rounded-[28px] bg-gradient-to-br from-[#4f6df5] via-[#6366f1] to-[#8b5cf6] text-white sm:rounded-[36px]">
         <div
           aria-hidden="true"

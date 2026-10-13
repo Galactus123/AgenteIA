@@ -16,17 +16,16 @@ const COLUMNS = [
   {
     title: "Produto",
     links: [
-      { label: "Como funciona", href: "#como-funciona" },
-      { label: "Funcionalidades", href: "#dashboard" },
-      { label: "Preços", href: "#precos" },
-      { label: "Integrações", href: "#integracoes" },
+      { label: "Como funciona", href: "/#servicos" },
+      { label: "Funcionalidades", href: "/#servicos" },
+      { label: "Preços", href: "/#precos" },
     ],
   },
   {
     title: "Empresa",
     links: [
       { label: "Sobre nós", href: "/sobre-nos" },
-      { label: "Contato", href: "/contato" },
+      { label: "Contato", href: "#contato" },
     ],
   },
   {
@@ -43,7 +42,7 @@ export default function CtaFooter() {
 
   return (
     <footer id="contato" className="bg-slate-900">
-      <div className="bg-sidebar">
+      <div className="bg-[#0D1017]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
 <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
              Crie sua conta agora
@@ -64,7 +63,7 @@ export default function CtaFooter() {
         <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
             <div className="flex items-center gap-3">
-              <span className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-accent text-sidebar font-bold text-lg">
+              <span className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-accent text-white font-bold text-lg">
                 S
               </span>
               <span className="text-xl font-bold text-white">SaúdeSync</span>

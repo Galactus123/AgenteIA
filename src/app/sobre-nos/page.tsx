@@ -13,14 +13,26 @@ export default function SobreNosPage() {
     <div className="bg-background">
       <Header />
       <main>
-        <section className="relative overflow-hidden bg-gradient-to-b from-teal-50 via-background to-background py-20 lg:py-24">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary-dark">
+        <section className="relative overflow-hidden rounded-b-[40px] bg-gradient-to-b from-[#0D1017] via-[#101426] to-[#161B31] pb-24 pt-24 lg:pb-28 lg:pt-32">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -left-24 -top-16 h-72 w-72 rounded-full bg-[#4f6df5]/25 blur-3xl"
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -bottom-24 -right-16 h-72 w-72 rounded-full bg-[#8b5cf6]/20 blur-3xl"
+          />
+          <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <span className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/20 px-4 py-1.5 text-sm font-medium text-blue-400">
               Sobre o SaúdeSync
             </span>
-            <h1 className="mt-6 text-4xl font-bold tracking-tight text-sidebar sm:text-5xl">
+            <h1 className="mt-6 text-4xl font-bold tracking-tight text-white sm:text-5xl">
               Nossa história e missão
             </h1>
+            <p className="mt-4 max-w-2xl text-base leading-relaxed text-slate-300 sm:text-lg">
+              Simplificamos a gestão de clínicas e consultórios com atendimento e agendamento
+              inteligentes no WhatsApp, 24 horas por dia.
+            </p>
           </div>
         </section>
 
@@ -28,7 +40,7 @@ export default function SobreNosPage() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-4xl space-y-12">
               <div>
-                <h2 className="text-2xl font-bold text-sidebar tracking-tight">
+                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
                   Nossa missão
                 </h2>
                 <p className="mt-4 text-lg text-slate-600 leading-relaxed">
@@ -40,7 +52,7 @@ export default function SobreNosPage() {
               </div>
 
               <div>
-                <h2 className="text-2xl font-bold text-sidebar tracking-tight">
+                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
                   Como surgiu
                 </h2>
                 <p className="mt-4 text-lg text-slate-600 leading-relaxed">
@@ -51,7 +63,7 @@ export default function SobreNosPage() {
               </div>
 
               <div>
-                <h2 className="text-2xl font-bold text-sidebar tracking-tight">
+                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
                   Atuação
                 </h2>
                 <p className="mt-4 text-lg text-slate-600 leading-relaxed">
@@ -61,7 +73,7 @@ export default function SobreNosPage() {
               </div>
 
               <div>
-                <h2 className="text-2xl font-bold text-sidebar tracking-tight">
+                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
                   Funcionalidades de destaque
                 </h2>
                 <ul className="mt-4 space-y-3">
@@ -121,7 +133,7 @@ export default function SobreNosPage() {
               </div>
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
-                <h3 className="text-lg font-semibold text-sidebar">
+                <h3 className="text-lg font-semibold text-slate-900">
                   Contacte-nos
                 </h3>
                 <p className="mt-2 text-slate-600">
