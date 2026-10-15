@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, FormEvent } from "react";
+import { usePlan } from "@/hooks/usePlan";
+import UpgradeModal from "@/components/UpgradeModal";
 
 interface ScheduleRow {
   weekday: number;
@@ -63,6 +65,8 @@ export default function MedicosPage() {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const { hasActivePlan } = usePlan();
 
   useEffect(() => {
     async function loadSpecialties() {
@@ -140,6 +144,11 @@ export default function MedicosPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    // Modo de visualização: criação/edição cancelada e UpgradeModal aberto.
+    if (!hasActivePlan) {
+      setUpgradeOpen(true);
+      return;
+    }
     setLoading(true);
     setError("");
     setSuccess("");
@@ -190,6 +199,10 @@ export default function MedicosPage() {
   }
 
   async function handleDelete(id: string) {
+    if (!hasActivePlan) {
+      setUpgradeOpen(true);
+      return;
+    }
     if (!confirm("Excluir este profissional?")) return;
     try {
       const res = await fetch(`/api/professionals/${id}`, { method: "DELETE" });
@@ -205,6 +218,10 @@ export default function MedicosPage() {
   }
 
   async function toggleStatus(d: Professional) {
+    if (!hasActivePlan) {
+      setUpgradeOpen(true);
+      return;
+    }
     const newStatus = d.status === "active" ? "inactive" : "active";
     try {
       const res = await fetch(`/api/professionals/${d.id}`, {
@@ -442,6 +459,8 @@ export default function MedicosPage() {
           </div>
         )}
       </div>
+
+      <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
     </div>
   );
 }

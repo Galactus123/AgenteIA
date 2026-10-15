@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { usePlan } from "@/hooks/usePlan";
+import UpgradeModal from "@/components/UpgradeModal";
 
 interface ChatMessage {
   id: number;
@@ -24,8 +26,10 @@ export default function ChatPage() {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [transferred, setTransferred] = useState(false);
   const [status, setStatus] = useState("");
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const { hasActivePlan } = usePlan();
 
   // Busca histórico usando conversationId quando disponível, senão phone
   const fetchHistory = useCallback(async (targetPhone: string) => {
@@ -74,6 +78,12 @@ export default function ChatPage() {
   async function send() {
     const text = input.trim();
     if (!text || loading || !historyLoaded) return;
+    // Modo de visualização: sem plano ativo o envio é cancelado e abre o
+    // UpgradeModal (o gate do servidor continua a valer por baixo).
+    if (!hasActivePlan) {
+      setUpgradeOpen(true);
+      return;
+    }
     setInput("");
     setLoading(true);
     setStatus("digitando...");
@@ -258,6 +268,8 @@ export default function ChatPage() {
         <p>• Cancelar: diga &quot;quero cancelar minha consulta&quot;.</p>
         <p>• Transferir: diga &quot;quero falar com um atendente&quot;.</p>
       </div>
+
+      <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
     </div>
   );
 }

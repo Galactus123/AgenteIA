@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, FormEvent } from "react";
+import { usePlan } from "@/hooks/usePlan";
+import UpgradeModal from "@/components/UpgradeModal";
 
 interface Patient {
   id: number;
@@ -28,6 +30,8 @@ export default function PacientesPage() {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const { hasActivePlan } = usePlan();
 
   const load = useCallback(async () => {
     setFetching(true);
@@ -56,6 +60,11 @@ export default function PacientesPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    // Modo de visualização: cadastro cancelado e UpgradeModal aberto.
+    if (!hasActivePlan) {
+      setUpgradeOpen(true);
+      return;
+    }
     setLoading(true);
     clearFeedback();
 
@@ -218,6 +227,8 @@ export default function PacientesPage() {
           </div>
         )}
       </div>
+
+      <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, FormEvent } from "react";
+import { usePlan } from "@/hooks/usePlan";
+import UpgradeModal from "@/components/UpgradeModal";
 
 interface Specialty {
   id: number;
@@ -18,6 +20,8 @@ export default function EspecialidadesPage() {
   const [keywordsText, setKeywordsText] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const { hasActivePlan } = usePlan();
 
   const load = useCallback(async () => {
     const res = await fetch("/api/especialidades");
@@ -46,6 +50,11 @@ export default function EspecialidadesPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    // Modo de visualização: criação/edição cancelada e UpgradeModal aberto.
+    if (!hasActivePlan) {
+      setUpgradeOpen(true);
+      return;
+    }
     setLoading(true);
     setError("");
     const payload = {
@@ -75,6 +84,10 @@ export default function EspecialidadesPage() {
   }
 
   async function handleDelete(id: number) {
+    if (!hasActivePlan) {
+      setUpgradeOpen(true);
+      return;
+    }
     if (!confirm("Excluir esta especialidade?")) return;
     const res = await fetch(`/api/especialidades/${id}`, { method: "DELETE" });
     if (res.ok) await load();
@@ -189,6 +202,8 @@ export default function EspecialidadesPage() {
           </div>
         )}
       </div>
+
+      <UpgradeModal isOpen={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
     </div>
   );
 }
