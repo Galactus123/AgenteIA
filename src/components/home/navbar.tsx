@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, MessageCircle, X } from "lucide-react";
 import { ctaUrl } from "@/lib/landing-data";
+
+// Contacto oficial (WhatsApp Business do SaúdeSync).
+const WHATSAPP_URL = "https://wa.me/258860020811";
 
 const NAV_LINKS = [
   { label: "Início", href: "#inicio" },
   { label: "Funcionalidades", href: "#servicos" },
-  { label: "Depoimentos", href: "#depoimentos" },
   { label: "Preços", href: "#precos" },
   { label: "Sobre nós", href: "/sobre-nos" },
 ];
@@ -61,6 +63,15 @@ export default function Navbar() {
         </nav>
 
         <div className="hidden items-center gap-2 lg:flex">
+          <a
+            href={WHATSAPP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Falar no WhatsApp: +258 860020811"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/10 hover:text-white"
+          >
+            <MessageCircle size={18} />
+          </a>
           <Link
             href="/login"
             className="rounded-full px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
@@ -105,6 +116,15 @@ export default function Navbar() {
             ))}
           </nav>
           <div className="mt-2 flex flex-col gap-2 border-t border-white/10 pt-3">
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={close}
+              className="rounded-full border border-white/15 px-5 py-2.5 text-center text-sm font-semibold text-slate-200 transition hover:border-indigo-400/50 hover:text-white"
+            >
+              WhatsApp: +258 860020811
+            </a>
             <Link
               href="/login"
               onClick={close}

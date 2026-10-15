@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ctaUrl } from "@/lib/landing-data";
 
 const COLUMNS = [
   {
@@ -14,7 +13,6 @@ const COLUMNS = [
     title: "Recursos",
     links: [
       { label: "Como funciona", href: "#servicos" },
-      { label: "Depoimentos", href: "#depoimentos" },
       { label: "Preços completos", href: "/precos" },
     ],
   },
@@ -29,8 +27,8 @@ const COLUMNS = [
   {
     title: "Contacto",
     links: [
-      { label: "WhatsApp: +258 84 000 0000", href: ctaUrl("footer-whatsapp") },
-      { label: "geral@saudesync.com", href: "mailto:geral@saudesync.com" },
+      { label: "WhatsApp: +258 860020811", href: "https://wa.me/258860020811" },
+      { label: "saudesync1info@gmail.com", href: "mailto:saudesync1info@gmail.com" },
       { label: "Maputo · São Paulo", href: "/sobre-nos" },
     ],
   },
@@ -84,6 +82,9 @@ export default function Footer() {
                     <li key={link.label}>
                       <Link
                         href={link.href}
+                        {...(link.href.startsWith("http")
+                          ? { target: "_blank", rel: "noopener noreferrer" }
+                          : {})}
                         className="text-sm text-slate-400 transition hover:text-white"
                       >
                         {link.label}

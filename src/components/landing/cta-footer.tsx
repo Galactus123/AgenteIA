@@ -7,7 +7,7 @@ const WHATSAPP_PATH =
 const SOCIAL_LINKS = [
   {
     label: "WhatsApp",
-    href: "https://wa.me/258853287859",
+    href: "https://wa.me/258860020811",
     icon: <path d={WHATSAPP_PATH} />,
   },
 ];
@@ -48,7 +48,7 @@ export default function CtaFooter() {
              Crie sua conta agora
            </h2>
            <p className="mt-2 text-sm text-slate-400">
-             📧 contato@saudesync1info@gmail.com · 📱 +258 853 287 859
+             📧 saudesync1info@gmail.com · 📱 +258 860020811
            </p>
           <Link
             href={ctaUrl("cta-final")}
