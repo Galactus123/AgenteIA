@@ -14,6 +14,8 @@ type Service = {
   title: string;
   subtitle: string;
   description: string;
+  // Só layout: largura no Bento Grid (visual, não altera textos).
+  span?: boolean;
 };
 
 const SERVICES: Service[] = [
@@ -32,6 +34,7 @@ const SERVICES: Service[] = [
     subtitle: "IA que marca consultas 24 horas por dia",
     description:
       "A IA entende o paciente, sugere a especialidade certa e marca, confirma e remarca a consulta sozinha, direto no WhatsApp.",
+    span: true,
   },
   {
     number: "003",
@@ -40,6 +43,7 @@ const SERVICES: Service[] = [
     subtitle: "Indicadores da clínica em tempo real",
     description:
       "Veja ocupação da agenda, no-shows e faturamento em painéis simples, sem planilhas e sem trabalho manual.",
+    span: true,
   },
   {
     number: "004",
@@ -64,6 +68,7 @@ const SERVICES: Service[] = [
     subtitle: "Dados protegidos por padrão",
     description:
       "Criptografia, controlo de acesso por utilizador e conformidade com a LGPD no Brasil e com a legislação de Moçambique.",
+    span: true,
   },
 ];
 
@@ -72,10 +77,10 @@ export default function Services() {
     <section id="servicos" className="px-4 py-16 sm:px-6 lg:px-10 lg:py-24">
       <div className="mx-auto max-w-7xl">
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
-          <h2 className="text-3xl font-bold leading-tight tracking-tight text-slate-900 dark:text-white sm:text-4xl lg:text-5xl">
+          <h2 className="text-3xl font-bold leading-tight tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent sm:text-4xl lg:text-5xl">
             Serviços de saúde em que pode confiar
           </h2>
-          <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400 sm:text-base lg:pb-2">
+          <p className="text-sm leading-relaxed text-slate-400 sm:text-base lg:pb-2">
             Soluções completas para cuidar da sua clínica em cada fase: da recepção virtual ao
             relatório de gestão, tudo conectado no mesmo lugar.
           </p>
@@ -87,25 +92,32 @@ export default function Services() {
             return (
               <article
                 key={service.number}
-                className="group rounded-3xl border border-slate-200 bg-white p-6 transition duration-300 hover:-translate-y-1 hover:border-[#4f6df5]/40 hover:shadow-xl hover:shadow-[#4f6df5]/10 dark:border-white/10 dark:bg-[#161926]"
+                className={`group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:border-indigo-400/40 hover:bg-white/[0.07] hover:shadow-2xl hover:shadow-indigo-500/10 ${
+                  service.span ? "lg:col-span-2" : ""
+                }`}
               >
-                <div className="flex items-start justify-between">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition group-hover:bg-[#4f6df5] group-hover:text-white dark:bg-white/5 dark:text-slate-300">
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-indigo-500/0 blur-3xl transition duration-500 group-hover:bg-indigo-500/20"
+                />
+
+                <div className="relative flex items-start justify-between">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-indigo-200 transition duration-300 group-hover:border-transparent group-hover:bg-gradient-to-br group-hover:from-[#6366f1] group-hover:to-[#8b5cf6] group-hover:text-white">
                     <Icon size={20} />
                   </span>
-                  <span className="font-mono text-lg font-semibold text-slate-300 dark:text-white/20">
+                  <span className="font-mono text-lg font-semibold text-white/20">
                     {service.number}
                   </span>
                 </div>
 
-                <h3 className="mt-6 text-lg font-semibold text-slate-900 dark:text-white">
+                <h3 className="relative mt-6 text-lg font-semibold tracking-tight text-white">
                   {service.title}
                 </h3>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                <p className="relative mt-1 text-sm text-slate-400">
                   {service.subtitle}
                 </p>
 
-                <p className="mt-5 border-t border-slate-100 pt-5 text-sm leading-relaxed text-slate-500 dark:border-white/10 dark:text-slate-400">
+                <p className="relative mt-5 border-t border-white/10 pt-5 text-sm leading-relaxed text-slate-400">
                   {service.description}
                 </p>
               </article>

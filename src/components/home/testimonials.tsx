@@ -57,13 +57,13 @@ export default function Testimonials() {
     <section id="depoimentos" className="px-4 py-16 sm:px-6 lg:px-10 lg:py-24">
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-[#4f6df5]">
+          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/10 px-4 py-1 text-xs font-semibold text-indigo-300 backdrop-blur-md">
             Depoimentos
-          </p>
-          <h2 className="mt-3 text-3xl font-bold leading-tight tracking-tight text-slate-900 dark:text-white sm:text-4xl lg:text-5xl">
+          </span>
+          <h2 className="mt-3 text-3xl font-bold leading-tight tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent sm:text-4xl lg:text-5xl">
             Não está sozinho. Ouça a nossa comunidade
           </h2>
-          <p className="mt-4 text-sm leading-relaxed text-slate-600 dark:text-slate-400 sm:text-base">
+          <p className="mt-4 text-sm leading-relaxed text-slate-400 sm:text-base">
             Clínicas do Brasil e de Moçambique que já receberam a recepção do SaúdeSync.
           </p>
         </div>
@@ -72,21 +72,21 @@ export default function Testimonials() {
           {TESTIMONIALS.map((testimonial) => (
             <figure
               key={testimonial.name}
-              className="flex flex-col justify-between gap-5 rounded-3xl border border-slate-200 bg-white p-6 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/5 dark:border-white/10 dark:bg-[#161926]"
+              className="flex flex-col justify-between gap-5 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-2xl hover:shadow-indigo-500/10"
             >
-              <blockquote className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+              <blockquote className="text-sm leading-relaxed text-slate-300">
                 {testimonial.quote}
               </blockquote>
 
-              <figcaption className="flex items-center gap-3 border-t border-slate-100 pt-4 dark:border-white/10">
+              <figcaption className="flex items-center gap-3 border-t border-white/10 pt-4">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#4f6df5] to-[#8b5cf6] text-xs font-bold text-white">
                   {testimonial.initials}
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                  <p className="truncate text-sm font-semibold text-white">
                     {testimonial.name}
                   </p>
-                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                  <p className="truncate text-xs text-slate-400">
                     {testimonial.role}
                   </p>
                 </div>

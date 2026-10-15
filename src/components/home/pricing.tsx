@@ -9,23 +9,23 @@ export default function Pricing() {
     <section id="precos" className="px-4 py-16 sm:px-6 lg:px-10 lg:py-24">
       <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1fr_0.9fr] lg:items-center lg:gap-16">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-[#4f6df5]">
+          <span className="inline-flex items-center rounded-full border border-white/10 bg-white/10 px-4 py-1 text-xs font-semibold uppercase tracking-widest text-indigo-300 backdrop-blur-md">
             Planos e preços
-          </p>
-          <h2 className="mt-3 text-3xl font-bold leading-tight tracking-tight text-slate-900 dark:text-white sm:text-4xl lg:text-5xl">
+          </span>
+          <h2 className="mt-3 text-3xl font-bold leading-tight tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent sm:text-4xl lg:text-5xl">
             Preço simples, sem surpresa
           </h2>
-          <p className="mt-4 max-w-xl text-sm leading-relaxed text-slate-600 dark:text-slate-400 sm:text-base">
+          <p className="mt-4 max-w-xl text-sm leading-relaxed text-slate-400 sm:text-base">
             Um único plano com tudo o que a sua clínica precisa para receber, agendar e acompanhar
             pacientes. Escolha a moeda do seu país.
           </p>
 
-          <div className="mt-7 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1 dark:border-white/10 dark:bg-[#161926]">
+          <div className="mt-7 inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 backdrop-blur-md">
             {PLANS.map((plan) => (
               <Link
                 key={plan.id}
                 href={`/precos?utm_source=saudesync&utm_medium=landing&utm_campaign=pricing-${plan.id}`}
-                className="rounded-full px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:text-[#4f6df5] dark:text-slate-300"
+                className="rounded-full px-5 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
               >
                 {plan.flag} {plan.id === "br" ? "Real" : "Metical"}
               </Link>
@@ -34,12 +34,12 @@ export default function Pricing() {
 
           <ul className="mt-8 space-y-3">
             {ADDONS.map((addon) => (
-              <li key={addon.name} className="flex items-start gap-3 text-sm text-slate-600 dark:text-slate-400">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#4f6df5]/10 text-[#4f6df5]">
+              <li key={addon.name} className="flex items-start gap-3 text-sm text-slate-400">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-indigo-300">
                   <Check size={12} />
                 </span>
                 <span>
-                  <span className="font-medium text-slate-900 dark:text-white">{addon.name}</span>
+                  <span className="font-medium text-slate-100">{addon.name}</span>
                   {" — "}
                   {addon.description}
                 </span>
@@ -52,60 +52,55 @@ export default function Pricing() {
           {PLANS.map((plan, index) => (
             <div
               key={plan.id}
-              className={`rounded-[28px] border p-7 transition duration-300 sm:p-8 ${
+              className={`relative overflow-hidden rounded-3xl p-7 backdrop-blur-md transition duration-300 sm:p-8 ${
                 index === 0
-                  ? "border-transparent bg-gradient-to-br from-[#4f6df5] via-[#6366f1] to-[#8b5cf6] text-white shadow-2xl shadow-[#4f6df5]/30"
-                  : "border-slate-200 bg-white dark:border-white/10 dark:bg-[#161926]"
+                  ? "border border-indigo-400/40 bg-gradient-to-br from-indigo-500/15 via-white/[0.04] to-violet-500/10 shadow-2xl shadow-indigo-500/20"
+                  : "border border-white/10 bg-white/5 shadow-lg shadow-black/20 hover:border-white/20"
               }`}
             >
-              <div className="flex items-center justify-between gap-3">
+              {index === 0 && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-indigo-500/25 blur-3xl"
+                />
+              )}
+
+              <div className="relative flex items-center justify-between gap-3">
                 <div>
-                  <p
-                    className={`text-sm font-semibold ${
-                      index === 0 ? "text-white/80" : "text-slate-500 dark:text-slate-400"
-                    }`}
-                  >
+                  <p className="text-sm font-semibold text-slate-400">
                     {plan.flag} {plan.country}
                   </p>
-                  <h3
-                    className={`mt-1 text-lg font-bold ${
-                      index === 0 ? "text-white" : "text-slate-900 dark:text-white"
-                    }`}
-                  >
+                  <h3 className="mt-1 text-lg font-bold tracking-tight text-white">
                     SaúdeSync Base
                   </h3>
                 </div>
                 {index === 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1.5 text-xs font-semibold">
-                    <Sparkles size={13} />
-                    Popular
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-md">
+                    <Sparkles size={13} className="text-indigo-300" />
+                    Mais Popular
                   </span>
                 )}
               </div>
 
-              <p className="mt-6 text-4xl font-bold">
-                <span className={index === 0 ? "text-white/80" : "text-[#4f6df5]"}>{plan.currency}</span>{" "}
+              <p className="relative mt-6 text-4xl font-bold tracking-tight text-white">
+                <span className="text-indigo-300">{plan.currency}</span>{" "}
                 {plan.price}
-                <span
-                  className={`text-base font-medium ${
-                    index === 0 ? "text-white/70" : "text-slate-400"
-                  }`}
-                >
+                <span className="text-base font-medium text-slate-400">
                   /{plan.cadence}
                 </span>
               </p>
 
-              <ul className="mt-6 space-y-3">
+              <ul className="relative mt-6 space-y-3">
                 {plan.includes.map((item) => (
                   <li
                     key={item}
-                    className={`flex items-start gap-3 text-sm ${
-                      index === 0 ? "text-white/90" : "text-slate-600 dark:text-slate-400"
-                    }`}
+                    className="flex items-start gap-3 text-sm text-slate-300"
                   >
                     <span
                       className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
-                        index === 0 ? "bg-white/25 text-white" : "bg-[#4f6df5]/10 text-[#4f6df5]"
+                        index === 0
+                          ? "bg-gradient-to-br from-[#6366f1] to-[#8b5cf6] text-white"
+                          : "bg-white/10 text-indigo-300"
                       }`}
                     >
                       <Check size={12} />
@@ -117,17 +112,17 @@ export default function Pricing() {
 
               <Link
                 href={ctaUrl(`pricing-${plan.id}`)}
-                className={`mt-7 flex w-full items-center justify-center rounded-full px-6 py-3 text-sm font-semibold transition ${
+                className={`relative mt-7 flex w-full items-center justify-center rounded-full px-6 py-3 text-sm font-semibold transition duration-300 ${
                   index === 0
-                    ? "bg-white text-slate-900 hover:bg-white/90"
-                    : "bg-slate-900 text-white hover:bg-[#4f6df5] dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+                    ? "bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white shadow-lg shadow-indigo-500/25 hover:brightness-110 hover:shadow-indigo-500/40"
+                    : "border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10"
                 }`}
               >
                 Começar agora
               </Link>
             </div>
           ))}
-          <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-center text-xs text-slate-500">
             Sem taxa de setup. Cancele quando quiser.
           </p>
         </div>

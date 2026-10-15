@@ -39,8 +39,17 @@ const COLUMNS = [
 export default function Footer() {
   return (
     <footer className="px-4 pb-6 sm:px-6 lg:px-10">
-      <div className="mx-auto max-w-[1400px] overflow-hidden rounded-[28px] bg-[#0D1017] px-6 py-12 text-slate-300 sm:rounded-[36px] sm:px-10 lg:px-14 lg:py-16">
-        <div className="grid gap-10 lg:grid-cols-[1.2fr_2fr]">
+      <div className="relative mx-auto max-w-[1400px] overflow-hidden rounded-[28px] border border-white/10 bg-white/5 px-6 py-12 text-slate-300 shadow-2xl shadow-black/40 backdrop-blur-md sm:rounded-[36px] sm:px-10 lg:px-14 lg:py-16">
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -left-20 -top-24 h-56 w-56 rounded-full bg-indigo-600/15 blur-3xl"
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-16 bottom-0 h-48 w-48 rounded-full bg-violet-600/15 blur-3xl"
+        />
+
+        <div className="relative grid gap-10 lg:grid-cols-[1.2fr_2fr]">
           <div>
             <Link href="#inicio" className="flex items-center gap-2.5" aria-label="SaúdeSync - topo da página">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#4f6df5] to-[#8b5cf6] text-white">
@@ -87,7 +96,7 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-12 flex flex-col gap-4 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative mt-12 flex flex-col gap-4 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-slate-500">
             © {new Date().getFullYear()} SaúdeSync. Todos os direitos reservados.
           </p>
