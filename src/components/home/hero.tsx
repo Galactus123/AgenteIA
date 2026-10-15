@@ -52,12 +52,14 @@ export default function Hero() {
               </p>
 
               <div className="mt-8 flex flex-wrap items-center gap-3">
-                <Link
+                <a
                   href={ctaUrl("hero")}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition duration-300 hover:brightness-110 hover:shadow-indigo-500/40"
                 >
                   Começar agora
-                </Link>
+                </a>
                 <Link
                   href="#precos"
                   className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm font-semibold text-slate-200 backdrop-blur-md transition hover:bg-white/10"

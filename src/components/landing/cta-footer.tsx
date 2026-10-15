@@ -50,12 +50,14 @@ export default function CtaFooter() {
            <p className="mt-2 text-sm text-slate-400">
              📧 saudesync1info@gmail.com · 📱 +258 860020811
            </p>
-          <Link
+          <a
             href={ctaUrl("cta-final")}
+            target="_blank"
+            rel="noopener noreferrer"
             className="mt-8 inline-flex items-center justify-center rounded-lg bg-primary hover:bg-primary-dark text-white font-medium px-8 py-3.5 transition-colors"
           >
             Começar agora
-          </Link>
+          </a>
         </div>
       </div>
 

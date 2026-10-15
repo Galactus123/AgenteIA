@@ -25,18 +25,9 @@ export async function POST(request: NextRequest) {
 
     const plan = getPlan(planId);
 
-    // Enterprise: redirecionar para contato personalizado
-    if (planId === "enterprise") {
-      return NextResponse.json({
-        type: "contact",
-        message: "Para o plano Enterprise, entre em contato com nossa equipe comercial.",
-        contactUrl: "mailto:contato@saudesync.com.br?subject=Plano%20Enterprise%20-%20Solicita%C3%A7%C3%A3o",
-      });
-    }
-
     // Mapear plan_id para o ID fixo do produto LOJOU — mesmo dicionário que o
     // webhook usa para gravar subscriptions.plan_id, para os dois lados
-    // coincidirem sempre.
+    // coincidirem sempre. Vale para os 4 planos (inclusive enterprise).
     const priceId = getLojouIdForPlan(planId);
     if (!priceId) {
       console.error(`[checkout] Produto LOJOU não mapeado para o plano ${planId}`);

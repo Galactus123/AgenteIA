@@ -28,6 +28,7 @@ describe("Checkout LOJOU — IDs fixos de produto", () => {
       ["start", "JzRcy"],
       ["pro", "CZqfz"],
       ["business", "CvPAy"],
+      ["enterprise", "Z8cWN"],
     ];
 
     for (const [planId, lojouId] of cases) {
@@ -41,10 +42,8 @@ describe("Checkout LOJOU — IDs fixos de produto", () => {
   });
 
   it("usa exatamente os IDs do dicionário partilhado com o webhook", async () => {
-    const fromDict = Object.entries(LOJOU_PLAN_BY_PRICE_ID).filter(
-      ([, planId]) => planId !== "enterprise"
-    );
-    expect(fromDict).toHaveLength(3);
+    const fromDict = Object.entries(LOJOU_PLAN_BY_PRICE_ID);
+    expect(fromDict).toHaveLength(4);
 
     for (const [lojouId, planId] of fromDict) {
       const res = await POST(makeRequest(planId));
@@ -53,11 +52,13 @@ describe("Checkout LOJOU — IDs fixos de produto", () => {
     }
   });
 
-  it("enterprise segue o fluxo de contacto em vez de checkout", async () => {
+  it("enterprise também gera checkout com o produto fixo Z8cWN", async () => {
     const res = await POST(makeRequest("enterprise"));
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toMatchObject({ type: "contact" });
+    const body = await res.json();
+    expect(body.type).toBe("checkout");
+    expect(body.checkoutUrl).toContain("price_id=Z8cWN");
   });
 
   it("plano inválido é rejeitado com 400", async () => {

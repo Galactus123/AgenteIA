@@ -132,12 +132,14 @@ export default function Header() {
           >
             Entrar
           </Link>
-          <Link
+          <a
             href={ctaUrl("header")}
+            target="_blank"
+            rel="noopener noreferrer"
             className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark"
           >
             Começar agora
-          </Link>
+          </a>
         </div>
 
         <button
@@ -228,13 +230,15 @@ export default function Header() {
             >
               Entrar
             </Link>
-            <Link
+            <a
               href={ctaUrl("header")}
               onClick={closeMobile}
+              target="_blank"
+              rel="noopener noreferrer"
               className="rounded-full bg-primary px-5 py-2.5 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark"
             >
               Começar agora
-            </Link>
+            </a>
           </div>
         </div>
       )}

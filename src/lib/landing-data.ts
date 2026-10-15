@@ -1,3 +1,5 @@
+import { getCheckoutLink } from "@/lib/checkout-links";
+
 export type Specialty = {
   name: string;
   slug: string;
@@ -135,13 +137,16 @@ export const ADDONS: Addon[] = [
   },
 ];
 
+// CTA público leva direto ao checkout LOJOU (link oficial do projeto,
+// com UTM preservado). Override por env var também vale aqui, porque o
+// valor vem de getCheckoutLink. Última reserva: /precos (não acontece:
+// o link oficial garante retorno não-nulo).
 export function ctaUrl(campaign: string, medium = "landing") {
-  const params = new URLSearchParams({
-    utm_source: "saudesync",
-    utm_medium: medium,
-    utm_campaign: campaign,
-  });
-  // Sem funil de teste gratis: o CTA publico leva direto às planos, onde o
-  // checkout da LOJOU so e aberto apos login (acesso = assinatura paga ativa).
-  return `/precos?${params.toString()}`;
+  const checkout = getCheckoutLink("start") ?? "/precos";
+  if (checkout === "/precos") return `/precos?utm_source=saudesync&utm_medium=${medium}&utm_campaign=${campaign}`;
+  const url = new URL(checkout);
+  url.searchParams.set("utm_source", "saudesync");
+  url.searchParams.set("utm_medium", medium);
+  url.searchParams.set("utm_campaign", campaign);
+  return url.toString();
 }

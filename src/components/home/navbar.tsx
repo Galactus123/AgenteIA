@@ -78,12 +78,14 @@ export default function Navbar() {
           >
             Entrar
           </Link>
-          <Link
+          <a
             href={ctaUrl("navbar")}
+            target="_blank"
+            rel="noopener noreferrer"
             className="rounded-full bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition duration-300 hover:brightness-110 hover:shadow-indigo-500/40"
           >
             Começar agora
-          </Link>
+          </a>
         </div>
 
         <button
@@ -132,13 +134,15 @@ export default function Navbar() {
             >
               Entrar
             </Link>
-            <Link
+            <a
               href={ctaUrl("navbar-mobile")}
               onClick={close}
+              target="_blank"
+              rel="noopener noreferrer"
               className="rounded-full bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-5 py-2.5 text-center text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition duration-300 hover:brightness-110"
             >
               Começar agora
-            </Link>
+            </a>
           </div>
         </div>
       )}

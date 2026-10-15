@@ -163,8 +163,9 @@ export default function PrecosPage({ resumePlan = null }: PrecosPageProps) {
             const plan = PLANS.find((p) => p.id === planId)!;
             const colors = planColors[planId];
             const isHighlighted = plan.highlighted;
-            // Plano com link direto de checkout LOJOU (Start/Pro): âncora externa
-            // em nova aba, sem passar pela API de checkout.
+            // Checkout LOJOU direto para os 4 planos (link oficial do projeto
+            // ou env var saneada): âncora externa em nova aba, sem passar
+            // pela API de checkout.
             const checkoutLink = getCheckoutLink(plan.id);
 
             return (
@@ -249,7 +250,9 @@ export default function PrecosPage({ resumePlan = null }: PrecosPageProps) {
                   )}
                 </ul>
 
-                {/* CTA */}
+                {/* CTA: os 4 planos apontam ao checkout LOJOU (nova aba). O
+                    botão interno só fica como rede de segurança caso o link
+                    nunca venha a existir. */}
                 {checkoutLink ? (
                   <a
                     href={checkoutLink}
@@ -264,14 +267,6 @@ export default function PrecosPage({ resumePlan = null }: PrecosPageProps) {
                     }`}
                   >
                     {plan.buttonLabel}
-                    <ArrowRight size={16} />
-                  </a>
-                ) : plan.id === "enterprise" ? (
-                  <a
-                    href="mailto:contato@saudesync.com.br?subject=Plano%20Enterprise%20-%20Solicita%C3%A7%C3%A3o"
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-indigo-500 dark:border-indigo-400 px-6 py-3 text-sm font-semibold text-indigo-600 dark:text-indigo-400 transition-colors hover:bg-indigo-50 dark:hover:bg-indigo-500/10"
-                  >
-                    Falar com especialista
                     <ArrowRight size={16} />
                   </a>
                 ) : (

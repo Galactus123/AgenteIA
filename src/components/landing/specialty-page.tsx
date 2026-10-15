@@ -46,12 +46,14 @@ export default function SpecialtyPage({ specialty }: { specialty: Specialty }) {
               </h1>
               <p className="mt-6 text-lg text-slate-300">{specialty.description}</p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link
+                <a
                   href={ctaUrl(`agendamento-${specialty.slug}`)}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center justify-center rounded-full bg-primary px-7 py-3.5 text-base font-semibold text-white shadow-sm transition hover:bg-primary-dark"
                 >
 Começar agora
-                </Link>
+                </a>
                 <Link
                   href="/#servicos"
                   className="inline-flex items-center justify-center rounded-full border border-white/40 px-7 py-3.5 text-base font-semibold text-white transition hover:border-white hover:bg-white/10"
@@ -103,12 +105,14 @@ Começar agora
 <h2 className="text-3xl font-bold text-white sm:text-4xl">
                  Pronto para atender mais pacientes em {specialty.name}?
                </h2>
-               <Link
+               <a
                 href={ctaUrl(`agendamento-${specialty.slug}`)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="mt-8 inline-flex items-center justify-center rounded-full bg-primary px-8 py-3.5 font-semibold text-white shadow-sm transition hover:bg-primary-dark"
               >
                 Começar agora
-              </Link>
+              </a>
             </div>
           </div>
         </section>

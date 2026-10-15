@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { ArrowRight, Check, Sparkles, X } from "lucide-react";
+import { PLANS, formatLimit, formatPrice } from "@/lib/plans";
 import { getCheckoutLink } from "@/lib/checkout-links";
 
 interface UpgradeModalProps {
@@ -9,29 +10,9 @@ interface UpgradeModalProps {
   onClose: () => void;
 }
 
-// Planos apresentados no modal (preços alinhados com src/lib/plans.ts).
-const PLANS = [
-  {
-    id: "start" as const,
-    name: "Start",
-    price: "R$ 297",
-    cadence: "/mês",
-    description: "Para clínicas pequenas que estão começando com automação.",
-    featured: false,
-  },
-  {
-    id: "pro" as const,
-    name: "Pro",
-    price: "R$ 697",
-    cadence: "/mês",
-    description: "Automação completa para clínicas em crescimento.",
-    featured: true,
-  },
-];
-
-// Modal de upgrade em modo de visualização: bloqueia a ação e oferece os
-// checkouts diretos da LOJOU (env NEXT_PUBLIC_LINK_CHECKOUT_LOJOU_*);
-// sem link configurado, cai para a página de preços.
+// Modal de upgrade em modo de visualização: bloqueia a ação e mostra os 4
+// planos da tabela de preços (fonte: src/lib/plans.ts), com checkout direto
+// da LOJOU em nova aba (link oficial do projeto ou env var saneada).
 export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
   useEffect(() => {
     if (!isOpen) return;
@@ -57,7 +38,7 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
         aria-hidden="true"
       />
 
-      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-[#0B0D14]/95 p-7 shadow-2xl shadow-black/60 backdrop-blur-xl sm:p-8">
+      <div className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-3xl border border-white/10 bg-[#0B0D14]/95 p-7 shadow-2xl shadow-black/60 backdrop-blur-xl sm:p-8">
         <span
           aria-hidden="true"
           className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-indigo-500/25 blur-3xl"
@@ -96,22 +77,21 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             {PLANS.map((plan) => {
               const checkoutUrl = getCheckoutLink(plan.id) ?? "/precos";
-              const isExternal = /^https?:\/\//i.test(checkoutUrl);
+              const isFeatured = Boolean(plan.highlighted);
               return (
                 <a
                   key={plan.id}
                   href={checkoutUrl}
-                  {...(isExternal
-                    ? { target: "_blank", rel: "noopener noreferrer" }
-                    : {})}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   onClick={onClose}
-                  className={`group relative flex flex-col rounded-2xl border p-5 transition duration-300 hover:-translate-y-0.5 ${
-                    plan.featured
+                  className={`group relative flex flex-col rounded-2xl border p-4 transition duration-300 hover:-translate-y-0.5 sm:p-5 ${
+                    isFeatured
                       ? "border-indigo-400/40 bg-gradient-to-br from-indigo-500/15 via-white/[0.04] to-violet-500/10 shadow-lg shadow-indigo-500/15 hover:border-indigo-400/60"
                       : "border-white/10 bg-white/5 hover:border-white/25 hover:bg-white/[0.07]"
                   }`}
                 >
-                  {plan.featured && (
+                  {isFeatured && (
                     <span className="absolute -top-2.5 right-4 rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-md">
                       Mais popular
                     </span>
@@ -119,9 +99,11 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
 
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold text-white">Plano {plan.name}</p>
-                    <span className="text-lg font-bold text-white">
-                      {plan.price}
-                      <span className="text-xs font-medium text-slate-400">{plan.cadence}</span>
+                    <span className="text-base font-bold text-white sm:text-lg">
+                      {formatPrice(plan.price, plan.currency)}
+                      <span className="text-xs font-medium text-slate-400">
+                        /{plan.billingInterval === "month" ? "mês" : plan.billingInterval}
+                      </span>
                     </span>
                   </div>
 
@@ -132,17 +114,21 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
                   <ul className="mt-3 space-y-1.5">
                     <li className="flex items-center gap-2 text-xs text-slate-300">
                       <Check size={13} className="shrink-0 text-indigo-300" />
-                      Agenda, pacientes e PEP
+                      {formatLimit(plan.limits.maxProfessionals)} profissionais
                     </li>
                     <li className="flex items-center gap-2 text-xs text-slate-300">
                       <Check size={13} className="shrink-0 text-indigo-300" />
-                      WhatsApp com IA
+                      {formatLimit(plan.limits.maxWhatsappConversations)} conversas WhatsApp/mês
+                    </li>
+                    <li className="flex items-center gap-2 text-xs text-slate-300">
+                      <Check size={13} className="shrink-0 text-indigo-300" />
+                      {formatLimit(plan.limits.maxAiInteractions)} interações IA/mês
                     </li>
                   </ul>
 
                   <span
                     className={`mt-4 flex items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-semibold transition duration-300 ${
-                      plan.featured
+                      isFeatured
                         ? "bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white shadow-lg shadow-indigo-500/25 group-hover:brightness-110"
                         : "border border-white/10 bg-white/5 text-slate-200 group-hover:bg-white/10"
                     }`}

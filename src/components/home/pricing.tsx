@@ -110,8 +110,10 @@ export default function Pricing() {
                 ))}
               </ul>
 
-              <Link
+              <a
                 href={ctaUrl(`pricing-${plan.id}`)}
+                target="_blank"
+                rel="noopener noreferrer"
                 className={`relative mt-7 flex w-full items-center justify-center rounded-full px-6 py-3 text-sm font-semibold transition duration-300 ${
                   index === 0
                     ? "bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white shadow-lg shadow-indigo-500/25 hover:brightness-110 hover:shadow-indigo-500/40"
@@ -119,7 +121,7 @@ export default function Pricing() {
                 }`}
               >
                 Começar agora
-              </Link>
+              </a>
             </div>
           ))}
           <p className="text-center text-xs text-slate-500">

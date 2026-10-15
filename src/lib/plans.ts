@@ -227,7 +227,7 @@ export const PLANS: Plan[] = [
     currency: "R$",
     billingInterval: "month",
     description: "Solução personalizada para grandes clínicas e grupos.",
-    buttonLabel: "Falar com especialista",
+    buttonLabel: "Assinar Enterprise",
     buttonVariant: "outline",
     limits: {
       maxProfessionals: Infinity,
