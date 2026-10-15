@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X, ArrowRight, MessageCircle, Sparkles, Zap } from "lucide-react";
 import { PLANS, FEATURE_CATEGORIES, formatLimit, type PlanId, type FeatureId } from "@/lib/plans";
+import { getCheckoutLink } from "@/lib/checkout-links";
 
 const planOrder: PlanId[] = ["start", "pro", "business", "enterprise"];
 
@@ -127,6 +128,10 @@ export default function PrecosPage({ resumePlan = null }: PrecosPageProps) {
     void startCheckout(resumePlan, true);
   }, [resumePlan, startCheckout]);
 
+  // Plano destacado do CTA final: link direto LOJOU quando configurado.
+  const featuredPlanId: PlanId = PLANS.find((p) => p.highlighted)?.id ?? "start";
+  const featuredCheckoutLink = getCheckoutLink(featuredPlanId);
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0D14]">
       {/* Header */}
@@ -158,6 +163,9 @@ export default function PrecosPage({ resumePlan = null }: PrecosPageProps) {
             const plan = PLANS.find((p) => p.id === planId)!;
             const colors = planColors[planId];
             const isHighlighted = plan.highlighted;
+            // Plano com link direto de checkout LOJOU (Start/Pro): âncora externa
+            // em nova aba, sem passar pela API de checkout.
+            const checkoutLink = getCheckoutLink(plan.id);
 
             return (
               <div
@@ -242,7 +250,23 @@ export default function PrecosPage({ resumePlan = null }: PrecosPageProps) {
                 </ul>
 
                 {/* CTA */}
-                {plan.id === "enterprise" ? (
+                {checkoutLink ? (
+                  <a
+                    href={checkoutLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`flex w-full items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition-colors ${
+                      isHighlighted
+                        ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
+                        : plan.buttonVariant === "primary"
+                          ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                          : "bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-white/10"
+                    }`}
+                  >
+                    {plan.buttonLabel}
+                    <ArrowRight size={16} />
+                  </a>
+                ) : plan.id === "enterprise" ? (
                   <a
                     href="mailto:contato@saudesync.com.br?subject=Plano%20Enterprise%20-%20Solicita%C3%A7%C3%A3o"
                     className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-indigo-500 dark:border-indigo-400 px-6 py-3 text-sm font-semibold text-indigo-600 dark:text-indigo-400 transition-colors hover:bg-indigo-50 dark:hover:bg-indigo-500/10"
@@ -417,22 +441,30 @@ export default function PrecosPage({ resumePlan = null }: PrecosPageProps) {
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
             Sem taxa de setup. Cancele quando quiser.
           </p>
-          {/* Bottom CTA: checkout do plano destacado (sem funil de trial —
-              401 leva ao login e retoma o checkout aqui após autenticar). */}
-          <button
-            type="button"
-            onClick={() =>
-              void startCheckout(
-                PLANS.find((p) => p.highlighted)?.id ?? "start",
-                false
-              )
-            }
-            disabled={loadingPlan !== null}
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 shadow-sm disabled:opacity-60 disabled:cursor-wait"
-          >
-            {loadingPlan !== null ? "Abrindo checkout..." : "Começar agora"}
-            <ArrowRight size={16} />
-          </button>
+          {/* Bottom CTA: link direto da LOJOU quando configurado; senão o
+              checkout do plano destacado (sem funil de trial — 401 leva ao
+              login e retoma o checkout aqui após autenticar). */}
+          {featuredCheckoutLink ? (
+            <a
+              href={featuredCheckoutLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 shadow-sm"
+            >
+              Começar agora
+              <ArrowRight size={16} />
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void startCheckout(featuredPlanId, false)}
+              disabled={loadingPlan !== null}
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 shadow-sm disabled:opacity-60 disabled:cursor-wait"
+            >
+              {loadingPlan !== null ? "Abrindo checkout..." : "Começar agora"}
+              <ArrowRight size={16} />
+            </button>
+          )}
         </div>
       </div>
     </div>
