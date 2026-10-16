@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, FormEvent } from "react";
+import { useState, useEffect, useCallback, useRef, FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { usePlan } from "@/hooks/usePlan";
 import UpgradeModal from "@/components/UpgradeModal";
 
@@ -23,6 +24,12 @@ export default function EspecialidadesPage() {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const { hasActivePlan } = usePlan();
 
+  // Deep link da busca global: /especialidades?id=<id> abre o registro.
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("id");
+  // Um único carregamento por id: cancelar a edição não reabre o form.
+  const appliedHighlight = useRef<string | null>(null);
+
   const load = useCallback(async () => {
     const res = await fetch("/api/especialidades");
     if (res.ok) setItems(await res.json());
@@ -33,6 +40,20 @@ export default function EspecialidadesPage() {
       await load();
     })();
   }, [load]);
+
+  // Vindo da busca global: preenche o formulário com a especialidade e leva
+  // a vista até ele.
+  useEffect(() => {
+    if (!highlightId || appliedHighlight.current === highlightId) return;
+    if (items.length === 0) return;
+    const target = items.find((s) => String(s.id) === highlightId);
+    if (!target) return;
+    appliedHighlight.current = highlightId;
+    startEdit(target);
+    document
+      .getElementById("form-especialidade")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [highlightId, items]);
 
   function startEdit(s: Specialty) {
     setEditing(true);
@@ -102,7 +123,12 @@ export default function EspecialidadesPage() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="rounded-2xl p-5 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+      <form
+        id="form-especialidade"
+        onSubmit={handleSubmit}
+        className="rounded-2xl p-5 space-y-4"
+        style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
+      >
         <div className="flex items-center justify-between">
           <h2 className="font-semibold dark:text-white text-slate-900">{editing ? "Editar especialidade" : "Nova especialidade"}</h2>
           {editing && (

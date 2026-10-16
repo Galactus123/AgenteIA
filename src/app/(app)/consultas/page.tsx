@@ -4,7 +4,15 @@ import { displayDateTime } from "@/lib/datetime";
 
 export const dynamic = "force-dynamic";
 
-export default async function ConsultasPage() {
+export default async function ConsultasPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  // Deep link da busca global: /consultas?id=<id>#consulta-<id>.
+  const params = (await searchParams) ?? {};
+  const highlightId = typeof params.id === "string" ? params.id : null;
+
   let appointments;
   try {
     // Clínica da sessão: sem vínculo não há listagem (fail-closed).
@@ -54,7 +62,14 @@ export default async function ConsultasPage() {
               </thead>
               <tbody>
                 {appointments.map((a) => (
-                  <tr key={a.id} className="border-t" style={{ borderColor: "var(--surface-border)" }}>
+                  <tr
+                    key={a.id}
+                    id={`consulta-${a.id}`}
+                    className={`border-t ${
+                      String(a.id) === highlightId ? "bg-indigo-50 dark:bg-indigo-500/10" : ""
+                    }`}
+                    style={{ borderColor: "var(--surface-border)" }}
+                  >
                     <td className="px-4 py-3 font-medium dark:text-white text-slate-900">{a.patient_name}</td>
                     <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{a.doctor_name}</td>
                     <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{a.specialty_name}</td>

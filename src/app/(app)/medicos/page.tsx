@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, FormEvent } from "react";
+import { useState, useEffect, useCallback, useRef, FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { usePlan } from "@/hooks/usePlan";
 import UpgradeModal from "@/components/UpgradeModal";
 
@@ -68,6 +69,12 @@ export default function MedicosPage() {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const { hasActivePlan } = usePlan();
 
+  // Deep link da busca global: /medicos?id=<uuid> abre o registro na edição.
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("id");
+  // Um único carregamento por id: cancelar a edição não reabre o form.
+  const appliedHighlight = useRef<string | null>(null);
+
   useEffect(() => {
     async function loadSpecialties() {
       try {
@@ -103,6 +110,20 @@ export default function MedicosPage() {
       await load();
     })();
   }, [load]);
+
+  // Vindo da busca global (/medicos?id=): abre o formulário preenchido com
+  // o registro e leva a vista até ele.
+  useEffect(() => {
+    if (!highlightId || appliedHighlight.current === highlightId) return;
+    if (professionals.length === 0) return;
+    const target = professionals.find((d) => d.id === highlightId);
+    if (!target) return;
+    appliedHighlight.current = highlightId;
+    startEdit(target);
+    document
+      .getElementById("form-profissional")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [highlightId, professionals]);
 
   function startEdit(d: Professional) {
     setEditingId(d.id);
@@ -244,7 +265,12 @@ export default function MedicosPage() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="rounded-2xl p-5 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+      <form
+        id="form-profissional"
+        onSubmit={handleSubmit}
+        className="rounded-2xl p-5 space-y-4"
+        style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
+      >
         <div className="flex items-center justify-between">
           <h2 className="font-semibold dark:text-white text-slate-900">{editingId ? "Editar profissional" : "Novo profissional"}</h2>
           {editingId && (

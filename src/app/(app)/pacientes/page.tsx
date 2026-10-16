@@ -1,17 +1,42 @@
 "use client";
 
-import { useState, useEffect, useCallback, FormEvent } from "react";
+import { useState, useEffect, useCallback, useRef, FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import { usePlan } from "@/hooks/usePlan";
 import UpgradeModal from "@/components/UpgradeModal";
 
 interface Patient {
-  id: number;
+  id: string;
   nome: string;
   telefone: string;
   email: string | null;
   data_nascimento: string | null;
   endereco: string | null;
   observacoes: string | null;
+}
+
+// Linha crua de GET /api/pacientes: as colunas do Supabase sao em ingles
+// (name, phone, date_of_birth, address, notes) e a UI usa os rotulos PT.
+interface PatientRow {
+  id: string;
+  name: string;
+  phone: string;
+  email: string | null;
+  date_of_birth: string | null;
+  address: string | null;
+  notes: string | null;
+}
+
+function toPatient(row: PatientRow): Patient {
+  return {
+    id: row.id,
+    nome: row.name ?? "",
+    telefone: row.phone ?? "",
+    email: row.email,
+    data_nascimento: row.date_of_birth,
+    endereco: row.address,
+    observacoes: row.notes,
+  };
 }
 
 const EMPTY: Omit<Patient, "id"> = {
@@ -33,11 +58,17 @@ export default function PacientesPage() {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const { hasActivePlan } = usePlan();
 
+  // Deep link da busca global: /pacientes?id=<uuid>.
+  const searchParams = useSearchParams();
+  const highlightId = searchParams.get("id");
+  const scrolledToHighlight = useRef<string | null>(null);
+
   const load = useCallback(async () => {
     setFetching(true);
     const res = await fetch("/api/pacientes");
     if (res.ok) {
-      setPatients(await res.json());
+      const data: unknown = await res.json();
+      setPatients(Array.isArray(data) ? (data as PatientRow[]).map(toPatient) : []);
     }
     setFetching(false);
   }, []);
@@ -47,6 +78,17 @@ export default function PacientesPage() {
       await load();
     })();
   }, [load]);
+
+  // Rola até a linha vinda da busca (uma vez por id; as próximas recargas
+  // da lista não voltam a puxar a página).
+  useEffect(() => {
+    if (fetching || !highlightId) return;
+    if (scrolledToHighlight.current === highlightId) return;
+    scrolledToHighlight.current = highlightId;
+    document
+      .getElementById(`paciente-${highlightId}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [fetching, highlightId]);
 
   function resetForm() {
     setForm(EMPTY);
@@ -72,12 +114,12 @@ export default function PacientesPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        nome: form.nome,
-        telefone: form.telefone,
+        name: form.nome,
+        phone: form.telefone,
         email: form.email || undefined,
-        data_nascimento: form.data_nascimento || undefined,
-        endereco: form.endereco || undefined,
-        observacoes: form.observacoes || undefined,
+        date_of_birth: form.data_nascimento || undefined,
+        address: form.endereco || undefined,
+        notes: form.observacoes || undefined,
       }),
     });
 
@@ -210,7 +252,14 @@ export default function PacientesPage() {
               </thead>
               <tbody>
                 {patients.map((p) => (
-                  <tr key={p.id} className="border-t" style={{ borderColor: "var(--surface-border)" }}>
+                  <tr
+                    key={p.id}
+                    id={`paciente-${p.id}`}
+                    className={`border-t ${
+                      p.id === highlightId ? "bg-indigo-50 dark:bg-indigo-500/10" : ""
+                    }`}
+                    style={{ borderColor: "var(--surface-border)" }}
+                  >
                     <td className="px-4 py-3 font-medium dark:text-white text-slate-900">{p.nome}</td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{p.telefone}</td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{p.email || "—"}</td>
