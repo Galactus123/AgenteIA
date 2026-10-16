@@ -9,8 +9,20 @@ import { guardActiveSubscription } from "@/lib/services/plan-limits";
 // dades operacionais) passa pelo gate de assinatura ativa em requireAuth.
 const SUBSCRIPTION_EXEMPT_PREFIXES = ["/api/auth", "/api/subscription", "/api/health"];
 
+// Rotas cuja LEITURA (GET) serve apenas para preencher formulários e seleções
+// do painel (catálogo estático, sem dados de pacientes). Ficam isentas do gate
+// para que um utilizador em modo de visualização ainda veja as opções
+// disponíveis — a escrita continua bloqueada porque não é GET.
+const SUBSCRIPTION_EXEMPT_READ_PREFIXES = ["/api/especialidades"];
+
 export function isSubscriptionExemptApi(pathname: string): boolean {
   return SUBSCRIPTION_EXEMPT_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
+export function isSubscriptionExemptReadApi(pathname: string): boolean {
+  return SUBSCRIPTION_EXEMPT_READ_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
 }
@@ -51,7 +63,13 @@ export async function requireAuth(request: NextRequest): Promise<NextResponse | 
   // às rotas operacionais (a de faturação é isenta para poder cobrar).
   // Sem vínculo em clinic_members o gate responde 402 (nunca consulta a
   // "primeira clínica" da base — seria um fail-open multi-tenant).
-  if (!isSubscriptionExemptApi(request.nextUrl.pathname)) {
+  // Leituras de catálogo (GET em /api/especialidades) ficam de fora: servem
+  // só para popular <select> do form e não expõem dados de pacientes.
+  const exempt =
+    isSubscriptionExemptApi(request.nextUrl.pathname) ||
+    (request.method === "GET" &&
+      isSubscriptionExemptReadApi(request.nextUrl.pathname));
+  if (!exempt) {
     const clinicId = await resolveClinicIdByUserId(user.id);
     const gate = await guardActiveSubscription(clinicId);
     if (gate) {

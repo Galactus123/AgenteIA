@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, FormEvent } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { usePlan } from "@/hooks/usePlan";
 import UpgradeModal from "@/components/UpgradeModal";
@@ -59,6 +60,8 @@ const EMPTY_FORM = {
 export default function MedicosPage() {
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
+  const [specialtiesLoading, setSpecialtiesLoading] = useState(true);
+  const [specialtiesError, setSpecialtiesError] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
   const [schedule, setSchedule] = useState<ScheduleRow[]>(EMPTY_SCHEDULE);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -76,17 +79,28 @@ export default function MedicosPage() {
   const appliedHighlight = useRef<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     async function loadSpecialties() {
+      setSpecialtiesLoading(true);
+      setSpecialtiesError("");
       try {
         const res = await fetch("/api/especialidades");
         if (!res.ok) throw new Error(String(res.status));
         const data: unknown = await res.json();
-        setSpecialties(Array.isArray(data) ? (data as Specialty[]) : []);
+        if (!cancelled) {
+          setSpecialties(Array.isArray(data) ? (data as Specialty[]) : []);
+        }
       } catch (err) {
         console.error("Erro ao buscar especialidades:", err);
+        if (!cancelled) setSpecialtiesError("Erro ao carregar as especialidades.");
+      } finally {
+        if (!cancelled) setSpecialtiesLoading(false);
       }
     }
     void loadSpecialties();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const load = useCallback(async () => {
@@ -173,6 +187,19 @@ export default function MedicosPage() {
     setLoading(true);
     setError("");
     setSuccess("");
+
+    // Validação extra no cliente: garante que uma especialidade foi escolhida
+    // e que o id é um número válido antes de enviar ao servidor.
+    if (!form.specialty_id) {
+      setError("Selecione uma especialidade antes de salvar.");
+      setLoading(false);
+      return;
+    }
+    if (!Number.isInteger(Number(form.specialty_id)) || Number(form.specialty_id) <= 0) {
+      setError("Especialidade inválida. Selecione uma das opções disponíveis.");
+      setLoading(false);
+      return;
+    }
 
     const selectedDays = schedule
       .filter((r) => r.enabled)
@@ -305,21 +332,43 @@ export default function MedicosPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Especialidade</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Especialidade</label>
+              <Link
+                href="/especialidades"
+                className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+              >
+                + Nova especialidade
+              </Link>
+            </div>
             <select
               aria-label="Especialidade"
               value={form.specialty_id || ""}
               onChange={(e) => setForm({ ...form, specialty_id: e.target.value })}
-              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
+              disabled={specialtiesLoading}
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] disabled:opacity-60"
               required
             >
-              <option value="">Selecione...</option>
-              {specialties.map((esp) => (
-                <option key={esp.id} value={esp.id}>
-                  {esp.name}
-                </option>
-              ))}
+              <option value="">
+                {specialtiesLoading
+                  ? "A carregar especialidades..."
+                  : specialtiesError
+                    ? "Erro ao carregar especialidades"
+                    : specialties.length === 0
+                      ? "Nenhuma especialidade cadastrada (cadastre uma na aba Especialidades)"
+                      : "Selecione..."}
+              </option>
+              {!specialtiesLoading &&
+                !specialtiesError &&
+                specialties.map((esp) => (
+                  <option key={esp.id} value={esp.id}>
+                    {esp.name}
+                  </option>
+                ))}
             </select>
+            {specialtiesError && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{specialtiesError}</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">

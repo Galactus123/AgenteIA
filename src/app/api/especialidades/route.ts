@@ -6,7 +6,15 @@ import { auditRequest } from "@/lib/services/audit";
 export async function GET(request: NextRequest) {
   const session = await requireClinic(request);
   if (session instanceof NextResponse) return session;
-  return NextResponse.json(await listSpecialties(session.clinicId));
+  try {
+    return NextResponse.json(await listSpecialties(session.clinicId));
+  } catch (err) {
+    console.error("[especialidades] Falha ao listar:", err);
+    return NextResponse.json(
+      { error: "Erro ao carregar as especialidades." },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {

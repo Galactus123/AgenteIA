@@ -19,7 +19,7 @@ vi.mock("@supabase/ssr", () => ({
 }));
 
 import { fakeSupabase } from "./helpers/supabase-fake";
-import { requireAuth, isSubscriptionExemptApi } from "@/lib/api-auth";
+import { requireAuth, isSubscriptionExemptApi, isSubscriptionExemptReadApi } from "@/lib/api-auth";
 import {
   guardActiveSubscription,
   subscriptionGateEnabled,
@@ -257,6 +257,14 @@ describe("regras de acesso por subscrição", () => {
     expect(isSubscriptionExemptApi("/api/health")).toBe(true);
     expect(isSubscriptionExemptApi("/api/pacientes")).toBe(false);
     expect(isSubscriptionExemptApi("/api/authx")).toBe(false);
+  });
+
+  it("isSubscriptionExemptReadApi isenta a leitura do catálogo de especialidades", () => {
+    expect(isSubscriptionExemptReadApi("/api/especialidades")).toBe(true);
+    expect(isSubscriptionExemptReadApi("/api/especialidades/12")).toBe(true);
+    // Escritas e outras rotas continuam fora da isenção.
+    expect(isSubscriptionExemptReadApi("/api/pacientes")).toBe(false);
+    expect(isSubscriptionExemptReadApi("/api/especialidadesx")).toBe(false);
   });
 
   it("só a página de faturação pode ser aberta sem assinatura", () => {
