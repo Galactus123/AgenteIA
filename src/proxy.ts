@@ -17,9 +17,22 @@ export const PROTECTED_ROUTES = [
   "/perfil",
 ] as const;
 
+// Páginas públicas que o proxy consulta com a sessão ativa:
+// - `/login`: sessão válida redireciona para /dashboard (utilizador já entrou).
+// - `/`: sessão válida é só registada (cookies renovados no servidor); a
+//   landing continua a ser servida normalmente e a Navbar mostra o estado.
+export const SESSION_PUBLIC_ROUTES = ["/", "/login"] as const;
+
 export function isProtectedRoute(pathname: string): boolean {
   return PROTECTED_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+}
+
+function needsSessionCheck(pathname: string): boolean {
+  return (
+    isProtectedRoute(pathname) ||
+    (SESSION_PUBLIC_ROUTES as readonly string[]).includes(pathname)
   );
 }
 
@@ -56,13 +69,16 @@ export async function proxy(request: NextRequest) {
     if (!global.ok) return tooManyRequests(global.retryAfterSec);
   }
 
-  if (!isProtectedRoute(pathname) && !pathname.startsWith("/api/")) {
+  const isProtected = isProtectedRoute(pathname);
+  const isApi = pathname.startsWith("/api/");
+
+  if (!needsSessionCheck(pathname) && !isApi) {
     return supabaseResponse;
   }
 
   if (!hasSessionCookie(request)) {
     // Só página vai para /login: rota de API devolve 401 do próprio handler.
-    if (isProtectedRoute(pathname)) {
+    if (isProtected) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
     return supabaseResponse;
@@ -93,17 +109,48 @@ export async function proxy(request: NextRequest) {
   // não consegue escrever cookie e a maioria das rotas de API usa `setAll() {}`,
   // então sem este passo o token girado é descartado e toda requisição seguinte
   // refaz o refresh com o mesmo refresh token.
+  // `null` = indeterminado (Supabase indisponível): nunca redireciona, a
+  // página decide via getUser() como já fazia.
+  let sessionValid: boolean | null = null;
   try {
-    await supabase.auth.getSession();
+    const { data } = await supabase.auth.getSession();
+    sessionValid = Boolean(data.session);
   } catch {
-    // Supabase indisponível: segue sem refresh; a página faz getUser() e decide.
+    sessionValid = null;
   }
 
+  if (isApi) {
+    return supabaseResponse;
+  }
+
+  if (isProtected) {
+    // Cookie presente mas sessão expirada/revogada de facto: volta ao login
+    // em vez de deixar a página renderizar e falhar logo a seguir.
+    if (sessionValid === false) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    return supabaseResponse;
+  }
+
+  if (pathname === "/login") {
+    // Já tem sessão ativa: não faz sentido mostrar o formulário de novo.
+    if (sessionValid === true) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    return supabaseResponse;
+  }
+
+  // pathname === "/": landing servida normalmente (sem salto forçado). A
+  // Navbar detecta o cookie sb- e confirma a sessão em /api/auth/me para
+  // mostrar "Ir para o Dashboard" — assim a landing continua estática para
+  // visitantes anónimos e o proxy só renova o cookie no servidor.
   return supabaseResponse;
 }
 
 export const config = {
   matcher: [
+    "/",
+    "/login",
     "/chat/:path*",
     "/perfil/:path*",
     "/medicos/:path*",

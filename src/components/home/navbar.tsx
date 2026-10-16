@@ -17,6 +17,10 @@ const NAV_LINKS = [
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
+  // Sessão ativa detectada no cliente: o proxy renova o cookie no servidor e
+  // a Navbar só confirma com /api/auth/me quando já existe cookie sb-, para
+  // não penalizar visitantes anónimos da landing (continua estática).
+  const [authed, setAuthed] = useState(false);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -24,6 +28,26 @@ export default function Navbar() {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    const hasSessionCookie = document.cookie
+      .split("; ")
+      .some((cookie) => cookie.startsWith("sb-"));
+    if (!hasSessionCookie) return;
+
+    let cancelled = false;
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { authenticated?: boolean } | null) => {
+        if (!cancelled && data?.authenticated === true) setAuthed(true);
+      })
+      .catch(() => {
+        // Falha de rede: mantém a landing no estado de visitante.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const close = () => setOpen(false);
@@ -72,20 +96,40 @@ export default function Navbar() {
           >
             <MessageCircle size={18} />
           </a>
-          <Link
-            href="/login"
-            className="rounded-full px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
-          >
-            Entrar
-          </Link>
-          <a
-            href={ctaUrl("navbar")}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-full bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition duration-300 hover:brightness-110 hover:shadow-indigo-500/40"
-          >
-            Começar agora
-          </a>
+          {authed ? (
+            <>
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-300"
+                aria-label="Sessão ativa"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+                Sessão ativa
+              </span>
+              <Link
+                href="/dashboard"
+                className="rounded-full bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition duration-300 hover:brightness-110 hover:shadow-indigo-500/40"
+              >
+                Ir para o Dashboard
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="rounded-full px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+              >
+                Entrar
+              </Link>
+              <a
+                href={ctaUrl("navbar")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition duration-300 hover:brightness-110 hover:shadow-indigo-500/40"
+              >
+                Começar agora
+              </a>
+            </>
+          )}
         </div>
 
         <button
@@ -127,22 +171,34 @@ export default function Navbar() {
             >
               WhatsApp: +258 860020811
             </a>
-            <Link
-              href="/login"
-              onClick={close}
-              className="rounded-full border border-white/15 px-5 py-2.5 text-center text-sm font-semibold text-slate-200 transition hover:border-indigo-400/50 hover:text-white"
-            >
-              Entrar
-            </Link>
-            <a
-              href={ctaUrl("navbar-mobile")}
-              onClick={close}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-full bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-5 py-2.5 text-center text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition duration-300 hover:brightness-110"
-            >
-              Começar agora
-            </a>
+            {authed ? (
+              <Link
+                href="/dashboard"
+                onClick={close}
+                className="rounded-full bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-5 py-2.5 text-center text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition duration-300 hover:brightness-110"
+              >
+                Ir para o Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  onClick={close}
+                  className="rounded-full border border-white/15 px-5 py-2.5 text-center text-sm font-semibold text-slate-200 transition hover:border-indigo-400/50 hover:text-white"
+                >
+                  Entrar
+                </Link>
+                <a
+                  href={ctaUrl("navbar-mobile")}
+                  onClick={close}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] px-5 py-2.5 text-center text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition duration-300 hover:brightness-110"
+                >
+                  Começar agora
+                </a>
+              </>
+            )}
           </div>
         </div>
       )}
