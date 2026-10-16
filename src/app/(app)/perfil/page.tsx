@@ -89,14 +89,14 @@ export default function PerfilPage() {
     <div className="space-y-6 max-w-xl">
       <div>
         <h1 className="text-xl font-bold dark:text-white text-slate-900">Perfil</h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
           Gerencie suas credenciais de acesso.
         </p>
       </div>
 
       {admin && (
         <div className="rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
-          <p className="text-sm text-slate-500">Usuário</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Usuário</p>
           <p className="font-medium dark:text-white text-slate-900">{admin.username}</p>
           <p className="text-sm text-slate-500 mt-2">Função</p>
           <p className="font-medium capitalize dark:text-white text-slate-900">
@@ -114,7 +114,7 @@ export default function PerfilPage() {
         <h2 className="font-semibold dark:text-white text-slate-900">Alterar E-mail</h2>
 
         <div>
-          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">
+          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">
             Novo E-mail
           </label>
           <input
@@ -123,13 +123,13 @@ export default function PerfilPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="novo@email.com"
-            className="w-full rounded-lg px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
+            className="w-full rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">
+          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">
             Senha Atual (confirmação)
           </label>
           <input
@@ -137,7 +137,7 @@ export default function PerfilPage() {
             type="password"
             value={emailPassword}
             onChange={(e) => setEmailPassword(e.target.value)}
-            className="w-full rounded-lg px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
+            className="w-full rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
             required
           />
         </div>
@@ -170,7 +170,7 @@ export default function PerfilPage() {
         <h2 className="font-semibold dark:text-white text-slate-900">Alterar Senha</h2>
 
         <div>
-          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">
+          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">
             Senha Atual
           </label>
           <input
@@ -178,13 +178,13 @@ export default function PerfilPage() {
             type="password"
             value={currentPw}
             onChange={(e) => setCurrentPw(e.target.value)}
-            className="w-full rounded-lg px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
+            className="w-full rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">
+          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">
             Nova Senha
           </label>
           <input
@@ -193,14 +193,14 @@ export default function PerfilPage() {
             value={newPw}
             onChange={(e) => setNewPw(e.target.value)}
             minLength={8}
-            className="w-full rounded-lg px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
+            className="w-full rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
             required
           />
-          <p className="text-xs text-slate-400 mt-1">Mínimo de 8 caracteres.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Mínimo de 8 caracteres.</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">
+          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">
             Confirmar Nova Senha
           </label>
           <input
@@ -209,7 +209,7 @@ export default function PerfilPage() {
             value={confirmPw}
             onChange={(e) => setConfirmPw(e.target.value)}
             minLength={8}
-            className="w-full rounded-lg px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
+            className="w-full rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
             required
           />
         </div>

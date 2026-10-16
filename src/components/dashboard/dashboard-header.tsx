@@ -27,7 +27,7 @@ export default function DashboardHeader({ userName = "Admin", clinicName = "Saú
     >
       <div className="flex items-center gap-3 flex-1 min-w-0 pl-10 lg:pl-0">
         <div className="relative flex-1 max-w-md">
-          <Search size={16} strokeWidth={1.75} className="absolute left-3 top-1/2 -translate-y-1/2 dark:text-slate-500 text-slate-400" />
+          <Search size={16} strokeWidth={1.75} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
             type="text"
             placeholder="Buscar..."

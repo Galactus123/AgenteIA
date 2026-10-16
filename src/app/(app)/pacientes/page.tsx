@@ -109,66 +109,66 @@ export default function PacientesPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Nome *</label>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Nome *</label>
             <input
               aria-label="Nome"
               type="text"
               value={form.nome}
               onChange={(e) => setForm({ ...form, nome: e.target.value })}
-              className="w-full rounded-lg border border-[rgba(99,102,241,0.1)] bg-[rgba(255,255,255,0.04)] text-white px-3 py-2 text-sm focus:outline-none focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 px-3 py-2 text-sm focus:outline-none focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Telefone *</label>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Telefone *</label>
             <input
               aria-label="Telefone"
               type="tel"
               value={form.telefone}
               onChange={(e) => setForm({ ...form, telefone: e.target.value })}
               placeholder="+258 8X XXX XXXX"
-              className="w-full rounded-lg border border-[rgba(99,102,241,0.1)] bg-[rgba(255,255,255,0.04)] text-white px-3 py-2 text-sm focus:outline-none focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 px-3 py-2 text-sm focus:outline-none focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">E-mail</label>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">E-mail</label>
             <input
               aria-label="E-mail"
               type="email"
               value={form.email ?? ""}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full rounded-lg border border-[rgba(99,102,241,0.1)] bg-[rgba(255,255,255,0.04)] text-white px-3 py-2 text-sm focus:outline-none focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 px-3 py-2 text-sm focus:outline-none focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Data de nascimento</label>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Data de nascimento</label>
             <input
               aria-label="Data de nascimento"
               type="date"
               value={form.data_nascimento ?? ""}
               onChange={(e) => setForm({ ...form, data_nascimento: e.target.value })}
-              className="w-full rounded-lg border border-[rgba(99,102,241,0.1)] bg-[rgba(255,255,255,0.04)] text-white px-3 py-2 text-sm focus:outline-none focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 px-3 py-2 text-sm focus:outline-none focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Endereço</label>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Endereço</label>
             <input
               aria-label="Endereço"
               type="text"
               value={form.endereco ?? ""}
               onChange={(e) => setForm({ ...form, endereco: e.target.value })}
-              className="w-full rounded-lg border border-[rgba(99,102,241,0.1)] bg-[rgba(255,255,255,0.04)] text-white px-3 py-2 text-sm focus:outline-none focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 px-3 py-2 text-sm focus:outline-none focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
             />
           </div>
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Observações</label>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Observações</label>
             <textarea
               aria-label="Observações"
               value={form.observacoes ?? ""}
               onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
               rows={2}
-              className="w-full rounded-lg border border-[rgba(99,102,241,0.1)] bg-[rgba(255,255,255,0.04)] text-white px-3 py-2 text-sm focus:outline-none focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 px-3 py-2 text-sm focus:outline-none focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
             />
           </div>
         </div>
@@ -187,14 +187,14 @@ export default function PacientesPage() {
       <div className="rounded-2xl overflow-hidden" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
         {fetching ? (
           <div className="p-6 space-y-3">
-            <div className="h-4 rounded animate-pulse w-1/3 bg-white/5" />
-            <div className="h-4 rounded animate-pulse w-1/2 bg-white/5" />
-            <div className="h-4 rounded animate-pulse w-2/5 bg-white/5" />
+            <div className="h-4 rounded animate-pulse w-1/3 bg-slate-100 dark:bg-white/5" />
+            <div className="h-4 rounded animate-pulse w-1/2 bg-slate-100 dark:bg-white/5" />
+            <div className="h-4 rounded animate-pulse w-2/5 bg-slate-100 dark:bg-white/5" />
           </div>
         ) : patients.length === 0 ? (
           <div className="p-6 text-center">
-            <p className="text-sm dark:text-slate-500 text-slate-400">Nenhum paciente cadastrado.</p>
-            <p className="text-xs mt-1 dark:text-slate-500 text-slate-400">Use o formulário acima para cadastrar o primeiro paciente.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Nenhum paciente cadastrado.</p>
+            <p className="text-xs mt-1 text-slate-500 dark:text-slate-400">Use o formulário acima para cadastrar o primeiro paciente.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -212,14 +212,14 @@ export default function PacientesPage() {
                 {patients.map((p) => (
                   <tr key={p.id} className="border-t" style={{ borderColor: "var(--surface-border)" }}>
                     <td className="px-4 py-3 font-medium dark:text-white text-slate-900">{p.nome}</td>
-                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{p.telefone}</td>
-                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{p.email || "—"}</td>
-                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{p.telefone}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{p.email || "—"}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
                       {p.data_nascimento
                         ? new Date(p.data_nascimento).toLocaleDateString("pt-BR")
                         : "—"}
                     </td>
-                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{p.endereco || "—"}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{p.endereco || "—"}</td>
                   </tr>
                 ))}
               </tbody>

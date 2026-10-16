@@ -112,28 +112,28 @@ export default function EspecialidadesPage() {
           )}
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Nome</label>
+          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Nome</label>
           <input
             aria-label="Nome"
             type="text"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full rounded-lg px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
+            className="w-full rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Descrição</label>
+          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Descrição</label>
           <textarea
             aria-label="Descrição"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             rows={2}
-            className="w-full rounded-lg px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
+            className="w-full rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">
+          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">
             Palavras-chave (separadas por vírgula)
           </label>
           <input
@@ -142,7 +142,7 @@ export default function EspecialidadesPage() {
             value={keywordsText}
             onChange={(e) => setKeywordsText(e.target.value)}
             placeholder="ex.: dor de cabeça, febre, tosse"
-            className="w-full rounded-lg px-3 py-2 text-sm bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
+            className="w-full rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5] focus:outline-none"
           />
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
@@ -178,7 +178,7 @@ export default function EspecialidadesPage() {
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         {s.keywords.slice(0, 5).map((k, i) => (
-                          <span key={i} className="rounded-full px-2 py-0.5 text-xs dark:text-slate-300 text-slate-600" style={{ background: "rgba(99,102,241,0.1)" }}>
+                          <span key={i} className="rounded-full px-2 py-0.5 text-xs text-slate-700 dark:text-slate-200" style={{ background: "rgba(99,102,241,0.1)" }}>
                             {k}
                           </span>
                         ))}
@@ -188,7 +188,7 @@ export default function EspecialidadesPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <button onClick={() => startEdit(s)} className="text-sm text-primary hover:underline mr-3">
+                      <button onClick={() => startEdit(s)} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline mr-3">
                         Editar
                       </button>
                       <button onClick={() => handleDelete(s.id)} className="text-sm text-red-600 hover:underline">

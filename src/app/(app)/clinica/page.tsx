@@ -74,77 +74,77 @@ export default function ClinicaPage() {
 
       <form onSubmit={handleSubmit} className="rounded-2xl p-5 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
         <div>
-          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Nome da clínica</label>
+          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Nome da clínica</label>
           <input
             aria-label="Nome da clínica"
             type="text"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5]"
+            className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5]"
             required
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Endereço</label>
+          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Endereço</label>
           <input
             aria-label="Endereço"
             type="text"
             value={form.address}
             onChange={(e) => setForm({ ...form, address: e.target.value })}
-            className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5]"
+            className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5]"
           />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Telefone</label>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Telefone</label>
             <input
               aria-label="Telefone"
               type="text"
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5]"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5]"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">WhatsApp</label>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">WhatsApp</label>
             <input
               aria-label="WhatsApp"
               type="text"
               value={form.whatsapp}
               onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
-              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5]"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5]"
             />
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Horário de funcionamento</label>
+          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Horário de funcionamento</label>
           <input
             aria-label="Horário de funcionamento"
             type="text"
             value={form.opening_hours}
             onChange={(e) => setForm({ ...form, opening_hours: e.target.value })}
             placeholder="Segunda a Sexta: 08h às 18h"
-            className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5]"
+            className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5]"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Localização</label>
+          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Localização</label>
           <input
             aria-label="Localização"
             type="text"
             value={form.location}
             onChange={(e) => setForm({ ...form, location: e.target.value })}
-            className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5]"
+            className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5]"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Redes sociais (JSON)</label>
+          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Redes sociais (JSON)</label>
           <textarea
             aria-label="Redes sociais (JSON)"
             value={form.social_media}
             onChange={(e) => setForm({ ...form, social_media: e.target.value })}
             rows={2}
-            className="w-full rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5]"
+            className="w-full rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5]"
           />
         </div>
 

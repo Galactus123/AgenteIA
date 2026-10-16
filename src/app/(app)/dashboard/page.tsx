@@ -206,7 +206,7 @@ async function DashboardContent() {
             <p className="relative text-xl sm:text-2xl font-bold mt-3 dark:text-white text-slate-900">{kpi.value}</p>
             <p className="relative text-xs sm:text-sm mt-1 dark:text-slate-400 text-slate-500">{kpi.label}</p>
             {kpi.sub && (
-              <p className="relative text-[11px] mt-1 dark:text-slate-500 text-slate-400">{kpi.sub}</p>
+              <p className="relative text-[11px] mt-1 text-slate-500 dark:text-slate-400">{kpi.sub}</p>
             )}
           </div>
         ))}
@@ -234,9 +234,9 @@ async function DashboardContent() {
           {stats.todayAppointments.length === 0 ? (
             <div className="text-center py-8">
                 <div className="inline-flex p-3 rounded-xl mb-3" style={{ background: "rgba(99,102,241,0.08)" }}>
-                  <FileText size={24} strokeWidth={1.75} className="dark:text-slate-500 text-slate-400" />
+                  <FileText size={24} strokeWidth={1.75} className="text-slate-500 dark:text-slate-400" />
                 </div>
-                <p className="text-sm dark:text-slate-500 text-slate-400">Nenhuma consulta agendada para hoje.</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Nenhuma consulta agendada para hoje.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -294,7 +294,7 @@ async function DashboardContent() {
                 <div className="inline-flex p-3 rounded-xl mb-3" style={{ background: "rgba(16,185,129,0.08)" }}>
                   <CheckCircle2 size={24} strokeWidth={1.75} className="dark:text-emerald-400 text-emerald-600" />
                 </div>
-                <p className="text-sm dark:text-slate-500 text-slate-400">Nenhuma conversa aguardando atendimento humano.</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Nenhuma conversa aguardando atendimento humano.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -344,9 +344,9 @@ async function DashboardContent() {
             {stats.doctors.length === 0 ? (
               <div className="text-center py-6">
                 <div className="inline-flex p-3 rounded-xl mb-3" style={{ background: "rgba(99,102,241,0.08)" }}>
-                  <Stethoscope size={24} strokeWidth={1.75} className="dark:text-slate-500 text-slate-400" />
+                  <Stethoscope size={24} strokeWidth={1.75} className="text-slate-500 dark:text-slate-400" />
                 </div>
-                <p className="text-sm dark:text-slate-500 text-slate-400">Nenhum médico encontrado.</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Nenhum médico encontrado.</p>
               </div>
             ) : (
               <div className="space-y-2">

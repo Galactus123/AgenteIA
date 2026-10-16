@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* O tema é controlado pela classe `.dark` no <html> (next-themes,
+   attribute="class"). Sem esta declaração o Tailwind v4 usa
+   `@media (prefers-color-scheme: dark)`, que segue o SO e ignora o toggle
+   do utilizador — resultado: `dark:text-white` ativo com fundo claro. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ═══════════════════════════════════════════════════════════════════
    THEME: LIGHT (default)
    ═══════════════════════════════════════════════════════════════════ */
@@ -8,18 +14,18 @@
   --foreground: #0F172A;
   --card: #FFFFFF;
   --card-foreground: #0F172A;
-  --card-border: rgba(99, 102, 241, 0.1);
-  --card-hover-border: rgba(99, 102, 241, 0.2);
+  --card-border: #E2E8F0;
+  --card-hover-border: #CBD5E1;
   --surface: #F1F5F9;
   --surface-hover: #E2E8F0;
-  --surface-border: rgba(0, 0, 0, 0.06);
+  --surface-border: rgba(0, 0, 0, 0.08);
   --input-bg: #F8FAFC;
   --input-border: #E2E8F0;
   --muted-foreground: #475569;
   --text-primary: #0F172A;
   --text-secondary: #334155;
   --text-muted: #475569;
-  --text-faint: #94A3B8;
+  --text-faint: #64748B;
   --neon-blue: rgba(59, 130, 246, 0.15);
   --neon-purple: rgba(139, 92, 246, 0.1);
   --neon-glow: 0 0 0 transparent;
@@ -209,6 +215,13 @@ body {
   background: rgba(79, 109, 245, 0.12);
   color: #818cf8;
   border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+/* #818cf8 sobre fundo claro dá ~2.5:1 — no tema claro usa o tom de marca
+   escuro (indigo-700) para passar AA. */
+:root:not(.dark) .neon-badge {
+  color: #4338CA;
+  border-color: rgba(67, 56, 202, 0.28);
 }
 
 .dark .neon-badge-success {

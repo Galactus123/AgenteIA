@@ -71,7 +71,7 @@ const SidebarLink = memo(function SidebarLink({
           : "rgba(79, 109, 245, 0.08)",
         boxShadow: isDark ? "0 0 20px rgba(79,109,245,0.15), inset 0 1px 0 rgba(255,255,255,0.05)" : "none",
         border: isDark ? "1px solid rgba(99,102,241,0.2)" : "1px solid rgba(99,102,241,0.12)",
-        color: "var(--color-primary)",
+        color: isDark ? "var(--color-primary)" : "#4338CA",
       } : {
         color: "var(--text-muted)",
         border: "1px solid transparent",
@@ -159,7 +159,7 @@ function SidebarInner() {
                 <p className="font-semibold leading-tight text-sm truncate dark:text-white text-slate-900">
                   Saúde<span className="text-indigo-500">Sync</span>
                 </p>
-                <p className="text-[10px] truncate dark:text-slate-500 text-slate-400">Recepção virtual IA</p>
+                <p className="text-[10px] truncate text-slate-600 dark:text-slate-400">Recepção virtual IA</p>
               </div>
             )}
           </Link>
@@ -227,7 +227,7 @@ function SidebarInner() {
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="mx-2 mb-3 flex items-center justify-center gap-2 text-xs py-1.5 rounded-lg hover:opacity-80 transition-opacity"
-          style={{ color: "var(--text-faint)" }}
+          style={{ color: "var(--text-muted)" }}
           aria-label={collapsed ? "Expandir sidebar" : "Recolher sidebar"}
         >
           <ChevronLeft size={14} className={`transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`} />
@@ -264,7 +264,7 @@ function SidebarInner() {
               <p className="font-semibold leading-tight text-sm truncate dark:text-white text-slate-900">
                 Saúde<span className="text-indigo-500">Sync</span>
               </p>
-              <p className="text-[10px] truncate dark:text-slate-500 text-slate-400">Recepção virtual IA</p>
+              <p className="text-[10px] truncate text-slate-600 dark:text-slate-400">Recepção virtual IA</p>
             </div>
           </Link>
           <button
@@ -353,7 +353,7 @@ function MobileMenuButton({ onClick, isDark, mounted }: { onClick: () => void; i
   return (
     <button
       onClick={onClick}
-      className="lg:hidden fixed top-4 left-4 z-40 p-2.5 rounded-xl text-white shadow-lg transition-opacity hover:opacity-80 min-w-[48px] min-h-[48px] flex items-center justify-center"
+      className="lg:hidden fixed top-4 left-4 z-40 p-2.5 rounded-xl text-slate-700 dark:text-white shadow-lg transition-opacity hover:opacity-80 min-w-[48px] min-h-[48px] flex items-center justify-center"
       style={{
         background: bg,
         border: `1px solid ${border}`,

@@ -106,7 +106,7 @@ export default function AuditoriaPage() {
             ))}
           </div>
         ) : events.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+          <div className="flex flex-col items-center justify-center py-16 text-slate-500 dark:text-slate-400">
             <Inbox size={32} />
             <p className="mt-3 text-sm">Nenhum evento registrado ainda.</p>
           </div>

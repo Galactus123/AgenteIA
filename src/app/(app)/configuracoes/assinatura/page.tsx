@@ -122,7 +122,7 @@ export default function AssinaturaPage() {
         {subscription && (
           <div className="flex flex-wrap gap-4 text-sm text-slate-600 dark:text-slate-300 mb-6 pb-6 border-b border-slate-100 dark:border-[rgba(99,102,241,0.06)]">
             <div className="flex items-center gap-2">
-              <Calendar size={14} className="text-slate-400" />
+              <Calendar size={14} className="text-slate-500 dark:text-slate-400" />
               <span>
                 Renovação: <strong>{formatDate(subscription.currentPeriodEnd)}</strong>
               </span>

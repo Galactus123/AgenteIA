@@ -152,13 +152,13 @@ export default function ChatPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-sm font-medium dark:text-slate-300 text-slate-600">WhatsApp do paciente:</label>
+        <label className="text-sm font-medium text-slate-700 dark:text-slate-200">WhatsApp do paciente:</label>
         <input
           aria-label="WhatsApp do paciente"
           type="text"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
-          className="rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5]"
+          className="rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5]"
         />
         <div className="flex gap-1.5">
           {SAMPLE_PHONES.map((p) => (
@@ -168,7 +168,7 @@ export default function ChatPage() {
               className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
                 phone === p.value
                   ? "bg-primary text-white border-primary"
-                  : "text-slate-600 hover:border-primary"
+                  : "text-slate-600 dark:text-slate-300 hover:border-primary"
               }`}
               style={phone !== p.value ? { background: "var(--card)", borderColor: "var(--card-border)" } : undefined}
             >
@@ -179,7 +179,7 @@ export default function ChatPage() {
       </div>
 
       {transferred && (
-        <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700" style={{ border: "1px solid var(--card-border)" }}>
+        <div className="rounded-xl bg-amber-50 dark:bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300" style={{ border: "1px solid var(--card-border)" }}>
           Esta conversa foi transferida para a recepção humana.
         </div>
       )}
@@ -199,10 +199,10 @@ export default function ChatPage() {
 
         <div className="h-[420px] overflow-y-auto p-4 space-y-2 scrollbar-thin">
           {!historyLoaded && (
-            <p className="text-center text-sm text-slate-500 py-10">Carregando conversa...</p>
+            <p className="text-center text-sm text-slate-600 py-10">Carregando conversa...</p>
           )}
           {historyLoaded && messages.length === 0 && (
-            <p className="text-center text-sm text-slate-500 py-10">
+            <p className="text-center text-sm text-slate-600 py-10">
               Envie uma mensagem para iniciar a conversa, por exemplo:
               <br />
               <span className="text-slate-600">&quot;Estou com dor de cabeça há três dias&quot;</span>
@@ -214,7 +214,7 @@ export default function ChatPage() {
             if (isSystem) {
               return (
                 <div key={m.id} className="text-center">
-                  <span className="inline-block bg-white/70 text-slate-500 text-xs rounded-full px-3 py-1">
+                  <span className="inline-block bg-white/70 text-slate-600 text-xs rounded-full px-3 py-1">
                     {m.content}
                   </span>
                 </div>
@@ -230,7 +230,7 @@ export default function ChatPage() {
                   }`}
                 >
                   <p className="whitespace-pre-wrap break-words">{m.content}</p>
-                  <p className="text-right text-[10px] text-slate-400 mt-1">
+                  <p className="text-right text-[10px] text-slate-600 mt-1">
                     {m.created_at.slice(11, 16)}
                   </p>
                 </div>
@@ -249,7 +249,7 @@ export default function ChatPage() {
             onKeyDown={(e) => e.key === "Enter" && send()}
             placeholder={!historyLoaded ? "Carregando..." : "Digite sua mensagem..."}
             disabled={loading || !historyLoaded}
-            className="flex-1 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-60 bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5]"
+            className="flex-1 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-60 bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5]"
           />
           <button
             onClick={send}
@@ -261,7 +261,7 @@ export default function ChatPage() {
         </div>
       </div>
 
-      <div className="rounded-xl p-4 text-sm space-y-1 dark:text-slate-300 text-slate-600" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+      <div className="rounded-xl p-4 text-sm space-y-1 text-slate-700 dark:text-slate-200" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
         <p className="font-medium dark:text-white text-slate-900">Dicas para testar o fluxo do PRD:</p>
         <p>• Agendar: informe o problema e confirme o horário que a IA sugerir.</p>
         <p>• Remarcar: diga &quot;quero remarcar minha consulta&quot;.</p>

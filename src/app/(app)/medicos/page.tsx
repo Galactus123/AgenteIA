@@ -256,35 +256,35 @@ export default function MedicosPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Nome</label>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Nome</label>
             <input
               aria-label="Nome"
               type="text"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Email</label>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Email</label>
             <input
               aria-label="Email"
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               placeholder="profissional@exemplo.com"
-              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Especialidade</label>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Especialidade</label>
             <select
               aria-label="Especialidade"
               value={form.specialty_id || ""}
               onChange={(e) => setForm({ ...form, specialty_id: e.target.value })}
-              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             >
               <option value="">Selecione...</option>
@@ -296,7 +296,7 @@ export default function MedicosPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">
               Duração da consulta (minutos)
             </label>
             <input
@@ -306,12 +306,12 @@ export default function MedicosPage() {
               step={5}
               value={form.consultation_duration}
               onChange={(e) => setForm({ ...form, consultation_duration: Number(e.target.value) })}
-              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Valor da consulta</label>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Valor da consulta</label>
             <input
               aria-label="Valor da consulta"
               type="number"
@@ -319,24 +319,24 @@ export default function MedicosPage() {
               step={10}
               value={form.price}
               onChange={(e) => setForm({ ...form, price: Number(e.target.value) })}
-              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">Status</label>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Status</label>
             <select
               aria-label="Status"
               value={form.status}
               onChange={(e) => setForm({ ...form, status: e.target.value })}
-              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
             >
               <option value="active">Ativo</option>
               <option value="inactive">Inativo</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-slate-300 text-slate-600">
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">
               Telefone / WhatsApp
             </label>
             <input
@@ -345,13 +345,13 @@ export default function MedicosPage() {
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
               placeholder="+258 8X XXX XXXX"
-              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-2 dark:text-slate-300 text-slate-600">Dias e horários de atendimento</label>
+          <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-200">Dias e horários de atendimento</label>
           <div className="space-y-1.5">
             {schedule.map((row) => (
               <div key={row.weekday} className="flex items-center gap-3 text-sm">
@@ -360,7 +360,7 @@ export default function MedicosPage() {
                     type="checkbox"
                     checked={row.enabled}
                     onChange={(e) => updateScheduleRow(row.weekday, { enabled: e.target.checked })}
-                    className="rounded border-[rgba(99,102,241,0.1)] text-primary focus:ring-primary"
+                    className="rounded border border-slate-300 dark:border-slate-700 text-primary accent-primary focus:ring-primary"
                   />
                   {DAY_LABELS[row.weekday]}
                 </label>
@@ -371,15 +371,15 @@ export default function MedicosPage() {
                       type="time"
                       value={row.start_time}
                       onChange={(e) => updateScheduleRow(row.weekday, { start_time: e.target.value })}
-                      className="rounded-lg px-2 py-1 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
+                      className="rounded-lg px-2 py-1 text-sm focus:outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
                     />
-                    <span className="dark:text-slate-500 text-slate-400">até</span>
+                    <span className="text-slate-500 dark:text-slate-400">até</span>
                     <input
                       aria-label={`Fim ${DAY_LABELS[row.weekday]}`}
                       type="time"
                       value={row.end_time}
                       onChange={(e) => updateScheduleRow(row.weekday, { end_time: e.target.value })}
-                      className="rounded-lg px-2 py-1 text-sm focus:outline-none bg-[rgba(255,255,255,0.04)] text-white border-[rgba(99,102,241,0.1)] focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
+                      className="rounded-lg px-2 py-1 text-sm focus:outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5] focus:ring-1 focus:ring-[#4f6df5]"
                     />
                   </div>
                 )}
@@ -402,12 +402,12 @@ export default function MedicosPage() {
       <div className="rounded-2xl overflow-hidden" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
         {fetching ? (
           <div className="p-6 space-y-3">
-            <div className="h-4 bg-slate-100 rounded animate-pulse w-1/3" />
-            <div className="h-4 bg-slate-100 rounded animate-pulse w-1/2" />
-            <div className="h-4 bg-slate-100 rounded animate-pulse w-2/5" />
+            <div className="h-4 bg-slate-100 dark:bg-white/5 rounded animate-pulse w-1/3" />
+            <div className="h-4 bg-slate-100 dark:bg-white/5 rounded animate-pulse w-1/2" />
+            <div className="h-4 bg-slate-100 dark:bg-white/5 rounded animate-pulse w-2/5" />
           </div>
         ) : professionals.length === 0 ? (
-          <p className="p-6 text-sm dark:text-slate-500 text-slate-400">Nenhum profissional cadastrado.</p>
+          <p className="p-6 text-sm text-slate-500 dark:text-slate-400">Nenhum profissional cadastrado.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -426,10 +426,10 @@ export default function MedicosPage() {
                 {professionals.map((d) => (
                   <tr key={d.id} style={{ borderTop: "1px solid var(--surface-border)" }}>
                     <td className="px-4 py-3 font-medium dark:text-white text-slate-900">{d.name}</td>
-                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{d.specialty_name}</td>
-                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{d.phone || "—"}</td>
-                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">{d.consultation_duration} min</td>
-                    <td className="px-4 py-3 dark:text-slate-300 text-slate-600">
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{d.specialty_name}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{d.phone || "—"}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{d.consultation_duration} min</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
                       {d.price.toLocaleString("pt-BR", { style: "currency", currency: "MZN" })}
                     </td>
                     <td className="px-4 py-3">
@@ -437,15 +437,15 @@ export default function MedicosPage() {
                         onClick={() => toggleStatus(d)}
                         className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
                           d.status === "active"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-slate-100"
+                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+                            : "bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-300"
                         }`}
                       >
                         {d.status === "active" ? "Ativo" : "Inativo"}
                       </button>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <button onClick={() => startEdit(d)} className="text-sm text-primary hover:underline mr-3">
+                      <button onClick={() => startEdit(d)} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline mr-3">
                         Editar
                       </button>
                       <button onClick={() => handleDelete(d.id)} className="text-sm text-red-600 hover:underline">

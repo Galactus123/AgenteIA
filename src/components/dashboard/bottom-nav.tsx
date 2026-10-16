@@ -52,10 +52,11 @@ export default function BottomNav() {
               href={item.href}
               prefetch={true}
               className={`flex flex-col items-center justify-center gap-1 min-w-[48px] min-h-[48px] px-2 py-1 rounded-xl transition-all duration-150 ${
-                active ? "" : "opacity-60 active:opacity-100 dark:text-slate-500 text-slate-400"
+                active
+                  ? "text-indigo-700 dark:text-indigo-400"
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
               style={active ? {
-                color: "var(--color-primary)",
                 background: "rgba(79,109,245,0.1)",
               } : undefined}
               aria-current={active ? "page" : undefined}

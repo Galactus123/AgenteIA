@@ -31,6 +31,16 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={`${jakarta.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="min-h-full bg-background text-foreground" suppressHydrationWarning>
+        {/* Aplica o tema ANTES da primeira pintura: o ThemeProvider só monta
+            na hidratação, e com o dark mode por classe (custom-variant) o
+            CSS precisa da classe `.dark` já no HTML parseado. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              '(function(){try{var t=localStorage.getItem("theme")||"dark";document.documentElement.classList.toggle("dark",t==="dark");if(t==="dark"||t==="light")document.documentElement.style.colorScheme=t;}catch(e){}})();',
+          }}
+          suppressHydrationWarning
+        />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           {children}
         </ThemeProvider>
