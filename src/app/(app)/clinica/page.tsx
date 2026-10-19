@@ -10,7 +10,11 @@ interface Clinic {
   whatsapp: string;
   opening_hours: string;
   location: string;
-  social_media: string;
+}
+
+interface Social {
+  instagram: string;
+  facebook: string;
 }
 
 const EMPTY: Clinic = {
@@ -21,11 +25,32 @@ const EMPTY: Clinic = {
   whatsapp: "",
   opening_hours: "",
   location: "",
-  social_media: "{}",
 };
+
+const EMPTY_SOCIAL: Social = { instagram: "", facebook: "" };
+
+// Lê a coluna social_media (JSON em texto) para os campos individuais do
+// form. Valor ausente, vazio ou inválido nunca quebra o carregamento.
+function parseSocial(raw: unknown): Social {
+  if (typeof raw !== "string" || !raw) return EMPTY_SOCIAL;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      const record = parsed as Record<string, unknown>;
+      return {
+        instagram: typeof record.instagram === "string" ? record.instagram : "",
+        facebook: typeof record.facebook === "string" ? record.facebook : "",
+      };
+    }
+  } catch {
+    // JSON inválido guardado no passado: começa vazio, sem erro.
+  }
+  return EMPTY_SOCIAL;
+}
 
 export default function ClinicaPage() {
   const [form, setForm] = useState<Clinic>(EMPTY);
+  const [social, setSocial] = useState<Social>(EMPTY_SOCIAL);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -35,7 +60,9 @@ export default function ClinicaPage() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data) {
-          setForm({ ...EMPTY, ...data });
+          const { social_media: rawSocial, ...rest } = data;
+          setForm({ ...EMPTY, ...rest });
+          setSocial(parseSocial(rawSocial));
           setLoaded(true);
         }
       });
@@ -45,15 +72,10 @@ export default function ClinicaPage() {
     e.preventDefault();
     setSaving(true);
     setSaved(false);
-    let social: Record<string, string> = {};
-    try {
-      social = JSON.parse(form.social_media);
-    } catch {
-      social = {};
-    }
     const res = await fetch("/api/clinica", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
+      // O backend recebe o objeto e stringifica para a coluna social_media.
       body: JSON.stringify({ ...form, social_media: social }),
     });
     if (res.ok) {
@@ -137,15 +159,29 @@ export default function ClinicaPage() {
             className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5]"
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Redes sociais (JSON)</label>
-          <textarea
-            aria-label="Redes sociais (JSON)"
-            value={form.social_media}
-            onChange={(e) => setForm({ ...form, social_media: e.target.value })}
-            rows={2}
-            className="w-full rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5]"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Instagram</label>
+            <input
+              aria-label="Instagram"
+              type="text"
+              value={social.instagram}
+              onChange={(e) => setSocial({ ...social, instagram: e.target.value })}
+              placeholder="https://instagram.com/suaclinica"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5]"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-200">Facebook</label>
+            <input
+              aria-label="Facebook"
+              type="text"
+              value={social.facebook}
+              onChange={(e) => setSocial({ ...social, facebook: e.target.value })}
+              placeholder="https://facebook.com/suaclinica"
+              className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 placeholder:text-slate-400 focus:border-[#4f6df5]"
+            />
+          </div>
         </div>
 
         {saved && <p className="text-sm text-emerald-600">Dados salvos com sucesso.</p>}
