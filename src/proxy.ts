@@ -8,6 +8,7 @@ import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 export const PROTECTED_ROUTES = [
   "/chat",
   "/clinica",
+  "/clinicas",
   "/configuracoes",
   "/consultas",
   "/dashboard",
@@ -157,6 +158,7 @@ export const config = {
     "/especialidades/:path*",
     "/consultas/:path*",
     "/clinica/:path*",
+    "/clinicas/:path*",
     "/configuracoes/:path*",
     "/pacientes/:path*",
     "/dashboard/:path*",

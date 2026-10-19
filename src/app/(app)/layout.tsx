@@ -5,7 +5,10 @@ import Sidebar from "@/components/sidebar";
 import AuthGuard from "@/components/auth-guard";
 import DashboardShell from "@/components/dashboard/dashboard-shell";
 import SubscriptionGuard from "@/components/subscription-guard";
-import { resolveClinicIdByUserId } from "@/lib/api-auth";
+import {
+  preferredClinicIdFromCookieStore,
+  resolveClinicIdByUserId,
+} from "@/lib/api-auth";
 import { guardActiveSubscription } from "@/lib/services/plan-limits";
 import { BILLING_PATH, canBrowseWithoutSubscription } from "@/lib/subscription-access";
 
@@ -40,7 +43,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // de API continua a valer e falha fechado.
   let subscriptionActive = true;
   try {
-    const clinicId = await resolveClinicIdByUserId(userId);
+    const clinicId = await resolveClinicIdByUserId(
+      userId,
+      await preferredClinicIdFromCookieStore()
+    );
     // Sem vínculo em clinic_members não há que verificar: não se deixa o
     // gate correr sem clinic_id (a consulta sem filtro pegaria a assinatura
     // de outra clínica). Quem não tem clínica fica como "sem assinatura".

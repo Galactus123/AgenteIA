@@ -26,6 +26,7 @@ import {
 } from "@/lib/services/plan-limits";
 import {
   BILLING_PATH,
+  CLINICS_PATH,
   canBrowseWithoutSubscription,
   isActiveSubscriptionStatus,
 } from "@/lib/subscription-access";
@@ -251,10 +252,14 @@ describe("kill switch SUBSCRIPTION_GATE_DISABLED", () => {
 });
 
 describe("regras de acesso por subscrição", () => {
-  it("isSubscriptionExemptApi só isenta auth, assinatura e health", () => {
+  it("isSubscriptionExemptApi isenta auth, assinatura, health e gestão de clínicas", () => {
     expect(isSubscriptionExemptApi("/api/auth/login")).toBe(true);
     expect(isSubscriptionExemptApi("/api/subscription/checkout")).toBe(true);
     expect(isSubscriptionExemptApi("/api/health")).toBe(true);
+    // Fase 1 multi-clínica: listar/trocar clínicas é meta-operação (sem ela,
+    // quem muda para uma clínica sem assinatura fica preso nela).
+    expect(isSubscriptionExemptApi("/api/clinics")).toBe(true);
+    expect(isSubscriptionExemptApi("/api/clinics/active")).toBe(true);
     expect(isSubscriptionExemptApi("/api/pacientes")).toBe(false);
     expect(isSubscriptionExemptApi("/api/authx")).toBe(false);
   });
@@ -267,9 +272,12 @@ describe("regras de acesso por subscrição", () => {
     expect(isSubscriptionExemptReadApi("/api/especialidadesx")).toBe(false);
   });
 
-  it("só a página de faturação pode ser aberta sem assinatura", () => {
+  it("só faturação e gestão de clínicas podem ser abertas sem assinatura", () => {
     expect(canBrowseWithoutSubscription(BILLING_PATH)).toBe(true);
+    expect(canBrowseWithoutSubscription(CLINICS_PATH)).toBe(true);
+    expect(canBrowseWithoutSubscription("/clinicas/qualquer")).toBe(true);
     expect(canBrowseWithoutSubscription("/dashboard")).toBe(false);
+    expect(canBrowseWithoutSubscription("/clinica")).toBe(false);
     expect(canBrowseWithoutSubscription("/configuracoes/auditoria")).toBe(false);
   });
 

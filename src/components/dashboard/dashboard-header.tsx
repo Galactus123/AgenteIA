@@ -6,9 +6,11 @@ import NotificationBell from "@/components/dashboard/notification-bell";
 import NotificationPanel from "@/components/dashboard/notification-panel";
 import ThemeToggle from "@/components/theme-toggle";
 import GlobalSearch from "@/components/dashboard/global-search";
+import ClinicSwitcher from "@/components/dashboard/clinic-switcher";
 
 interface DashboardHeaderProps {
   userName?: string;
+  // Nome da clínica usado só como fallback até o seletor carregar a lista.
   clinicName?: string;
 }
 
@@ -36,6 +38,10 @@ export default function DashboardHeader({ userName = "Admin", clinicName = "Saú
 
         <div className="h-8 w-px hidden sm:block" style={{ background: "var(--surface-border)" }}></div>
 
+        {/* Multi-clínica: nome REAL da clínica ativa + troca (em telas
+            pequenas o acesso fica em Minhas Clínicas, no menu lateral). */}
+        <ClinicSwitcher fallbackName={clinicName} className="hidden sm:block" />
+
         <Link
           href="/perfil"
           className="flex items-center gap-2 sm:gap-3 pl-2 pr-3 py-1.5 rounded-xl hover:opacity-80 transition-opacity min-h-[44px]"
@@ -49,7 +55,6 @@ export default function DashboardHeader({ userName = "Admin", clinicName = "Saú
           </div>
           <div className="text-left hidden sm:block">
             <p className="text-sm font-medium leading-tight dark:text-white text-slate-900" style={{ color: "var(--text-primary)" }}>{userName}</p>
-            <p className="text-xs dark:text-slate-400 text-slate-500" style={{ color: "var(--text-muted)" }}>{clinicName}</p>
           </div>
         </Link>
       </div>

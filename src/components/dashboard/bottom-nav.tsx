@@ -43,9 +43,10 @@ export default function BottomNav() {
     >
       <div className="flex items-center justify-around h-16 px-2">
         {BOTTOM_NAV_ITEMS.map((item) => {
+          // Fronteira de segmento: "/clinicas" não deve acender o item
+          // "/clinica" (startsWith puro casava o prefixo).
           const active =
-            pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.href}

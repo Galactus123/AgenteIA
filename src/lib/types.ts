@@ -180,6 +180,24 @@ export interface ClinicMember {
   created_at: string;
 }
 
+// Item da lista de clínicas do utilizador (GET /api/clinics — Fase 1
+// multi-clínica). `isCurrent` marca a clínica ativa da sessão; o resto do
+// painel é sempre escopado pelo clinic_id resolvido no servidor.
+// `hasActiveSubscription` vem de subscriptions.status (não do campo legado
+// clinics.subscription_status, cujo default é 'active' mesmo sem pagamento).
+export interface ClinicListItem {
+  id: number;
+  name: string;
+  role: string;
+  hasActiveSubscription: boolean;
+  isCurrent: boolean;
+}
+
+export interface ClinicsResponse {
+  clinics: ClinicListItem[];
+  currentClinicId: number | null;
+}
+
 export interface ClinicUnit {
   id: string;
   clinic_id: number;

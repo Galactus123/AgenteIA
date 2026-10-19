@@ -6,6 +6,12 @@
 // Única página da app acessível sem subscrição ativa: faturação/assinatura.
 export const BILLING_PATH = "/configuracoes/assinatura";
 
+// Gestão/troca de clínicas (Fase 1 multi-clínica) segue a mesma regra da
+// faturação: é meta-operação da conta. Sem isso, quem troca para uma clínica
+// sem assinatura seria redirecionado para a faturação sem conseguir voltar
+// à clínica anterior (o seletor fica inalcançável no resto do painel).
+export const CLINICS_PATH = "/clinicas";
+
 // subscriptions.status que dão acesso às funcionalidades operacionais.
 // Acesso estrito pós-pagamento: SOMENTE "active" — linha confirmada pelo
 // webhook da LOJOU. "trialing" (valor legado do CHECK da BD, nunca gravado
@@ -18,7 +24,12 @@ export function isActiveSubscriptionStatus(status: string | null | undefined): b
   return Boolean(status && ACTIVE_SUBSCRIPTION_STATUSES.has(status));
 }
 
-// true quando a página pedida é a de faturação (ou subrota dela).
+// true quando a página pedida é a de faturação ou a gestão de clínicas
+// (ou subrota dessas): ambas ficam sempre acessíveis para desbloquear a
+// conta ou trocar de clínica.
 export function canBrowseWithoutSubscription(pathname: string): boolean {
-  return pathname === BILLING_PATH || pathname.startsWith(`${BILLING_PATH}/`);
+  return (
+    (pathname === BILLING_PATH || pathname.startsWith(`${BILLING_PATH}/`)) ||
+    (pathname === CLINICS_PATH || pathname.startsWith(`${CLINICS_PATH}/`))
+  );
 }

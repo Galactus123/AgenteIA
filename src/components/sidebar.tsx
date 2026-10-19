@@ -21,6 +21,7 @@ import {
   Activity,
   CreditCard,
   ShieldCheck,
+  Layers,
 } from "lucide-react";
 
 interface NavItem {
@@ -37,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/medicos", label: "Médicos", icon: <Stethoscope size={18} strokeWidth={1.75} /> },
   { href: "/especialidades", label: "Especialidades", icon: <Tag size={18} strokeWidth={1.75} /> },
   { href: "/clinica", label: "Clínica", icon: <Building2 size={18} strokeWidth={1.75} /> },
+  { href: "/clinicas", label: "Minhas Clínicas", icon: <Layers size={18} strokeWidth={1.75} /> },
 ];
 
 const SidebarLink = memo(function SidebarLink({
@@ -169,7 +171,7 @@ function SidebarInner() {
         <nav className="flex-1 px-2 py-4 space-y-0.5" aria-label="Navegação lateral">
           {NAV_ITEMS.map((item) => {
             const active =
-              pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+              pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <SidebarLink
                 key={item.href}
@@ -280,7 +282,7 @@ function SidebarInner() {
         <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto" aria-label="Navegação lateral">
           {NAV_ITEMS.map((item) => {
             const active =
-              pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+              pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <SidebarLink
                 key={item.href}
