@@ -86,7 +86,7 @@ export const PLANS: Plan[] = [
     country: "Brasil",
     flag: "🇧🇷",
     currency: "R$",
-    price: "1.100",
+    price: "297",
     cadence: "mês",
     includes: [
       "Recepção virtual com IA no WhatsApp",
@@ -111,7 +111,7 @@ export const PLANS: Plan[] = [
   },
 ];
 
-// Preços: Brasil R$ 1.100/mês · Moçambique 3.500 MT/mês
+// Preços: Brasil R$ 297/mês · Moçambique 3.500 MT/mês
 
 export type Addon = {
   name: string;
